@@ -12,7 +12,8 @@ import ccf as xcf
 """
 		multi_ccf.py
 
-Computes the cross-correlation function of a band of interest with a reference band.
+Computes the cross-correlation function of a band of interest with a reference band over
+multiple data files.
 
 Arguments:
 data_file_list - The full path of the (ASCII/txt/dat) input file listing the event lists 
