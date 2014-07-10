@@ -179,14 +179,15 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 	cs_avg = total_cs_sum / float(total_segments)
 	
 	## Applying absolute rms normalization and subtracting the noise, and filtering
-	cs_avg = np.sqrt(cs_avg * (2.0 * dt / float(n_bins)) - (2.0 * mean_rate_total_ref))	
+	cs_avg = cs_avg * (2.0 * dt / float(n_bins)) - (2.0 * mean_rate_total_ref)
+	
 	old_settings = np.seterr(divide='ignore')
 	
 	## Normalizing ref band power to noise-subtracted fractional rms, integrating signal power
 	freq = fftpack.fftfreq(n_bins, d=dt)
-	min_freq_mask = freq <= 400.75 # we want the last 'True' element
-	max_freq_mask = freq >= 401.25 # we want the first 'True' element
-	j_min = list(min_freq_mask).index(False)-1 # see filter function for reasoning of -1
+	min_freq_mask = freq < 401 # we want the last 'True' element
+	max_freq_mask = freq > 401 # we want the first 'True' element
+	j_min = list(min_freq_mask).index(False) # see filter function for reasoning of -1
 	j_max = list(max_freq_mask).index(True)
 	df = freq[1] - freq[0]  # in Hz
 	signal_ref_rms2 = 2.0 * mean_power_ref[j_min:j_max] * dt / float(n_bins) \
@@ -200,10 +201,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 	zero_end = np.zeros((len(cs_avg) - j_max, 64))
 	filtered_cs_avg = np.concatenate((zero_front, cs_avg[j_min:j_max,:], zero_end), \
 						axis=0)
+	old_filtered_cs_avg = xcf.filter_freq_noise(cs_avg, dt, n_bins)
+	print False in filtered_cs_avg == old_filtered_cs_avg
 	assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
-	
-	
-	
 	
 	signal_ci_pow = np.complex128(mean_power_ci[j_min:j_max, :])
 	signal_ref_pow = np.complex128(mean_power_ref[j_min:j_max])
@@ -251,9 +251,6 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 	cs_error_ratio = cs_signal_amp / cs_noise_amp
 	print "Shape cs error ratio:", np.shape(cs_error_ratio)
 	print "cs error ratio:", cs_error_ratio[5:8]
-	
-	
-	
 	
 	
 	

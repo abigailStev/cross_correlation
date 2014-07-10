@@ -11,13 +11,13 @@ obsID="70080-01-01-02"
 in_file="$home_dir/Reduced_data/$propID/$obsID/eventlist_1.dat"
 # in_file="$home_dir/Dropbox/Research/sample_data/eventlist_1.dat"
 
-if test ! -d "$out_dir"
-	then mkdir -p "$out_dir"
+if [ ! -d "$out_dir" ]; then
+	mkdir -p "$out_dir"
 fi
 
 dt=1
 numsec=4
-testing=0
+testing=0   # o for no, 1 for yes
 
 if (( $testing == 0 )); then
 	out_file="$out_dir/${obsID}_${day}_t${dt}_${numsec}sec"
@@ -29,9 +29,9 @@ fi
 
 tab_ext="dat"
 
-# if [ -e "$in_file" ]; then
-# 	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${tab_ext}" "$numsec" "$dt" "$testing"
-# fi
+if [ -e "$in_file" ]; then
+	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${tab_ext}" "$numsec" "$dt" "$testing"
+fi
 
 ccfs_plot="$exe_dir/ccf_plot.png"
 
