@@ -4,8 +4,8 @@
 
 home_dir=$(ls -d ~)  # the -d flag is extremely important here
 day=$(date +%y%m%d)  # make the date a string and assign it to 'day', for filename
-exec_dir="$home_dir/Dropbox/Research/cross_correlation"
-out_dir="$exec_dir/out_ccf"
+exe_dir="$home_dir/Dropbox/Research/cross_correlation"
+out_dir="$exe_dir/out_ccf"
 propID="P70080"
 obsID="70080-01-01-02"
 in_file="$home_dir/Reduced_data/$propID/$obsID/eventlist_1.dat"
@@ -29,13 +29,18 @@ fi
 
 tab_ext="dat"
 
-if [ -e "$in_file" ]; then
-	time python "$exec_dir"/ccf.py "${in_file}" "${out_file}.${tab_ext}" "$numsec" "$dt" "$testing"
-fi
+# if [ -e "$in_file" ]; then
+# 	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${tab_ext}" "$numsec" "$dt" "$testing"
+# fi
+
+ccfs_plot="$exe_dir/ccf_plot.png"
 
 if [ -e "${out_file}.${tab_ext}" ]; then
-	python "$exec_dir"/plot_ccf.py "${out_file}.${tab_ext}" "${plot_root}" "${propID}/${obsID}"
+	python "$exe_dir"/plot_ccf.py "${out_file}.${tab_ext}" "${plot_root}" "${propID}/${obsID}"
 	open -a ImageJ "${plot_root}_chan_06.png"
+	
+	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" "${numsec}"
+	open -a ImageJ "$ccfs_plot"
 fi
 
 echo ""
