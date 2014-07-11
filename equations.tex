@@ -1,0 +1,125 @@
+\documentclass[11pt, oneside, reqno, a4paper]{article}
+
+% Packages
+\usepackage{amssymb, amsthm, amsmath, amsfonts}
+\usepackage{MnSymbol}
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage{ulem, stmaryrd}
+\usepackage{cite, url, hyperref, amsrefs}
+\usepackage[margin=1in]{geometry}
+\usepackage{multirow}
+\usepackage{lscape}
+\usepackage{tabularx}
+\usepackage{setspace}
+\usepackage{xcolor}
+\usepackage{epstopdf}
+\usepackage[noprefix]{nomencl}
+\usepackage{comment}
+\usepackage{latexsym}
+
+% Commands
+\newcommand{\be}{\begin{equation}}
+\newcommand{\bel}[1]{\begin{equation}\label{eq:#1}}
+\newcommand{\ee}{\end{equation}}
+\newcommand{\bd}{\begin{displaymath}} %like \be, but doesn't put in eqn. number
+\newcommand{\ed}{\end{displaymath}}   %like \ee, but doesn't put in eqn. number
+\newcommand{\bea}{\begin{eqnarray}}
+\newcommand{\beal}[1]{\begin{eqnarray}\label{eq:#1}}
+\newcommand{\eea}{\end{eqnarray}}
+\newcommand{\eqlab}[1]{\label{eq:#1}}
+\newcommand{\Msun}{\ensuremath{\,\text{M}_\odot}}
+\newcommand{\Rsun}{\ensuremath{\,\text{R}_\odot}}
+\newcommand{\Lsun}{\ensuremath{\, \text{L}_\odot}}
+\newcommand{\del}{\ensuremath{\nabla}}
+\newcommand{\G}{\ensuremath{\,\text{G}}}
+\newcommand{\B}{\ensuremath{\mathcal{B}}}
+\newcommand{\degrees}{\ensuremath{^{\circ}}}
+\newcommand{\chis}{\ensuremath{\chi^{2}}}
+\newcommand{\Tstrut}{\rule{0pt}{2.6ex}}         % = `top' strut
+\newcommand{\Bstrut}{\rule[-0.9ex]{0pt}{0pt}}   % = `bottom' strut
+\newcommand{\dchis}{\ensuremath{\Delta\chi^{2}}}
+\newcommand{\scp}{\ensuremath{P_{S, \,\text{ci}}}}
+\newcommand{\srp}{\ensuremath{P_{S, \,\text{ref}}}}
+\newcommand{\ncp}{\ensuremath{P_{N, \,\text{ci}}}}
+\newcommand{\nrp}{\ensuremath{P_{N, \,\text{ref}}}}
+
+
+
+
+% Theorems
+\theoremstyle{plain}
+
+% Visual Stuff
+\numberwithin{equation}{section}
+\linespread{1.2}                              % 1.5 spaced
+\geometry{a4paper}
+%\setlength{\baselineskip}{16pt}
+
+\title{Cross-correlation function equations}
+\date{}
+
+% Document begins here
+\begin{document}
+\maketitle
+We start with four quantities: 
+$\scp^*$, the power ($P^*$) of the signal ($S$) in the channel of interest ($ci$); 
+$\srp^*$, the power of the signal in the reference band ($ref$);
+$\ncp$, the power of the noise ($N$) in the channel of interest; and
+$\nrp$, the power of the noise in the reference band.
+The star ($^*$) here indicates the `raw' power, with no normalisations at all, so that $P^*$ is the FFT of the mean-subtracted count rate, squared. No star indicates absolute rms$^2$ normalisation, as explained in the next section.
+
+These are given by the following equations:
+\be
+\scp^* = P^*_{avg,\,\text{ci}} [i,\,j]
+\ee
+where $P^*_{avg,\,\text{ci}} [i,\,j]$ is the power in the channel of interest averaged over all Fourier segments, in the bins of the signal, $i$ to $j$.
+\be
+\srp^* = P^*_{avg,\,\text{ref}} [i,\,j]
+\ee
+where $P^*_{avg,\,\text{ref}} [i,\,j]$ is the power in the reference band averaged over all Fourier segments, in the bins of the signal, $i$ to $j$.
+
+\be
+\ncp = 2 \cdot \text{mean\_rate}_{\,\text{ci}}
+\ee
+
+\be
+\nrp = 2 \cdot \text{mean\_rate}_{\,\text{ref}}
+\ee
+
+\section{Normalize powers to absolute rms$^2$}
+The absolute rms$^2$ power will be denoted without a star, as $P$. The equation to normalise the signal power in noise-subtracted absolute rms$^2$ units is
+\be
+P_{S,\,\text{xyz}} = \left(P^*_{S,\,\text{xyz}} \cdot \frac{2\,dt}{n} \right) - \left(2 \cdot \text{mean\_rate}_{\,\text{xyz}}\right)
+\ee
+where \textit{xyz} is either \textit{ci} or \textit{ref}, and $n$ is the number of time bins in one Fourier segment.
+
+\section{Compute cross spectrum amplitude and noise}
+We then want to compute the noise in the signal frequencies of the frequency-filtered cross spectrum. 
+\be
+\text{CS}_{N} = df \cdot\,\sqrt{\frac{\sum_{k=i}^j \left(P_{N, \,\text{ci}, \,k} \,\cdot\, P_{S, \,\text{ref},\,k} \right)^2 + \left(P_{S, \,\text{ci}, \,k} \,\cdot\, P_{N, \,\text{ref},\,k} \right)^2 + \left(P_{N, \,\text{ci}, \,k} \,\cdot\, P_{N, \,\text{ref},\,k} \right)^2 }{M}}
+\ee
+where $M$ is the number of segments, and $df$ is the size of a frequency bin in Hz.
+
+In words: 
+to compute the noise on the cross spectrum, we sum in quadrature the noise components of the cross spectrum, per frequency bin of signal. We then divide by the number of segments and take the square root of that quantity, and multiply by the size of the frequency bin. Note that the powers here are averaged over all segments of the light curve.
+
+The amplitude of the normalised frequency-filtered cross spectrum is:
+\be
+\text{CS}_{amp,\,e} =  df \cdot \sum^j_{k=i} \text{CS}_{avg,\,e,\,k}
+\ee
+where $e$ is per energy bin. The energy bin of \textit{CS}$_N$ depends on the channel of interest (\textit{ci}) used.
+
+This means that the relative error of the cross spectrum in each energy channel is 
+
+\be
+\text{err}_\text{\,frac,\,e} = \frac{\text{CS}_{N,\,e}}{\text{CS}_{amp,\,e}}
+\ee
+
+In the final step, to get the error on the cross-correlation function, we take 
+\be
+\text{err}_\text{\,CCF,\,e} = \text{CCF}_{amp,\,e} \cdot \text{err}_\text{\,frac,\,e}
+\ee
+
+
+\end{document}
