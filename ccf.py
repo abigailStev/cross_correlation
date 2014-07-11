@@ -148,13 +148,13 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
 	j_min = list(min_freq_mask).index(False)
 	j_max = list(max_freq_mask).index(True)
 # 	print j_min, j_max
-	print freq[j_min]
-	print freq[j_max-1]
+# 	print freq[j_min]
+# 	print freq[j_max-1]
 	zero_front = np.zeros((j_min,64))
 	zero_end = np.zeros((len(freq_space_array) - j_max, 64))
-	print np.shape(zero_front)
-	print np.shape(freq_space_array[j_min:j_max,:])
-	print np.shape(zero_end)
+# 	print np.shape(zero_front)
+# 	print np.shape(freq_space_array[j_min:j_max,:])
+# 	print np.shape(zero_end)
 	filt_freq_space_array = np.concatenate((zero_front, freq_space_array[j_min:j_max,:], \
 							zero_end), axis=0)	
 	assert np.shape(freq_space_array) == np.shape(filt_freq_space_array)
@@ -418,23 +418,22 @@ def main(in_file, out_file, num_seconds, dt_mult, short_run):
 	cs_avg = cs_sum / float(num_segments)
 	
 	filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
+	assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
 
-	old_settings = np.seterr(divide='ignore')
 	
-	## Normalizing ref band power to noise-subtracted fractional rms2, 
-	## integrating signal power (i.e. computing the variance), sqrt'ing that to get rms
+	## Absolute rms norms of poisson noise
+	noise_ci = 2.0 * mean_rate_whole_ci
+	noise_ref = 2.0 * mean_rate_whole_ref
+# 	print np.shape(noise_ci)
+# 	print np.shape(noise_ref)
+	noise_ref_array = np.repeat(noise_ref, 64)
+# 	print "noise ref array", np.shape(noise_ref_array)
+	
 	df = 1 / float(num_seconds)  # in Hz
-	signal_ref_rms2 = 2.0 * mean_power_ref[j_min:j_max] * dt / float(n_bins)
-	signal_ref_rms2 -= (2.0 * mean_rate_whole_ref)
-	signal_variance = np.sum(signal_ref_rms2 * df) 
-	rms_ref = np.sqrt(signal_variance)  # should be a few percent in fractional rms units
-	print "RMS of reference band:", rms_ref
+
+
 
 # 	np.savetxt('cs_avg.dat', cs_avg.real)
-	
-# 	old_filtered_cs_avg = filter_freq_noise(cs_avg, dt, n_bins)
-# 	print filtered_cs_avg == old_filtered_cs_avg
-	assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
 		
 	signal_ci_pow = np.complex128(mean_power_ci[j_min:j_max, :])
 	signal_ref_pow = np.complex128(mean_power_ref[j_min:j_max])
@@ -446,43 +445,58 @@ def main(in_file, out_file, num_seconds, dt_mult, short_run):
 	assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
 	
 	## Putting powers into absolute rms2 normalization
-	noise_ci = 2.0 * mean_rate_whole_ci
-	noise_ref = 2.0 * mean_rate_whole_ref
+# 	print np.shape(signal_ci_pow)
 	signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
 	print "signal ci pow:", signal_ci_pow[:, 5:8]
-	signal_ref_pow = signal_ref_pow_stacked * (2.0 * dt / float(n_bins)) - noise_ref
+	signal_ref_pow = signal_ref_pow_stacked * (2.0 * dt / float(n_bins)) - noise_ref_array
 	print "signal ref pow:", signal_ref_pow[:, 5:8]
-
-	temp = np.square(noise_ci * signal_ref_pow) + np.square(noise_ref * signal_ci_pow) +\
-			np.square(noise_ci * noise_ref)
+	print np.shape(signal_ref_pow)
+	
+	## Getting rms of reference band, to normalize the ccf
+	signal_variance = np.sum(signal_ref_pow * df) 
+	rms_ref = np.sqrt(signal_variance)  # should be a few percent in fractional rms units
+	print "RMS of reference band:", rms_ref
+	
+	temp = np.square(noise_ci * signal_ref_pow) + np.square(noise_ref_array * signal_ci_pow) +\
+			np.square(noise_ci * noise_ref_array)
 # 	print "Shape of temp:", np.shape(temp)
 	cs_noise_amp = np.sqrt(np.sum(temp) / float(num_segments)) * df
 	
 	abs_rms_cs_avg = cs_avg[j_min:j_max, :] * 2.0 * dt / float(n_bins)
 	cs_signal_amp = np.sum(abs_rms_cs_avg, axis=0) * df
-	print "Sum of cross signal amp:", np.sum(cs_signal_amp)
+	print "Sum of cs signal amp:", np.sum(cs_signal_amp)
+
+	old_settings = np.seterr(divide='ignore')
 
 # 	temp2 = np.sqrt(np.square(signal_ref_pow * signal_ci_pow)) * df
 # 	print "shape of temp2:", np.shape(temp2)
 # 	cs_signal_amp = np.sqrt(np.sum(temp2, axis=0) / float(num_segments))
-	print "cross signal amp:", cs_signal_amp[5:8]
-	print "shape of cross signal amp:", np.shape(cs_signal_amp)
-	print "cross noise amp:", cs_noise_amp
-	cs_error_ratio =  cs_noise_amp / cs_signal_amp
-	print "Shape cross error ratio:", np.shape(cs_error_ratio)
-	print "cross error ratio:", cs_error_ratio[5:8]
+	print "cs signal amp:", cs_signal_amp[5:8]
+	print "sum of cs signal amp:", np.sum(cs_signal_amp)
+# 	print "shape of cross signal amp:", np.shape(cs_signal_amp)
+	print "cs noise amp:", cs_noise_amp
+	cs_error_ratio =  cs_signal_amp / cs_noise_amp
+# 	print "Shape cs error ratio:", np.shape(cs_error_ratio)
+	print "cs error ratio:", cs_error_ratio[5:8]
 	
 	## Taking the IFFT of the cross spectrum to get the ccf
 	ccf = fftpack.ifft(cs_avg, axis = 0)
 	ccf_filtered = fftpack.ifft(filtered_cs_avg, axis = 0)
 	assert np.shape(ccf) == np.shape(ccf_filtered)
+	print cs_signal_amp[10]
+	error_ratio_sigtop = cs_signal_amp / cs_noise_amp
+	error_ratio_noisetop = cs_noise_amp / cs_signal_amp
+	error_ratio_noisetop[10] = np.complex128(0) # because that's the bin with no signal
 
+	print "error ratio, signal on top:", error_ratio_sigtop
+	print "error ratio, noise on top:", error_ratio_noisetop
+	
 	ccf_error = cs_error_ratio * ccf_filtered
 
 	## Dividing ccf by integrated rms power of signal in reference band
-	ccf /= rms_ref
-	ccf_filtered /= rms_ref
-	ccf_error /= rms_ref
+	ccf *= (2.0 / float(n_bins) / rms_ref)
+	ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
+	ccf_error *= (2.0 / float(n_bins) / rms_ref)
 	
 	print "filt CCF:", ccf_filtered[0, 5:8]
 	print "Shape of ccf error:", np.shape(ccf_error)
