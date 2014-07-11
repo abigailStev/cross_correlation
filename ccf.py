@@ -92,50 +92,6 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
 			## End of for-loops
 		## End of with-block
 	## End of function 'output'
-
-
-#########################################################################################
-def filter_freq_noise(cross_avg, dt, n_bins):
-	"""
-			filter_freq_noise
-	
-	Applying a filter to the averaged cross-spectrum per energy channel (in frequency 
-	space). The current values are specific to SAX J1808, so any amplitudes above or 
-	below 401 get zeroed out for now.
-	
-	Passed: cross_avg - The average cross spectrum over all segments (and all files, 
-				if applicable).
-			dt - Time step between bins, in seconds. Must be a power of 2.
-	
-	Returns: smoothed_cross_avg_i
-	
-	"""
-	
-# 	print "Length of cross spectrum before filter =", len(cross_avg_i)
-	freq = fftpack.fftfreq(n_bins, d=dt)
-
-	min_freq_mask = freq <= 400.75 # we want the last 'True' element
-# 	print min_freq_mask
-	max_freq_mask = freq >= 401.25 # we want the first 'True' element
-	j_min = list(min_freq_mask).index(False)-1 # If this is the first False element, 
-											   # then the last True one is -1.
-	j_max = list(max_freq_mask).index(True)
-# 	print j_min, j_max
-# 	print "Shape of cross avg", np.shape(cross_avg)
-	smooth_front = np.zeros(j_min)
-# 	print "Length of cross avg", len(cross_avg)
-	smooth_end = np.zeros((len(cross_avg) - j_max))
-# 	print len(smooth_front)+len(cross_avg[j_min:j_max])+len(smooth_end)
-# 	smoothed_cross_avg = np.zeros((n_bins,64), dtype=np.complex128)
-	
-	smooth_front_alt = np.reshape(np.tile(smooth_front, 64), (len(smooth_front), 64))
-	smooth_end_alt = np.reshape(np.tile(smooth_end, 64), (len(smooth_end), 64))
-	smoothed_cross_avg = np.concatenate((smooth_front_alt, cross_avg[j_min:j_max,:],
-                                         smooth_end_alt))
-# 	print "Length of cross spectrum after filter =", len(smoothed_cross_avg_i)
-# 	print "Shape of smoothed cross avg", np.shape(smoothed_cross_avg)
-	return smoothed_cross_avg
-	## End of function 'filter_freq_noise'
 	
 
 #########################################################################################
@@ -167,6 +123,44 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
 	return rate_ref
 	## End of function 'stack_reference_band'
 	
+	
+#########################################################################################
+def filter_freq(freq_space_array, dt, n_bins, signal_freq):
+	"""
+			filter_freq
+	
+	Applying a filter to the averaged cross-spectrum per energy channel (in frequency 
+	space). Any cross spectrum amplitudes above or below signal_freq get zeroed out.
+	
+	Passed: freq_space_array - The average cross spectrum over all segments (and all files, 
+				if applicable).
+			dt - Time step between bins, in seconds. Must be a power of 2.
+			n_bins - Number of bins in one segment.
+			signal_freq - The frequency, in Hz, of the signal we want to filter around.
+	
+	Returns: smoothed_cross_avg_i
+	
+	"""
+	
+	freq = fftpack.fftfreq(n_bins, d=dt)
+	min_freq_mask = freq < signal_freq # we want the last 'True' element
+	max_freq_mask = freq > signal_freq # we want the first 'True' element
+	j_min = list(min_freq_mask).index(False)
+	j_max = list(max_freq_mask).index(True)
+# 	print j_min, j_max
+	print freq[j_min]
+	print freq[j_max-1]
+	zero_front = np.zeros((j_min,64))
+	zero_end = np.zeros((len(freq_space_array) - j_max, 64))
+	print np.shape(zero_front)
+	print np.shape(freq_space_array[j_min:j_max,:])
+	print np.shape(zero_end)
+	filt_freq_space_array = np.concatenate((zero_front, freq_space_array[j_min:j_max,:], \
+							zero_end), axis=0)	
+	assert np.shape(freq_space_array) == np.shape(filt_freq_space_array)
+	return filt_freq_space_array, j_min, j_max
+	## End of function 'filter_freq'	
+
 
 #########################################################################################
 def each_segment(rate_ci, rate_ref, n_bins, dt):
@@ -422,84 +416,51 @@ def main(in_file, out_file, num_seconds, dt_mult, short_run):
 	mean_power_ci = sum_power_ci / float(num_segments)
 	mean_power_ref = sum_power_ref / float(num_segments)
 	cross_avg = cross_sum / float(num_segments)
-	
-	## Applying absolute rms normalization, and subtracting the noise
-	cross_avg = cross_avg * (2.0 * dt / float(n_bins)) - (2.0 * mean_rate_whole_ref)
-	
+	filtered_cross_avg, j_min, j_max = filter_freq(cross_avg, dt, n_bins, 401.0)
+
 	old_settings = np.seterr(divide='ignore')
 	
 	## Normalizing ref band power to noise-subtracted fractional rms2, 
 	## integrating signal power (i.e. computing the variance), sqrt'ing that to get rms
-	freq = fftpack.fftfreq(n_bins, d=dt)
-	min_freq_mask = freq < 401 # we want the last 'True' element
-	max_freq_mask = freq > 401 # we want the first 'True' element
-	j_min = list(min_freq_mask).index(False)-1
-	j_max = list(max_freq_mask).index(True)
-	df = freq[1] - freq[0]  # in Hz
-	signal_ref_rms2 = 2.0 * mean_power_ref[j_min:j_max] * dt / float(n_bins) \
-						/ (mean_rate_whole_ref ** 2)
+	df = 1 / float(num_seconds)  # in Hz
+	signal_ref_rms2 = 2.0 * mean_power_ref[j_min:j_max] * dt / float(n_bins) / (mean_rate_whole_ref**2)
 	signal_ref_rms2 -= (2.0 / mean_rate_whole_ref)
 	signal_variance = np.sum(signal_ref_rms2 * df) 
 	rms_ref = np.sqrt(signal_variance)  # should be a few percent in fractional rms units
+		
+# 	np.savetxt('cs_avg.dat', cross_avg.real)
 	
-	## Filtering the cross spectrum in frequency
-	
-	np.savetxt('cs_avg.dat', cross_avg.real)
-	
-	
-	zero_front = np.zeros((j_min, 64))
-	zero_end = np.zeros((len(cross_avg) - j_max, 64))
-	filtered_cross_avg = np.concatenate((zero_front, cross_avg[j_min:j_max,:], zero_end), \
-						axis=0)
-	
-	print n_bins
-	print freq[j_min]
-	print freq[j_max-1]
-	print np.shape(zero_front)
-	print j_min
-	print np.shape(cross_avg[j_min:j_max,:])
-	print j_max
-	print np.shape(zero_end)
-	old_filtered_cs_avg = filter_freq_noise(cross_avg, dt, n_bins)
-	print filtered_cross_avg == old_filtered_cs_avg
+# 	old_filtered_cs_avg = filter_freq_noise(cross_avg, dt, n_bins)
+# 	print filtered_cross_avg == old_filtered_cs_avg
 	assert np.shape(filtered_cross_avg) == np.shape(cross_avg)
 		
 	signal_ci_pow = np.complex128(mean_power_ci[j_min:j_max, :])
 	signal_ref_pow = np.complex128(mean_power_ref[j_min:j_max])
-# 	pow_noise_ci = np.concatenate((mean_power_ci[:j_min, :], mean_power_ci[j_max:, :]), axis=0)
-# 	pow_noise_ref = np.concatenate((mean_power_ref[:j_min], mean_power_ref[j_max:]))
 		
 	signal_ref_pow_stacked = signal_ref_pow
-# 	pow_noise_ref_stacked = pow_noise_ref
 	for i in xrange(63):
 		signal_ref_pow_stacked = np.column_stack((signal_ref_pow, signal_ref_pow_stacked))
-# 		pow_noise_ref_stacked = np.column_stack((pow_noise_ref, pow_noise_ref_stacked))
 	
 	assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
-# 	assert np.shape(pow_noise_ref_stacked) == np.shape(pow_noise_ci)
 	
 	## Putting powers into absolute rms normalization
-	signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) 
-	signal_ci_pow -= (2.0 * mean_rate_whole_ci)
-	print "signal ci pow:", signal_ci_pow[:, 5:8]
-	signal_ref_pow = signal_ref_pow_stacked * (2.0 * dt / float(n_bins)) 
-	signal_ref_pow -= (2.0 * mean_rate_whole_ref)
-	print "signal ref pow:", signal_ref_pow[:, 5:8]
-# 	pow_noise_ci = np.sqrt(pow_noise_ci * (2.0 * dt / float(n_bins)) - (2.0 * mean_rate_whole_ci))
-# 	pow_noise_ref = np.sqrt(pow_noise_ref * (2.0 * dt / float(n_bins)) - (2.0 * mean_rate_whole_ref))
 	noise_ci = 2.0 * mean_rate_whole_ci
 	noise_ref = 2.0 * mean_rate_whole_ref
-	
-	
-	temp = np.sqrt(np.square(noise_ci * signal_ref_pow) + 
-			np.square(noise_ref * signal_ci_pow) + 
-			np.square(noise_ci * noise_ref))
+	signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) 
+	signal_ci_pow -= noise_ci
+	print "signal ci pow:", signal_ci_pow[:, 5:8]
+	signal_ref_pow = signal_ref_pow_stacked * (2.0 * dt / float(n_bins)) 
+	signal_ref_pow -= noise_ref
+	print "signal ref pow:", signal_ref_pow[:, 5:8]
+
+	temp = np.square(noise_ci * signal_ref_pow) + \
+			np.square(noise_ref * signal_ci_pow) + \
+			np.square(noise_ci * noise_ref)
 # 	print "Shape of temp:", np.shape(temp)
-	cross_noise_amp = np.sqrt(np.sum(temp) / float(n_bins))
-	# Might be off by a factor of 2 here...
+	cross_noise_amp = np.sqrt(np.sum(temp) / float(num_segments)) * df
 	
 	print "RMS of reference band:", rms_ref
-	cross_signal_amp = np.sum(cross_avg[j_min:j_max, :], axis=0)
+	cross_signal_amp = np.sum(cross_avg[j_min:j_max, :], axis=0) * df
 	print "Sum of cross signal amp:", np.sum(cross_signal_amp)
 
 # 	temp2 = np.sqrt(np.square(signal_ref_pow * signal_ci_pow)) * df
