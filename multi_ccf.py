@@ -211,9 +211,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 	signal_variance = np.sum(signal_ref_pow * df) 
 	rms_ref = np.sqrt(signal_variance)  # should be a few percent in fractional rms units
 	
-	temp = np.sqrt(np.square(noise_ci * signal_ref_pow) + 
-			np.square(noise_ref * signal_ci_pow) + 
-			np.square(noise_ci * noise_ref))
+	temp = np.square(noise_ci * signal_ref_pow) + \
+			np.square(noise_ref * signal_ci_pow) + \
+			np.square(noise_ci * noise_ref)
 # 	print "Shape of temp:", np.shape(temp)
 	cs_noise_amp = np.sqrt(np.sum(temp) / float(n_bins)) * df
 	# Might be off by a factor of 2 here...
