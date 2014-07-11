@@ -168,6 +168,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 		sum_rate_whole_ci = None
 		sum_rate_whole_ref = None
 		cs_sum = None
+		num_segments = None
+		sum_power_ci = None
+		sum_power_ref = None
 		## End of for-loop
 
 	## Dividing these (currently just a sum of the segments) by the number of segments
@@ -210,15 +213,15 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 	## Getting rms of reference band, to normalize the ccf
 	signal_variance = np.sum(signal_ref_pow * df) 
 	rms_ref = np.sqrt(signal_variance)  # should be a few percent in fractional rms units
-	
+	print "RMS of reference band:", rms_ref
+
 	temp = np.square(noise_ci * signal_ref_pow) + \
 			np.square(noise_ref * signal_ci_pow) + \
 			np.square(noise_ci * noise_ref)
 # 	print "Shape of temp:", np.shape(temp)
-	cs_noise_amp = np.sqrt(np.sum(temp) / float(n_bins)) * df
+	cs_noise_amp = np.sqrt(np.sum(temp) / float(total_segments)) * df
 	# Might be off by a factor of 2 here...
 	
-	print "RMS of reference band:", rms_ref
 	cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
 	print "Sum of cs signal amp:", np.sum(cs_signal_amp)
 
