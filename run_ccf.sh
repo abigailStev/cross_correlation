@@ -8,8 +8,8 @@ exe_dir="$home_dir/Dropbox/Research/cross_correlation"
 out_dir="$exe_dir/out_ccf"
 propID="P70080"
 obsID="70080-01-01-02"
-in_file="$home_dir/Reduced_data/$propID/$obsID/eventlist_1.dat"
-# in_file="$home_dir/Dropbox/Research/sample_data/eventlist_1.dat"
+# in_file="$home_dir/Reduced_data/$propID/$obsID/eventlist_1.dat"
+in_file="$home_dir/Dropbox/Research/sample_data/eventlist_1.dat"
 
 if [ ! -d "$out_dir" ]; then
 	mkdir -p "$out_dir"
@@ -37,7 +37,7 @@ ccfs_plot="$exe_dir/ccf_plot.png"
 
 if [ -e "${out_file}.${tab_ext}" ]; then
 	python "$exe_dir"/plot_ccf.py "${out_file}.${tab_ext}" "${plot_root}" "${propID}/${obsID}"
-	open -a ImageJ "${plot_root}_chan_06.png"
+# 	open -a ImageJ "${plot_root}_chan_06.png"
 	
 	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" "${numsec}"
 	open -a ImageJ "$ccfs_plot"
