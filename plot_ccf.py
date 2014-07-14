@@ -1,7 +1,6 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-# from pylab import plot, show, title, xlabel, ylabel
 
 """
 		plot_ccf.py
@@ -14,12 +13,12 @@ propID - The proposal ID of the data.
 
 Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
 
-All scientific modules imported above, as well as python 2.7, can be downloaded in the 
-Anaconda package, https://store.continuum.io/cshop/anaconda/
+All scientific modules imported above, as well as python 2.7, can be downloaded
+in the Anaconda package, https://store.continuum.io/cshop/anaconda/
 
 """
 
-######################################
+###############################################################################
 def main(tab_file, plot_root, propID):
 	pass
 	
@@ -50,7 +49,7 @@ def main(tab_file, plot_root, propID):
 		fig, ax = plt.subplots()
 		ax.plot(phase_bins, CCF[i], linewidth=1.5, label="Filtered CCF")
 		plt.xlabel('Phase bins')
-		plt.ylabel('CCF amplitude')
+		plt.ylabel('Photon count rate [photons / s]')
 		plt.xlim(0, n_bins)
 # 		plt.ylim(-100,100)
 		#plt.xscale('symlog') # this works much better than 'log'
@@ -58,7 +57,8 @@ def main(tab_file, plot_root, propID):
 		title = propID + ", Energy channel " + str(c)
 		plt.title(title)
 
-		## The following legend code was found on stack overflow I think, or a pyplot tutorial
+		## The following legend code was found on stack overflow
+		##  or a pyplot tutorial
 # 		legend = ax.legend(loc='lower right')
 # 		## Set the fontsize
 # 		for label in legend.get_texts():
@@ -71,16 +71,18 @@ def main(tab_file, plot_root, propID):
 		plt.close()
 
 
-##########################
+###############################################################################
 if __name__ == "__main__":
 	
 	parser = argparse.ArgumentParser()
-	parser.add_argument('tab_file', \
-		help="The input table file, in ASCII/txt/dat format, with frequency in column 1, CCF amplitudes in columns 2-65.")
-	parser.add_argument('plot_root', \
-		help="The root of the filename to save the plot to. Energy channel will be appended to name before saving.")
-	parser.add_argument('propID', \
-		help="The proposal ID of the data.")
+	parser.add_argument('-i', '--intable', required=True, dest='tab_file',
+        help="The input table file, in ASCII/txt/dat format, with frequency in \
+        column 1, CCF amplitudes in columns 2-65, error in columns 66-129.")
+	parser.add_argument('-o', '--outroot', required=True, dest='plot_root',
+        help="The root of the filename to save the plot to. Energy channel will\
+         be appended to name before saving.")
+	parser.add_argument('-p', '--propID', required=True, dest='propID',
+        help="The proposal ID of the data.")
 	args = parser.parse_args()
 
 	main(args.tab_file, args.plot_root, args.propID)

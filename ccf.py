@@ -1,27 +1,28 @@
 import argparse
 import numpy as np
+import sys
 from scipy import fftpack
 
 import populate_lightcurve as lc
-import tools
+from tools import power_of_two, pairwise, obs_epoch_rxte
 
 """
-		ccf.py
-		
-Computes the cross-correlation function of two light curves to do phase-resolved 
-spectroscopy. Able to read light curves from data with the program
+        ccf.py
+
+Computes the cross-correlation function of two light curves, to do phase-
+resolved spectroscopy. Able to read light curves from data with the program
 'populate_lightcurve'.
 
 Arguments:
 in_file - Name of (ASCII/txt/dat) input file event list containing both the
     reference band and the channels of interest. Assumes ref band = PCU 0,
-	interest = PCU 2.
+    interest = PCU 2.
 out_file - Name of (ASCII/txt/dat) output file which the table of
     cross-correlation function data will be written to.
 num_seconds - Duration of each segment of the light curve, in seconds. Must be
     a power of 2.
 dt_mult - Multiple of 1/8192 seconds for timestep between bins.
-short_run - 1 if only computing one segment for testing, 0 if computing all
+test - 1 if only computing one segment for testing, 0 if computing all
     segments.
 
 Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
@@ -35,36 +36,36 @@ https://github.com/abigailStev/power_spectra
 """
 
 
-# ###############################################################################
+# ##############################################################################
 def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
-           mean_rate_whole_ci, mean_rate_whole_ref, t, time, ccf, ccf_filtered,
-           ccf_error):
+        mean_rate_whole_ci, mean_rate_whole_ref, t, time, ccf, ccf_filtered,
+        ccf_error):
     """
-			output
-	
-	Writes the cross-correlation function to an output file.
-	
-	Passed: out_file - Name of output file.
-			in_file - Name of event list with both reference and interest bands.
-			dt - Size of each time bin, in seconds.
-			n_bins - Number of (time) bins per segment.
-			num_seconds - Duration of each segment of the light curve, in
-			    seconds.
-			num_segments - Number of segments the light curve was split up into.
-			mean_rate_whole_ci - Mean count rate of light curve 1, averaged over
-			    all segments.
-			mean_rate_whole_ref - Mean count rate of light curve 2, averaged
-			    over all segments.
-			t - Integer time bins to plot against the ccf.
-			time - Time (starting at arbitrary 0) to plot against the ccf. The
-			    time is the length of one Fourier segment.
-			ccf - CCF amplitudes, not filtered in frequency space.
-			ccf_filtered - CCF amplitudes, filtered in frequency space.
-			ccf_error - Error on the filtered CCF.
-			
-	Returns: nothing
-			
-	"""
+            output
+
+    Writes the cross-correlation function to an output file.
+
+    Passed: out_file - Name of output file.
+            in_file - Name of event list with both reference and interest bands.
+            dt - Size of each time bin, in seconds.
+            n_bins - Number of (time) bins per segment.
+            num_seconds - Duration of each segment of the light curve, in
+                seconds.
+            num_segments - Number of segments the light curve was split up into.
+            mean_rate_whole_ci - Mean count rate of light curve 1, averaged over
+                all segments.
+            mean_rate_whole_ref - Mean count rate of light curve 2, averaged
+                over all segments.
+            t - Integer time bins to plot against the ccf.
+            time - Time (starting at arbitrary 0) to plot against the ccf. The
+                time is the length of one Fourier segment.
+            ccf - CCF amplitudes, not filtered in frequency space.
+            ccf_filtered - CCF amplitudes, filtered in frequency space.
+            ccf_error - Error on the filtered CCF.
+
+    Returns: nothing
+
+    """
     print "Output sent to %s" % out_file
 
     with open(out_file, 'w') as out:
@@ -83,40 +84,40 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         out.write("\n# ")
         out.write("\n# Column 1: Integer time bins")
         out.write("\n# Columns 2-65: Filtered ccf per energy channel, real \
-		    part")
-        out.write("\n# Columns 66-129: ccf per energy channel, real part")
+            part")
+        out.write("\n# Columns 66-129: Error on filtered ccf per energy \
+            channel, real part")
         out.write("\n# ")
         for j in xrange(0, n_bins):
             out.write("\n%d" % t[j])
             for i in xrange(0, 64):
-                out.write("\t%.5f" % (ccf_filtered[j][i].real))
+                out.write("\t%.5f" % ccf_filtered[j][i].real)
             for i in xrange(0, 64):
-                out.write("\t%.5f" % (ccf_error[j][i].real))
+                out.write("\t%.5f" % ccf_error[j][i].real)
                 # # End of for-loops
                 ## End of with-block
                 ## End of function 'output'
 
 
-# ###############################################################################
+# ##############################################################################
 def stack_reference_band(rate_ref_2d, obs_epoch):
     """
-			stack_reference_band
-			
-	Stacks the photons in the reference band from 3-20 keV to make one 'band'.
-	Epoch 1: abs channels 10 - 74
-	Epoch 2: abs channels 9 - 62
-	Epoch 3: abs channels 7 - 54
-	Epoch 4: abs channels 6 - 46
-	Epoch 5: abs channels 6 - 48
-	
-	Passed: rate_ref_2d - The populated 2-dimensional light curve for the 
-				second (reference) curve, split up by energy channel (0-63
-				inclusive).
-			obs_epoch - The RXTE observational epoch of the data
-	
-	Returns: rate_ref - The reference band, from 3 - 20 keV.
-	
-	"""
+            stack_reference_band
+
+    Stacks the photons in the reference band from 3-20 keV to make one 'band'.
+    Epoch 1: abs channels 10 - 74
+    Epoch 2: abs channels 9 - 62
+    Epoch 3: abs channels 7 - 54
+    Epoch 4: abs channels 6 - 46
+    Epoch 5: abs channels 6 - 48
+
+    Passed: rate_ref_2d - The populated 2-dimensional light curve for the
+                reference band, split up by energy channel (0-63 inclusive).
+            obs_epoch - The RXTE observational epoch of the data
+
+    Returns: rate_ref - The reference band, from 3 - 20 keV.
+
+    """
 
     if obs_epoch == 5:
         rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
@@ -132,25 +133,25 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
 ## End of function 'stack_reference_band'
 
 
-################################################################################
+###############################################################################
 def filter_freq(freq_space_array, dt, n_bins, signal_freq):
     """
-			filter_freq
-	
-	Applying a filter to the averaged cross-spectrum per energy channel (in
-	frequency space). Any cross spectrum amplitudes above or below signal_freq
-	get zeroed out.
-	
-	Passed: freq_space_array - The average cross spectrum over all segments (and
-	            all files, if applicable).
-			dt - Time step between bins, in seconds. Must be a power of 2.
-			n_bins - Number of bins in one segment.
-			signal_freq - The frequency, in Hz, of the signal we want to filter
-			around.
-	
-	Returns: filt_freq_space_array
-	
-	"""
+            filter_freq
+
+    Applying a filter to the averaged cross-spectrum per energy channel (in
+    frequency space). Any cross spectrum amplitudes above or below signal_freq
+    get zeroed out.
+
+    Passed: freq_space_array - The average cross spectrum over all segments (and
+                all files, if applicable).
+            dt - Time step between bins, in seconds. Must be a power of 2.
+            n_bins - Number of bins in one segment.
+            signal_freq - The frequency, in Hz, of the signal we want to filter
+            around.
+
+    Returns: filt_freq_space_array
+
+    """
 
     freq = fftpack.fftfreq(n_bins, d=dt)
     min_freq_mask = freq < signal_freq  # we want the last 'True' element
@@ -166,8 +167,7 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
     # 	print np.shape(freq_space_array[j_min:j_max,:])
     # 	print np.shape(zero_end)
     filt_freq_space_array = np.concatenate((zero_front,
-                                            freq_space_array[j_min:j_max, :],
-                                            zero_end), axis=0)
+    freq_space_array[j_min:j_max, :], zero_end), axis=0)
     assert np.shape(freq_space_array) == np.shape(filt_freq_space_array)
     return filt_freq_space_array, j_min, j_max
 
@@ -175,21 +175,21 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
 ## End of function 'filter_freq'
 
 
-################################################################################
+###############################################################################
 def each_segment(rate_ci, rate_ref, n_bins, dt):
     """
-			each_segment
-	
-	Generating the cross spectrum for each segment of the light curve.
-	
-	Passed: rate_ci - The count rate for this segment of light curve 1.
-			rate_ref - The count rate for this segment of light curve 2.
-	
-	Returns: cs_segment - The cross spectrum for this segment.
-			 mean_rate_segment_ci - The mean photon count rate of lightcurve 1.
-			 mean_rate_segment_ref - The mean photon count rate of lightcurve 2.
-	
-	"""
+            each_segment
+
+    Generating the cross spectrum for each segment of the light curve.
+
+    Passed: rate_ci - The count rate for this segment of light curve 1.
+            rate_ref - The count rate for this segment of light curve 2.
+
+    Returns: cs_segment - The cross spectrum for this segment.
+             mean_rate_segment_ci - The mean photon count rate of lightcurve 1.
+             mean_rate_segment_ref - The mean photon count rate of lightcurve 2.
+
+    """
     # 	print "Each segment"
     ## Computing the mean count rate of the segment
     mean_rate_segment_ci = np.mean(rate_ci, axis=0)
@@ -220,38 +220,39 @@ def each_segment(rate_ci, rate_ref, n_bins, dt):
 
     # 	print "Shape of cs_segment", np.shape(cs_segment)
     return cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
-           power_ref
+        power_ref
 
 
 ## End of function 'each_segment'
 
 
-################################################################################
-def make_crossspec(in_file, n_bins, dt, short_run):
+###############################################################################
+def make_crossspec(in_file, n_bins, dt, test):
     """
-			make_crossspec
-			
-	Making the cross spectrum. Reads in a clock-corrected GTI'd event list,
-	populates the light curves, computes cross spectra per energy channel and
-	keeps running average of cross spectra.
-	
-	Passed: in_file - The name of the event list with both reference and interest events.
-			n_bins - Number of bins in one segment of the light curve. Must be a power of 
-				2.
-			dt - Time step between bins, in seconds. Must be a power of 2.
-			short_run - True if computing one segment, False if computing all.
-	
-	Returns: cs_sum - The sum of the cross spectra over all segments of the light
-				curves, one per energy channel.
-			 sum_rate_whole_ci - Sum of the mean count rates of all segments of light 
-			 	curve 1, per energy channel.
-			 sum_rate_whole_ref - Sum of the mean count rates of all segments of light 
-			 	curve 2, per energy channel.
-			 num_segments - Number of segments computed.
-	
-	"""
-    assert tools.power_of_two(n_bins)
-    assert tools.power_of_two(int(1.0 / dt))
+            make_crossspec
+
+    Making the cross spectrum. Reads in a clock-corrected GTI'd event list,
+    populates the light curves, computes cross spectra per energy channel and
+    keeps running average of cross spectra.
+
+    Passed: in_file - The name of the event list with both reference and
+                interest events.
+            n_bins - Number of bins in one segment of the light curve. Must be
+                a power of 2.
+            dt - Time step between bins, in seconds. Must be a power of 2.
+            test - True if computing one segment, False if computing all.
+
+    Returns: cs_sum - The sum of the cross spectra over all segments of the
+                light curves, one per energy channel.
+             sum_rate_whole_ci - Sum of the mean count rates of all segments of
+                light curve 1, per energy channel.
+             sum_rate_whole_ref - Sum of the mean count rates of all segments
+                of light curve 2, per energy channel.
+             num_segments - Number of segments computed.
+
+    """
+    assert power_of_two(n_bins)
+    assert power_of_two(int(1.0 / dt))
 
     print "Input file: %s" % in_file
 
@@ -265,7 +266,7 @@ def make_crossspec(in_file, n_bins, dt, short_run):
 
     fits_file = in_file[0:-4] + ".fits"
     # 	print fits_file
-    obs_epoch = tools.obs_epoch_rxte(fits_file)
+    obs_epoch = obs_epoch_rxte(fits_file)
     print "Observation epoch:", obs_epoch
 
     ## Initializations
@@ -295,7 +296,7 @@ def make_crossspec(in_file, n_bins, dt, short_run):
 
     print "Segments computed:"
     with open(in_file, 'r') as f:
-        for line, next_line in tools.pairwise(f):
+        for line, next_line in pairwise(f):
             if line[0].strip() != "#":  # If the line is not a comment
                 line = line.strip().split()
                 next_line = next_line.strip().split()
@@ -303,7 +304,6 @@ def make_crossspec(in_file, n_bins, dt, short_run):
                 current_chan = np.int8(line[1])
                 current_pcu = np.int8(line[2])
                 next_time = np.float64(next_line[0])
-                # 				print "%.21f %d %d" % (current_time, current_chan, current_pcu)
 
                 if current_pcu == 2:  ## If pcu = 2
                     time_ci.append(current_time)
@@ -315,7 +315,7 @@ def make_crossspec(in_file, n_bins, dt, short_run):
 
                 else:
                     print "\n\tERROR: PCU is not 0 or 2. Exiting."
-                    exit()
+                    sys.exit()
 
                 if (next_time > end_time):  # Triggered at end of a segment
                     # Only take a cross spectrum if there's stuff in the list
@@ -328,23 +328,22 @@ def make_crossspec(in_file, n_bins, dt, short_run):
                         cs_segment = np.zeros((n_bins, 64), dtype=np.complex128)
 
                         rate_ci_2d, rate_ci_1d = lc.make_lightcurve(
-                            np.asarray(time_ci), \
+                            np.asarray(time_ci),
                             np.asarray(energy_ci), n_bins, dt, start_time)
                         rate_ref_2d, rate_ref_1d = lc.make_lightcurve(
-                            np.asarray(time_ref), \
+                            np.asarray(time_ref),
                             np.asarray(energy_ref), n_bins, dt, start_time)
-                        # 						print "Light curves populated."
 
                         rate_ref = stack_reference_band(rate_ref_2d, obs_epoch)
-                        cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, \
-                        power_ci, power_ref = each_segment(rate_ci_2d, rate_ref, \
-                                                           n_bins, dt)
+                        cs_segment, mean_rate_segment_ci, \
+                            mean_rate_segment_ref, power_ci, power_ref = \
+                            each_segment(rate_ci_2d, rate_ref, n_bins, dt)
 
                         sum_rate_whole_ci += mean_rate_segment_ci
                         sum_rate_whole_ref += mean_rate_segment_ref
                         sum_power_ci += power_ci
                         sum_power_ref += power_ref
-                        cs_sum += cs_segment  # This adds indices instead of concatenating arrays
+                        cs_sum += cs_segment  # This adds indices
 
                         num_segments += 1
 
@@ -372,41 +371,42 @@ def make_crossspec(in_file, n_bins, dt, short_run):
                     time_ref = []
                     energy_ref = []
 
-                    if short_run == True and num_segments == 20:  ## For testing purposes only
+                    if test is True and num_segments == 20:  # For testing
                         break
 
                         ## End of 'if the line is not a comment'
                         ## End of for-loop
                         ## End of with-block
-    return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, \
-           sum_power_ref
+    return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+        sum_power_ci, sum_power_ref
 
 
 ## End of function 'make_crossspec'
 
 
-#########################################################################################
-def main(in_file, out_file, num_seconds, dt_mult, short_run):
+###############################################################################
+def main(in_file, out_file, num_seconds, dt_mult, test):
     """
-			main
-		
-	Reads in one event list, splits into two light curves, makes segments and populates 
-	them to give them length n_bins, computes the cross spectrum of each segment per 
-	energy channel and then averaged cross spectrum of all the segments per energy 
-	channel, and then computes the cross-correlation function (ccf) per energy channel.
+            main
 
-	Passed: in_file - Name of (ASCII/txt/dat) input file event list containing both 
-				the reference band and the channels of interest. Assumes ref band = PCU 0,
-				interest = PCU 2.
-			out_file - Name of (ASCII/txt/dat) output file for ccf.
-			num_seconds - Number of seconds each segment should last. Must be a power of 
-				2. 
-			dt_mult - Multiple of 1/8192 seconds for timestep between bins. 
-			short_run - True if computing one segment, False if computing all.
-			
-	Returns: nothing
-	
-	"""
+    Reads in one event list, splits into two light curves, makes segments and
+    populates them to give them length n_bins, computes the cross spectrum of
+    each segment per energy channel and then averaged cross spectrum of all the
+    segments per energy channel, and then computes the cross-correlation
+    function (ccf) per energy channel.
+
+    Passed: in_file - Name of (ASCII/txt/dat) input file event list containing
+                both the reference band and the channels of interest. Assumes
+                ref band = PCU 0, interest = PCU 2.
+            out_file - Name of (ASCII/txt/dat) output file for ccf.
+            num_seconds - Number of seconds each segment should last. Must be a
+                power of 2.
+            dt_mult - Multiple of 1/8192 seconds for timestep between bins.
+            test - True if computing one segment, False if computing all.
+
+    Returns: nothing
+
+    """
     pass
 
     t_res = 1.0 / 8192.0
@@ -417,7 +417,7 @@ def main(in_file, out_file, num_seconds, dt_mult, short_run):
     # 	assert num_seconds > 0 # num_seconds must be a positive integer
     assert n_bins > 0  # number of bins must be a positive integer
     assert dt > 0
-    assert tools.power_of_two(n_bins)  # n_bins must be a power of 2 for the FFT
+    assert power_of_two(n_bins)  # n_bins must be a power of 2 for the FFT
 
     # 	print "dt =", dt, "seconds"
     # 	print "bins =", n_bins
@@ -429,7 +429,7 @@ def main(in_file, out_file, num_seconds, dt_mult, short_run):
     cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
 
     cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, \
-    sum_power_ref = make_crossspec(in_file, n_bins, dt, short_run)
+        sum_power_ref = make_crossspec(in_file, n_bins, dt, test)
 
     mean_rate_whole_ci = sum_rate_whole_ci / float(num_segments)
     mean_rate_whole_ref = sum_rate_whole_ref / float(num_segments)
@@ -447,11 +447,8 @@ def main(in_file, out_file, num_seconds, dt_mult, short_run):
     # 	print np.shape(noise_ci)
     # 	print np.shape(noise_ref)
     noise_ref_array = np.repeat(noise_ref, 64)
-    # 	print "noise ref array", np.shape(noise_ref_array)
 
     df = 1 / float(num_seconds)  # in Hz
-
-
 
     # 	np.savetxt('cs_avg.dat', cs_avg.real)
 
@@ -516,7 +513,7 @@ def main(in_file, out_file, num_seconds, dt_mult, short_run):
     print "error ratio, signal on top:", error_ratio_sigtop
     print "error ratio, noise on top:", error_ratio_noisetop
 
-    ccf_error = np.abs(cs_error_ratio) * np.abs(ccf_filtered)
+    ccf_error = np.absolute(cs_error_ratio) * np.absolute(ccf_filtered)
 
     ## Dividing ccf by integrated rms power of signal in reference band
     ccf *= (2.0 / float(n_bins) / rms_ref)
@@ -531,7 +528,6 @@ def main(in_file, out_file, num_seconds, dt_mult, short_run):
     # 	print "Mean rate for curve 1:", mean_rate_whole_ci
     # 	print "Mean mean rate for curve 1:", np.mean(mean_rate_whole_ci)
     print "Sum of mean rate for curve 1:", np.sum(mean_rate_whole_ci)
-    # 	print "Sum of means for curve 1 chan 0-12:", np.sum(mean_rate_whole_ci[0:13])
     print "Mean rate for curve 2:", np.mean(mean_rate_whole_ref)
 
     t = np.arange(0, n_bins)
@@ -540,40 +536,40 @@ def main(in_file, out_file, num_seconds, dt_mult, short_run):
 
     ## Calling 'output' function
     output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
-           mean_rate_whole_ci, \
-           mean_rate_whole_ref, t, time, ccf, ccf_filtered, ccf_error)
+        mean_rate_whole_ci, mean_rate_whole_ref, t, time, ccf, ccf_filtered,
+        ccf_error)
 
 ## End of function 'main'
 
 
-#########################################################################################
+###############################################################################
 if __name__ == "__main__":
-    """
-	Parsing cmd-line arguments and calling 'main'
-	"""
-    parser = argparse.ArgumentParser()
-    parser.add_argument('in_file', \
-                        help="Name of (ASCII/txt/dat) input file event list containing both the \
-		reference band and the channels of interest. Assumes ref band = PCU 0, interest \
-		= PCU 2.")
-    parser.add_argument('out_file', help= \
-        "The full path of the (ASCII/txt) file to write the frequency and power to.")
-    parser.add_argument('num_seconds', type=int, help= \
-        "Duration of segments the light curve is broken up into, in seconds. \
-		Must be a power of 2.")
-    parser.add_argument('dt_mult', type=int, \
-                        help="Multiple of 1/8192 seconds for timestep between bins.")
-    parser.add_argument('short_run', type=int, help= \
-        "1 if only computing one segment for testing, 0 if computing all segments.")
+
+    parser = argparse.ArgumentParser(description='Computes the cross-\
+        correlation function of a channel of interest with a reference band.')
+    parser.add_argument('-i', '--infile', required=True, dest='infile',
+        help='Name of (ASCII/txt/dat) input file event list containing both \
+        the reference band and the channels of interest. Assumes ref band = \
+        PCU 0, interest = PCU 2.')
+    parser.add_argument('-o', '--outfile', required=True, dest='out_file',
+        help='The full path of the (ASCII/txt) file to write the frequency \
+        and power to.')
+    parser.add_argument('-n', '--num_seconds', type=int, default=1,
+        dest='num_seconds', help='Duration of segments the light curve is \
+        broken up into, in seconds. Must be a power of 2.')
+    parser.add_argument('-m', '--dt_mult', type=int, default=1, dest='dt_mult',
+        help='Multiple of 1/8192 seconds for timestep between bins.')
+    parser.add_argument('-t', '--test', type=int, default=0,
+        choices=range(0, 2),
+        dest='test', help='1 if only computing one segment for testing, 0 if \
+        computing all segments.')
     args = parser.parse_args()
 
-    assert args.short_run == 1 or args.short_run == 0
-    if args.short_run == 1:
-        short_run = True
-    else:
-        short_run = False
+    test = False
+    if args.test == 1:
+        test = True
 
-    main(args.in_file, args.out_file, args.num_seconds, args.dt_mult, short_run)
+    main(args.infile, args.outfile, args.num_seconds, args.dt_mult, test)
 
 
 ## End of program 'ccf.py'
