@@ -192,6 +192,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 	noise_ref_array = np.repeat(noise_ref, 64)
 		
 	old_settings = np.seterr(divide='ignore')
+	
 	df = 1.0 / float(num_seconds) # in Hz
 	print "df =",  df
 	
@@ -206,9 +207,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 	
 	## Putting powers into absolute rms2 normalization
 	signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
-	print "signal ci pow:", signal_ci_pow[:, 5:8]
+	print "signal ci pow:", signal_ci_pow[:, 0:4]
 	signal_ref_pow = signal_ref_pow_stacked * (2.0 * dt / float(n_bins)) - noise_ref_array
-	print "signal ref pow:", signal_ref_pow[:, 5:8]
+	print "signal ref pow:", signal_ref_pow[:, 0:4]
 	
 	## Getting rms of reference band, to normalize the ccf
 	signal_variance = np.sum(signal_ref_pow * df) 
@@ -228,34 +229,45 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 # 	temp2 = np.sqrt(np.square(signal_ref_pow * signal_ci_pow)) * df
 # 	print "shape of temp2:", np.shape(temp2)
 # 	cs_signal_amp = np.sqrt(np.sum(temp2, axis=0) / float(num_segments))
-	print "CS signal amp:", cs_signal_amp[5:8]
+	print "CS signal amp:", cs_signal_amp[0:4]
 	print "shape of cs signal amp:", np.shape(cs_signal_amp)
 	print "CS noise amp:", cs_noise_amp
 	cs_error_ratio = cs_signal_amp / cs_noise_amp
 	print "Shape cs error ratio:", np.shape(cs_error_ratio)
-	print "cs error ratio:", cs_error_ratio[5:8]
+# 	print "cs error ratio:", cs_error_ratio
 	
-	
+	error_ratio_sigtop = cs_signal_amp / cs_noise_amp
+	error_ratio_noisetop = cs_noise_amp / cs_signal_amp
+	error_ratio_noisetop[10] = np.complex128(0) # because that's the bin with no signal
+
+	print "error ratio, signal on top:", error_ratio_sigtop
+	print "error ratio, noise on top:", error_ratio_noisetop
 	
 	## Taking the IFFT of the cross spectrum to get the cross-correlation function (CCF)
 	ccf = fftpack.ifft(cs_avg, axis = 0)
 	ccf_filtered = fftpack.ifft(filtered_cs_avg, axis = 0)
 	assert np.shape(ccf) == np.shape(ccf_filtered)
 
-	ccf_error = cs_error_ratio * ccf_filtered
+	ccf_error = np.abs(cs_error_ratio) * np.abs(ccf_filtered)
 
 	## Dividing ccf by integrated rms power of signal in reference band
-	ccf *= (2.0 / float(n_bins) / rms_ref)
-	ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
-	ccf_error *= (2.0 / float(n_bins) / rms_ref)
+	# ccf *= (2.0 / float(n_bins) / rms_ref)
+# 	ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
+# 	ccf_error *= (2.0 / float(n_bins) / rms_ref)
+	ccf /= rms_ref
+	ccf_filtered /= rms_ref
+	ccf_error /= rms_ref
 	
+# 	other_ccf_error = np.abs(cs_error_ratio) * np.abs(ccf_filtered)
+
 	
 	print "unfilt_ccf sum =", np.sum(ccf)
 	print "filt_ccf sum=", np.sum(ccf_filtered)
 	
-	print "filt CCF:", ccf_filtered[0, 5:8]
+	print "filt CCF:", ccf_filtered[0, 0:4]
 	print "Shape of ccf error:", np.shape(ccf_error)
-	print "CCF error:", ccf_error[0, 5:8]
+	print "CCF error:", ccf_error[0, 0:4]
+# 	print "Other ccf error:", other_ccf_error[0,:]
 
 	exposure = total_segments * num_seconds  # Exposure time of data used
 	print "Exposure_time = %.3f seconds" % exposure
