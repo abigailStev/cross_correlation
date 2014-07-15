@@ -367,7 +367,7 @@ def make_crossspec(in_file, n_bins, dt, test):
                     time_ref = []
                     energy_ref = []
 
-                    if test is True and num_segments == 1:  # For testing
+                    if test is True and num_segments == 10:  # For testing
                         break
 
                         ## End of 'if the line is not a comment'
@@ -447,31 +447,31 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     df = 1 / float(num_seconds)  # in Hz
 
     # 	np.savetxt('cs_avg.dat', cs_avg.real)
-
+	
+	## Extracting only the signal frequencies of the mean powers
     signal_ci_pow = np.complex128(mean_power_ci[j_min:j_max, :])
     signal_ref_pow = np.complex128(mean_power_ref[j_min:j_max])
-
-    signal_ref_pow_stacked = signal_ref_pow
-    for i in xrange(63):
-        signal_ref_pow_stacked = np.column_stack(
-            (signal_ref_pow, signal_ref_pow_stacked))
-
-    assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
 
     ## Putting powers into absolute rms2 normalization
     # 	print np.shape(signal_ci_pow)
     signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
     print "signal ci pow:", signal_ci_pow[:, 5:8]
-    signal_ref_pow = signal_ref_pow_stacked * (
-        2.0 * dt / float(n_bins)) - noise_ref_array
-    print "signal ref pow:", signal_ref_pow[:, 5:8]
-    print np.shape(signal_ref_pow)
-
+    signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
+#     print "signal ref pow:", signal_ref_pow[5:8]
+    print "shape of signal ref pow:", np.shape(signal_ref_pow)
+	
     ## Getting rms of reference band, to normalize the ccf
+    print signal_ref_pow
     signal_variance = np.sum(signal_ref_pow * df)
-    rms_ref = np.sqrt(
-        signal_variance)  # should be a few percent in fractional rms units
+    rms_ref = np.sqrt(signal_variance)  # should be few % of mean_rate_ref
     print "RMS of reference band:", rms_ref
+    
+    signal_ref_pow_stacked = signal_ref_pow  # to get same shape as signal_ci_pow
+    for i in xrange(63):
+        signal_ref_pow_stacked = np.column_stack(
+            (signal_ref_pow, signal_ref_pow_stacked))
+
+    assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
 
     temp = np.square(noise_ci * signal_ref_pow) + np.square(
         noise_ref_array * signal_ci_pow) + \
@@ -495,24 +495,20 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     ccf = fftpack.ifft(cs_avg, axis=0)
     ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
     assert np.shape(ccf) == np.shape(ccf_filtered)
-    print cs_signal_amp[10]
     error_ratio_sigtop = cs_signal_amp / cs_noise_amp
     error_ratio_noisetop = cs_noise_amp / cs_signal_amp
-    error_ratio_noisetop[10] = np.complex128(
-        0)  # because that's the bin with no signal
+    error_ratio_noisetop[10] = np.complex128(0)  # because that's the bin with no signal
 
-    print "error ratio, signal on top:", error_ratio_sigtop
-    print "error ratio, noise on top:", error_ratio_noisetop
+#     print "error ratio, signal on top:", error_ratio_sigtop
+#     print "error ratio, noise on top:", error_ratio_noisetop
 
     ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
 
     ## Dividing ccf by rms power of signal frequencies in reference band
-    # ccf *= (2.0 / float(n_bins) / rms_ref)
-    # ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
-    # 	ccf_error *= (2.0 / float(n_bins) / rms_ref)
-    ccf /= rms_ref
-    ccf_filtered /= rms_ref
-    ccf_error /= rms_ref
+    ccf *= (2.0 / float(n_bins) / rms_ref)
+    ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
+    ccf_error *= (2.0 / float(n_bins) / rms_ref)
+
 
     print "filt CCF:", ccf_filtered[0, 5:8]
     print "Shape of ccf error:", np.shape(ccf_error)
