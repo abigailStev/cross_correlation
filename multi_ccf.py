@@ -92,8 +92,8 @@ def multi_output(out_file, in_file_list, dt, n_bins,
             for i in xrange(0, 64):
                 out.write("\t%.5f" % ccf_error[j][i].real)
 
-                ## End of for-loops
-                ## End of with-block
+        ## End of for-loops
+    ## End of with-block
 
 
 ## End of function 'output'
@@ -239,8 +239,8 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 
     error_ratio_sigtop = cs_signal_amp / cs_noise_amp
     error_ratio_noisetop = cs_noise_amp / cs_signal_amp
-    error_ratio_noisetop[10] = np.complex128(
-        0)  # because that's the bin with no signal
+    error_ratio_noisetop[10] = np.complex128(0)  
+    # because that's the bin with no signal
 
     print "error ratio, signal on top:", error_ratio_sigtop
     print "error ratio, noise on top:", error_ratio_noisetop
@@ -250,7 +250,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
     assert np.shape(ccf) == np.shape(ccf_filtered)
 
-    ccf_error = np.absolute(cs_error_ratio) * np.absolute(ccf_filtered)
+    ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
 
     ## Dividing ccf by integrated rms power of signal in reference band
     # ccf *= (2.0 / float(n_bins) / rms_ref)
