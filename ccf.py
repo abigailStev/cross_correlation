@@ -38,8 +38,7 @@ https://github.com/abigailStev/power_spectra
 
 # ##############################################################################
 def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
-        mean_rate_whole_ci, mean_rate_whole_ref, t, time, ccf, ccf_filtered,
-        ccf_error):
+        mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error):
     """
             output
 
@@ -57,9 +56,6 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
             mean_rate_whole_ref - Mean count rate of light curve 2, averaged
                 over all segments.
             t - Integer time bins to plot against the ccf.
-            time - Time (starting at arbitrary 0) to plot against the ccf. The
-                time is the length of one Fourier segment.
-            ccf - CCF amplitudes, not filtered in frequency space.
             ccf_filtered - CCF amplitudes, filtered in frequency space.
             ccf_error - Error on the filtered CCF.
 
@@ -371,7 +367,7 @@ def make_crossspec(in_file, n_bins, dt, test):
                     time_ref = []
                     energy_ref = []
 
-                    if test is True and num_segments == 20:  # For testing
+                    if test is True and num_segments == 1:  # For testing
                         break
 
                         ## End of 'if the line is not a comment'
@@ -484,7 +480,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     cs_noise_amp = np.sqrt(np.sum(temp) / float(num_segments)) * df
 
     abs_rms_cs_avg = cs_avg[j_min:j_max, :] * 2.0 * dt / float(n_bins)
-    cs_signal_amp = np.sum(abs_rms_cs_avg, axis=0) * df
+    cs_signal_amp = np.sqrt(np.sum(abs_rms_cs_avg, axis=0) / float(num_segments)) * df
     print "Sum of cs signal amp:", np.sum(cs_signal_amp)
 
     old_settings = np.seterr(divide='ignore')
@@ -515,20 +511,23 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
 
     ccf_error = np.absolute(cs_error_ratio) * np.absolute(ccf_filtered)
 
-    ## Dividing ccf by integrated rms power of signal in reference band
-    ccf *= (2.0 / float(n_bins) / rms_ref)
-    ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
-    ccf_error *= (2.0 / float(n_bins) / rms_ref)
+    ## Dividing ccf by rms power of signal frequencies in reference band
+    # ccf *= (2.0 / float(n_bins) / rms_ref)
+    # ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
+    # 	ccf_error *= (2.0 / float(n_bins) / rms_ref)
+    ccf /= rms_ref
+    ccf_filtered /= rms_ref
+    ccf_error /= rms_ref
 
     print "filt CCF:", ccf_filtered[0, 5:8]
     print "Shape of ccf error:", np.shape(ccf_error)
     print "CCF error:", ccf_error[0, 5:8]
 
     print "Number of segments:", num_segments
-    # 	print "Mean rate for curve 1:", mean_rate_whole_ci
-    # 	print "Mean mean rate for curve 1:", np.mean(mean_rate_whole_ci)
-    print "Sum of mean rate for curve 1:", np.sum(mean_rate_whole_ci)
-    print "Mean rate for curve 2:", np.mean(mean_rate_whole_ref)
+    # 	print "Mean rate for ci:", mean_rate_whole_ci
+    # 	print "Mean mean rate for ci:", np.mean(mean_rate_whole_ci)
+    print "Sum of mean rate for ci:", np.sum(mean_rate_whole_ci)
+    print "Mean rate for ref:", np.mean(mean_rate_whole_ref)
 
     t = np.arange(0, n_bins)
     ## Converting to seconds
@@ -536,8 +535,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
 
     ## Calling 'output' function
     output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
-        mean_rate_whole_ci, mean_rate_whole_ref, t, time, ccf, ccf_filtered,
-        ccf_error)
+        mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
 
 ## End of function 'main'
 
@@ -551,7 +549,7 @@ if __name__ == "__main__":
         help='Name of (ASCII/txt/dat) input file event list containing both \
         the reference band and the channels of interest. Assumes ref band = \
         PCU 0, interest = PCU 2.')
-    parser.add_argument('-o', '--outfile', required=True, dest='out_file',
+    parser.add_argument('-o', '--outfile', required=True, dest='outfile',
         help='The full path of the (ASCII/txt) file to write the frequency \
         and power to.')
     parser.add_argument('-n', '--num_seconds', type=int, default=1,
