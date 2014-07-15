@@ -478,9 +478,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
            np.square(noise_ci * noise_ref_array)
     # 	print "Shape of temp:", np.shape(temp)
     cs_noise_amp = np.sqrt(np.sum(temp) / float(num_segments)) * df
-
-    abs_rms_cs_avg = cs_avg[j_min:j_max, :] * 2.0 * dt / float(n_bins)
-    cs_signal_amp = np.sqrt(np.sum(abs_rms_cs_avg, axis=0) / float(num_segments)) * df
+    cs_signal_amp = np.sqrt(np.sum(cs_avg[j_min:j_max, :], axis=0) / float(num_segments)) * df
     print "Sum of cs signal amp:", np.sum(cs_signal_amp)
 
     old_settings = np.seterr(divide='ignore')
@@ -492,9 +490,6 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     print "sum of cs signal amp:", np.sum(cs_signal_amp)
     # 	print "shape of cross signal amp:", np.shape(cs_signal_amp)
     print "cs noise amp:", cs_noise_amp
-    cs_error_ratio = cs_signal_amp / cs_noise_amp
-    # 	print "Shape cs error ratio:", np.shape(cs_error_ratio)
-    print "cs error ratio:", cs_error_ratio[5:8]
 
     ## Taking the IFFT of the cross spectrum to get the ccf
     ccf = fftpack.ifft(cs_avg, axis=0)
@@ -509,7 +504,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     print "error ratio, signal on top:", error_ratio_sigtop
     print "error ratio, noise on top:", error_ratio_noisetop
 
-    ccf_error = np.absolute(cs_error_ratio) * np.absolute(ccf_filtered)
+    ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
 
     ## Dividing ccf by rms power of signal frequencies in reference band
     # ccf *= (2.0 / float(n_bins) / rms_ref)

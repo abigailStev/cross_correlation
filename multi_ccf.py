@@ -192,7 +192,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     old_settings = np.seterr(divide='ignore')
 
     df = 1.0 / float(num_seconds)  # in Hz
-    print "df =", df
+#     print "df =", df
 
     signal_ci_pow = np.complex128(mean_power_ci[j_min:j_max, :])
     signal_ref_pow = np.complex128(mean_power_ref[j_min:j_max])
@@ -224,7 +224,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     cs_noise_amp = np.sqrt(np.sum(temp) / float(total_segments)) * df
     # Might be off by a factor of 2 here...
 
-    cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
+#     cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
+    cs_signal_amp = np.sqrt(np.sum(cs_avg[j_min:j_max, :], axis=0) / float(total_segments)) * df
+
     print "Sum of cs signal amp:", np.sum(cs_signal_amp)
 
     # 	temp2 = np.sqrt(np.square(signal_ref_pow * signal_ci_pow)) * df
