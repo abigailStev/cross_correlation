@@ -194,36 +194,36 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     df = 1.0 / float(num_seconds)  # in Hz
 #     print "df =", df
 
+    ## Extracting only the signal frequencies of the mean powers
     signal_ci_pow = np.complex128(mean_power_ci[j_min:j_max, :])
     signal_ref_pow = np.complex128(mean_power_ref[j_min:j_max])
 
-    signal_ref_pow_stacked = signal_ref_pow
-    for i in xrange(63):
-        signal_ref_pow_stacked = np.column_stack(
-            (signal_ref_pow, signal_ref_pow_stacked))
-
-    assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
-
     ## Putting powers into absolute rms2 normalization
     signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
-    print "signal ci pow:", signal_ci_pow[:, 0:4]
-    signal_ref_pow = signal_ref_pow_stacked * (
-        2.0 * dt / float(n_bins)) - noise_ref_array
-    print "signal ref pow:", signal_ref_pow[:, 0:4]
-
-    ## Getting rms of reference band, to normalize the ccf
+    print "signal ci pow:", signal_ci_pow[:, 2:5]
+    signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
+    print "signal ref pow:", signal_ref_pow[2:5]
+	
+	
+	## Getting rms of reference band, to normalize the ccf
     signal_variance = np.sum(signal_ref_pow * df)
     rms_ref = np.sqrt(
         signal_variance)  # should be a few percent in fractional rms units
     print "RMS of reference band:", rms_ref
+    
+    ## Putting signal_ref_pow in same shape as signal_ci_pow
+    signal_ref_pow_stacked = signal_ref_pow
+    for i in xrange(63):
+        signal_ref_pow_stacked = np.column_stack(
+            (signal_ref_pow, signal_ref_pow_stacked))
+    assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
 
-    temp = np.square(noise_ci * signal_ref_pow) + \
+
+    temp = np.square(noise_ci * signal_ref_pow_stacked) + \
            np.square(noise_ref * signal_ci_pow) + \
            np.square(noise_ci * noise_ref)
-    # 	print "Shape of temp:", np.shape(temp)
+# 	print "Shape of temp:", np.shape(temp)
     cs_noise_amp = np.sqrt(np.sum(temp) / float(total_segments)) * df
-    # Might be off by a factor of 2 here...
-
 #     cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
     cs_signal_amp = np.sqrt(np.sum(cs_avg[j_min:j_max, :], axis=0) / float(total_segments)) * df
 
@@ -232,7 +232,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     # 	temp2 = np.sqrt(np.square(signal_ref_pow * signal_ci_pow)) * df
     # 	print "shape of temp2:", np.shape(temp2)
     # 	cs_signal_amp = np.sqrt(np.sum(temp2, axis=0) / float(num_segments))
-    print "CS signal amp:", cs_signal_amp[0:4]
+    print "CS signal amp:", cs_signal_amp[2:5]
     print "shape of cs signal amp:", np.shape(cs_signal_amp)
     print "CS noise amp:", cs_noise_amp
     cs_error_ratio = cs_signal_amp / cs_noise_amp
@@ -241,8 +241,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 
     error_ratio_sigtop = cs_signal_amp / cs_noise_amp
     error_ratio_noisetop = cs_noise_amp / cs_signal_amp
-    error_ratio_noisetop[10] = np.complex128(0)  
-    # because that's the bin with no signal
+    error_ratio_noisetop[10] = np.complex128(0)  # the bin with no signal
 
     print "error ratio, signal on top:", error_ratio_sigtop
     print "error ratio, noise on top:", error_ratio_noisetop
@@ -255,12 +254,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
 
     ## Dividing ccf by integrated rms power of signal in reference band
-    # ccf *= (2.0 / float(n_bins) / rms_ref)
-    # 	ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
-    # 	ccf_error *= (2.0 / float(n_bins) / rms_ref)
-    ccf /= rms_ref
-    ccf_filtered /= rms_ref
-    ccf_error /= rms_ref
+    ccf *= (2.0 / float(n_bins) / rms_ref)
+    ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
+    ccf_error *= (2.0 / float(n_bins) / rms_ref)
 
     # 	other_ccf_error = np.abs(cs_error_ratio) * np.abs(ccf_filtered)
 

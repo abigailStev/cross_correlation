@@ -455,10 +455,10 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     ## Putting powers into absolute rms2 normalization
     # 	print np.shape(signal_ci_pow)
     signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
-    print "signal ci pow:", signal_ci_pow[:, 5:8]
+    print "signal ci pow:", signal_ci_pow[:, 2:5]
     signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
-#     print "signal ref pow:", signal_ref_pow[5:8]
-    print "shape of signal ref pow:", np.shape(signal_ref_pow)
+    print "signal ref pow:", signal_ref_pow[2:5]
+#     print "shape of signal ref pow:", np.shape(signal_ref_pow)
 	
     ## Getting rms of reference band, to normalize the ccf
     print signal_ref_pow
@@ -466,68 +466,70 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     rms_ref = np.sqrt(signal_variance)  # should be few % of mean_rate_ref
     print "RMS of reference band:", rms_ref
     
-    signal_ref_pow_stacked = signal_ref_pow  # to get same shape as signal_ci_pow
+    ## Putting signal_ref_pow in same shape as signal_ci_pow
+    signal_ref_pow_stacked = signal_ref_pow  
     for i in xrange(63):
         signal_ref_pow_stacked = np.column_stack(
             (signal_ref_pow, signal_ref_pow_stacked))
-
     assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
-
-    temp = np.square(noise_ci * signal_ref_pow) + np.square(
-        noise_ref_array * signal_ci_pow) + \
-           np.square(noise_ci * noise_ref_array)
+	
+    temp = np.square(noise_ci * signal_ref_pow_stacked) + \
+    	np.square(noise_ref_array * signal_ci_pow) + \
+        np.square(noise_ci * noise_ref_array)
     # 	print "Shape of temp:", np.shape(temp)
     cs_noise_amp = np.sqrt(np.sum(temp) / float(num_segments)) * df
+#     cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
     cs_signal_amp = np.sqrt(np.sum(cs_avg[j_min:j_max, :], axis=0) / float(num_segments)) * df
     print "Sum of cs signal amp:", np.sum(cs_signal_amp)
-
+	
     old_settings = np.seterr(divide='ignore')
-
+	
     # 	temp2 = np.sqrt(np.square(signal_ref_pow * signal_ci_pow)) * df
     # 	print "shape of temp2:", np.shape(temp2)
     # 	cs_signal_amp = np.sqrt(np.sum(temp2, axis=0) / float(num_segments))
-    print "cs signal amp:", cs_signal_amp[5:8]
+    print "cs signal amp:", cs_signal_amp[2:5]
     print "sum of cs signal amp:", np.sum(cs_signal_amp)
     # 	print "shape of cross signal amp:", np.shape(cs_signal_amp)
     print "cs noise amp:", cs_noise_amp
-
+	
+    error_ratio_sigtop = cs_signal_amp / cs_noise_amp
+    error_ratio_noisetop = cs_noise_amp / cs_signal_amp
+    error_ratio_noisetop[10] = np.complex128(0)  # the bin with no signal
+    
     ## Taking the IFFT of the cross spectrum to get the ccf
     ccf = fftpack.ifft(cs_avg, axis=0)
     ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
     assert np.shape(ccf) == np.shape(ccf_filtered)
-    error_ratio_sigtop = cs_signal_amp / cs_noise_amp
-    error_ratio_noisetop = cs_noise_amp / cs_signal_amp
-    error_ratio_noisetop[10] = np.complex128(0)  # because that's the bin with no signal
-
+	
 #     print "error ratio, signal on top:", error_ratio_sigtop
 #     print "error ratio, noise on top:", error_ratio_noisetop
-
+	
     ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
-
+	
     ## Dividing ccf by rms power of signal frequencies in reference band
     ccf *= (2.0 / float(n_bins) / rms_ref)
     ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
     ccf_error *= (2.0 / float(n_bins) / rms_ref)
-
-
-    print "filt CCF:", ccf_filtered[0, 5:8]
+	
+	
+    print "filt CCF:", ccf_filtered[0, 2:5]
     print "Shape of ccf error:", np.shape(ccf_error)
-    print "CCF error:", ccf_error[0, 5:8]
-
+    print "CCF error:", ccf_error[0, 2:5]
+	
     print "Number of segments:", num_segments
     # 	print "Mean rate for ci:", mean_rate_whole_ci
     # 	print "Mean mean rate for ci:", np.mean(mean_rate_whole_ci)
     print "Sum of mean rate for ci:", np.sum(mean_rate_whole_ci)
     print "Mean rate for ref:", np.mean(mean_rate_whole_ref)
-
+	
     t = np.arange(0, n_bins)
     ## Converting to seconds
     time = t * dt
-
+	
     ## Calling 'output' function
     output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
-
+	
 ## End of function 'main'
 
 
