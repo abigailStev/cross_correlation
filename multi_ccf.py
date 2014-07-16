@@ -225,7 +225,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 # 	print "Shape of temp:", np.shape(temp)
     cs_noise_amp = np.sqrt(np.sum(temp) / float(total_segments)) * df
 #     cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
-    cs_signal_amp = np.sqrt(np.sum(cs_avg[j_min:j_max, :], axis=0) / float(total_segments)) * df
+    cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0) / float(total_segments) * df
 
     print "Sum of cs signal amp:", np.sum(cs_signal_amp)
 

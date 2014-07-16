@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 import sys
 from scipy import fftpack
+from datetime import datetime
 
 import populate_lightcurve as lc
 from tools import power_of_two, pairwise, obs_epoch_rxte
@@ -19,8 +20,7 @@ in_file - Name of (ASCII/txt/dat) input file event list containing both the
     interest = PCU 2.
 out_file - Name of (ASCII/txt/dat) output file which the table of
     cross-correlation function data will be written to.
-num_seconds - Duration of each segment of the light curve, in seconds. Must be
-    a power of 2.
+num_seconds - Number of seconds in each Fourier segment. Must be a power of 2.
 dt_mult - Multiple of 1/8192 seconds for timestep between bins.
 test - 1 if only computing one segment for testing, 0 if computing all
     segments.
@@ -48,8 +48,7 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
             in_file - Name of event list with both reference and interest bands.
             dt - Size of each time bin, in seconds.
             n_bins - Number of (time) bins per segment.
-            num_seconds - Duration of each segment of the light curve, in
-                seconds.
+            num_seconds - Number of seconds in each Fourier segment.
             num_segments - Number of segments the light curve was split up into.
             mean_rate_whole_ci - Mean count rate of light curve 1, averaged over
                 all segments.
@@ -66,6 +65,7 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
 
     with open(out_file, 'w') as out:
         out.write("#\t\tCross-correlation function data")
+        out.write("\n# Date(YYYY-MM-DD localtime): %s" % str(datetime.now()))
         out.write("\n# Event list: %s" % in_file)
         out.write("\n# Time bin size = %.21f seconds" % dt)
         out.write("\n# Number of bins per segment = %d" % n_bins)
@@ -395,7 +395,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
                 both the reference band and the channels of interest. Assumes
                 ref band = PCU 0, interest = PCU 2.
             out_file - Name of (ASCII/txt/dat) output file for ccf.
-            num_seconds - Number of seconds each segment should last. Must be a
+            num_seconds - Number of seconds in each Fourier segment. Must be a
                 power of 2.
             dt_mult - Multiple of 1/8192 seconds for timestep between bins.
             test - True if computing one segment, False if computing all.
@@ -546,8 +546,8 @@ if __name__ == "__main__":
         help='The full path of the (ASCII/txt) file to write the frequency \
         and power to.')
     parser.add_argument('-n', '--num_seconds', type=int, default=1,
-        dest='num_seconds', help='Duration of segments the light curve is \
-        broken up into, in seconds. Must be a power of 2.')
+        dest='num_seconds', help='Number of seconds in each Fourier segment. \
+        Must be a power of 2.')
     parser.add_argument('-m', '--dt_mult', type=int, default=1, dest='dt_mult',
         help='Multiple of 1/8192 seconds for timestep between bins.')
     parser.add_argument('-t', '--test', type=int, default=0,
