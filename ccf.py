@@ -71,25 +71,25 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         out.write("\n# Number of bins per segment = %d" % n_bins)
         out.write("\n# Number of seconds per segment = %d" % num_seconds)
         out.write("\n# Number of segments per light curve = %d" % num_segments)
-        out.write("\n# Duration of light curve used = %d seconds" \
+        out.write("\n# Exposure time = %d seconds" \
                   % (num_segments * num_seconds))
-        out.write("\n# Mean count rate = %.8f, over light curve 1" \
-                  % np.mean(mean_rate_whole_ci))
-        out.write("\n# Mean count rate = %.8f, over light curve 2" \
+        out.write("\n# Mean count rate of ci = %s" \
+        	% str(list(mean_rate_total_ci)))
+        out.write("\n# Mean count rate of ref band = %.8f" \
                   % np.mean(mean_rate_whole_ref))
         out.write("\n# ")
-        out.write("\n# Column 1: Integer time bins")
+        out.write("\n# Column 1: Time bins")
         out.write("\n# Columns 2-65: Filtered ccf per energy channel, real \
-            part")
+            part [count rate]")
         out.write("\n# Columns 66-129: Error on filtered ccf per energy \
-            channel, real part")
+            channel, real part [count rate]")
         out.write("\n# ")
         for j in xrange(0, n_bins):
             out.write("\n%d" % t[j])
             for i in xrange(0, 64):
-                out.write("\t%.5f" % ccf_filtered[j][i].real)
+                out.write("\t%.6e" % ccf_filtered[j][i].real)
             for i in xrange(0, 64):
-                out.write("\t%.5f" % ccf_error[j][i].real)
+                out.write("\t%.6e" % ccf_error[j][i].real)
                 # # End of for-loops
                 ## End of with-block
                 ## End of function 'output'

@@ -31,9 +31,8 @@ in the Anaconda package, https://store.continuum.io/cshop/anaconda/
 """
 
 ###############################################################################
-def multi_output(out_file, in_file_list, dt, n_bins,
-        total_duration, mean_rate_total_ci, mean_rate_total_ref, t,
-        ccf_filtered, ccf_error):
+def multi_output(out_file, in_file_list, dt, n_bins, total_exposure, 
+	mean_rate_total_ci, mean_rate_total_ref, t, ccf_filtered, ccf_error):
     """
 			multi_output
 			
@@ -46,8 +45,7 @@ def multi_output(out_file, in_file_list, dt, n_bins,
 			    n-bins long.
 			dt - Size of time bin, in seconds (must be power of 2).
 			n_bins - Number of time bins in a segment (must be power of 2).
-			total_duration - Total duration of all light curves used for primary
-			    light curve.
+			total_exposure - Total exposure of the light curves used for ci.
 			mean_rate_total_ci -  Mean count rate of all curves used for
 			    channels of interest.
 			mean_rate_total_ref - Mean count rate of all curves used for
@@ -68,29 +66,26 @@ def multi_output(out_file, in_file_list, dt, n_bins,
         out.write("\n# List of event lists: %s" % in_file_list)
         out.write("\n# Time bin size = %.21f seconds" % dt)
         out.write("\n# Number of bins per segment = %d" % n_bins)
-        out.write("\n# Total duration of light curve = %d seconds" % \
-                  total_duration)
-        out.write("\n# Mean filtered count rate, curve 1 (per chan)= %s" % \
-                  str(list(mean_rate_total_ci)))
-        out.write("\n# Sum of mean filtered count rates, curve 1 = %.4f" % \
-                  np.sum(mean_rate_total_ci))
-        out.write("\n# Mean count rate, curve 2 = %.3f" % \
-                  np.mean(mean_rate_total_ref))
+        out.write("\n# Total exposure time = %d seconds" \
+        	% total_exposure)
+        out.write("\n# Mean count rate of ci = %s" \
+        	% str(list(mean_rate_total_ci)))
+        out.write("\n# Mean count rate of ref band = %.5f" \
+        	% mean_rate_total_ref)
         # 		if filter:
         # 			out.write("\n# Filter applied in frequency domain to eliminate \
         #               excess noise.")
         out.write("\n# ")
-        out.write("\n# Column 1: Integer time bins")
-        out.write("\n# Column 2-65: Filtered CCF per energy channel, real part")
-        out.write("\n# Column 66-129: Error on filtered ccf per energy \
-            channel, real part")
+        out.write("\n# Column 1: Time bins")
+        out.write("\n# Column 2-65: CCF per energy channel [count rate]")
+        out.write("\n# Column 66-129: Error on ccf per energy channel [count rate]")
         out.write("\n# ")
         for j in xrange(0, n_bins):
             out.write("\n%d" % t[j])
             for i in xrange(0, 64):
-                out.write("\t%.5f" % ccf_filtered[j][i].real)
+                out.write("\t%.6e" % ccf_filtered[j][i].real)
             for i in xrange(0, 64):
-                out.write("\t%.5f" % ccf_error[j][i].real)
+                out.write("\t%.6e" % ccf_error[j][i].real)
 
         ## End of for-loops
     ## End of with-block
@@ -200,9 +195,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 
     ## Putting powers into absolute rms2 normalization
     signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
-    print "signal ci pow:", signal_ci_pow[:, 2:5]
+#     print "signal ci pow:", signal_ci_pow[:, 2:5]
     signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
-    print "signal ref pow:", signal_ref_pow[2:5]
+#     print "signal ref pow:", signal_ref_pow[2:5]
 	
 	
 	## Getting rms of reference band, to normalize the ccf
@@ -223,27 +218,34 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
            np.square(noise_ref * signal_ci_pow) + \
            np.square(noise_ci * noise_ref)
 # 	print "Shape of temp:", np.shape(temp)
-    cs_noise_amp = np.sqrt(np.sum(temp) / float(total_segments)) * df
+    cs_noise_amp = np.sqrt(np.sum(temp) / float(total_segments))
 #     cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
-    cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0) / float(total_segments) * df
-
-    print "Sum of cs signal amp:", np.sum(cs_signal_amp)
+    cs_signal_amp = np.sum(cs_avg[j_min:j_max, :]* 2.0 * dt / float(n_bins), axis=0)
+    other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / float(total_segments))
+	
+	
+	
+	
+#     print "Sum of cs signal amp:", np.sum(cs_signal_amp)
 
     # 	temp2 = np.sqrt(np.square(signal_ref_pow * signal_ci_pow)) * df
     # 	print "shape of temp2:", np.shape(temp2)
     # 	cs_signal_amp = np.sqrt(np.sum(temp2, axis=0) / float(num_segments))
+    print "Shape of cs signal amp:", np.shape(cs_signal_amp)
+    print "Shape of other signal:", np.shape(other_sig)
     print "CS signal amp:", cs_signal_amp[2:5]
-    print "shape of cs signal amp:", np.shape(cs_signal_amp)
+    print "other signal amp:", other_sig[:,2:5]
+#     print "shape of cs signal amp:", np.shape(cs_signal_amp)
     print "CS noise amp:", cs_noise_amp
     cs_error_ratio = cs_signal_amp / cs_noise_amp
-    print "Shape cs error ratio:", np.shape(cs_error_ratio)
+#     print "Shape cs error ratio:", np.shape(cs_error_ratio)
     # 	print "cs error ratio:", cs_error_ratio
 
     error_ratio_sigtop = cs_signal_amp / cs_noise_amp
     error_ratio_noisetop = cs_noise_amp / cs_signal_amp
     error_ratio_noisetop[10] = np.complex128(0)  # the bin with no signal
 
-    print "error ratio, signal on top:", error_ratio_sigtop
+#     print "error ratio, signal on top:", error_ratio_sigtop
     print "error ratio, noise on top:", error_ratio_noisetop
 
     ## Taking the IFFT of the cross spectrum to get the CCF
@@ -261,12 +263,13 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     # 	other_ccf_error = np.abs(cs_error_ratio) * np.abs(ccf_filtered)
 
 
-    print "unfilt_ccf sum =", np.sum(ccf)
-    print "filt_ccf sum=", np.sum(ccf_filtered)
+#     print "unfilt_ccf sum =", np.sum(ccf)
+#     print "filt_ccf sum=", np.sum(ccf_filtered)
 
-    print "filt CCF:", ccf_filtered[0, 0:4]
-    print "Shape of ccf error:", np.shape(ccf_error)
+    print "CCF:", ccf_filtered[0, 0:4].real
     print "CCF error:", ccf_error[0, 0:4]
+    print "Shape of ccf error:", np.shape(ccf_error)
+
     # 	print "Other ccf error:", other_ccf_error[0,:]
 
     exposure = total_segments * num_seconds  # Exposure time of data used
@@ -300,8 +303,8 @@ if __name__ == "__main__":
         help="The full path of the (ASCII/txt/dat) output file to write the \
         cross-correlation function to.")
     parser.add_argument('-n', '--num_seconds', type=int, default=1,
-        dest='num_seconds', help="Duration of each segment the light curve is \
-        broken up into, in seconds. Must be an integer power of two.")
+        dest='num_seconds', help="Number of seconds in each Fourier segment. \
+        Must be an integer power of two.")
     parser.add_argument('-m', '--dt_mult', type=int, default=1, dest='dt_mult',
         help="Multiple of 1/8192 seconds for timestep between bins.")
     # parser.add_argument('-f', '--filter', help="True if applying filter \
