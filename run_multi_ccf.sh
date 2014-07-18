@@ -6,8 +6,8 @@ home_dir=$(ls -d ~)  ## the -d flag is extremely important here
 
 exe_dir="$home_dir/Dropbox/Research/cross_correlation"
 out_dir="$exe_dir/out_ccf" # for multiple input files with different obsIDs
-day=$(date +%y%m%d)  ## make the date a string and assign it to 'day', for filename
-# day="140709"
+day=$(date +%y%m%d)  ## make the date a string and assign it to 'day'
+# day="140715"
 
 if [ ! -d "$out_dir" ]; then 
 	mkdir -p "$out_dir"
@@ -39,7 +39,7 @@ python "$exe_dir"/multi_CCF.py -i "$saved_file_list" -o "${out_file}.${tab_ext}"
 
 if [ -e "${out_file}.${tab_ext}" ]; then
 	python "$exe_dir"/plot_CCF.py -i "${out_file}.${tab_ext}" -o "${plot_file}" -p "$propID"
-	open -a ImageJ "${plot_file}_chan_06.${plot_ext}"
+# 	open -a ImageJ "${plot_file}_chan_06.${plot_ext}"
 	
 	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" "$numsec"
 	open -a ImageJ "$ccfs_plot"

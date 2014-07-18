@@ -1,9 +1,9 @@
 #!/bin/bash
 
-## Simple script to run ccf.py
+## Simple script to run ccf.py, plot_ccf.py, and plot_multi.py
 
 home_dir=$(ls -d ~)  # the -d flag is extremely important here
-day=$(date +%y%m%d)  # make the date a string and assign it to 'day', for filename
+day=$(date +%y%m%d)  # make the date a string and assign it to 'day'
 exe_dir="$home_dir/Dropbox/Research/cross_correlation"
 out_dir="$exe_dir/out_ccf"
 propID="P70080"
@@ -17,7 +17,7 @@ fi
 
 dt=1
 numsec=4
-testing=0   # o for no, 1 for yes
+testing=0   # 0 for no, 1 for yes
 
 if (( $testing == 0 )); then
 	out_file="$out_dir/${obsID}_${day}_t${dt}_${numsec}sec"
@@ -40,7 +40,5 @@ if [ -e "${out_file}.${tab_ext}" ]; then
 # 	open -a ImageJ "${plot_root}_chan_06.png"
 	
 	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" "${numsec}"
-	open -a ImageJ "$ccfs_plot"
+# 	open -a ImageJ "$ccfs_plot"
 fi
-
-echo ""
