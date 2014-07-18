@@ -218,35 +218,28 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
            np.square(noise_ref * signal_ci_pow) + \
            np.square(noise_ci * noise_ref)
 # 	print "Shape of temp:", np.shape(temp)
-    cs_noise_amp = np.sqrt(np.sum(temp) / float(total_segments))
-#     cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
-    cs_signal_amp = np.sum(cs_avg[j_min:j_max, :]* 2.0 * dt / float(n_bins), axis=0)
-    other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / float(total_segments))
-	
-	
-	
-	
-#     print "Sum of cs signal amp:", np.sum(cs_signal_amp)
+    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(total_segments))
+    print "cs noise amp:", cs_noise_amp[2:5].real
 
-    # 	temp2 = np.sqrt(np.square(signal_ref_pow * signal_ci_pow)) * df
-    # 	print "shape of temp2:", np.shape(temp2)
-    # 	cs_signal_amp = np.sqrt(np.sum(temp2, axis=0) / float(num_segments))
+#     cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
+    temp1 = cs_avg[j_min:j_max, :] * (2.0 * dt / float(n_bins))
+    cs_signal_amp = np.sum(temp1, axis=0)
+#     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
+#     	float(total_segments))
+	
     print "Shape of cs signal amp:", np.shape(cs_signal_amp)
-    print "Shape of other signal:", np.shape(other_sig)
-    print "CS signal amp:", cs_signal_amp[2:5]
-    print "other signal amp:", other_sig[:,2:5]
+#     print "Shape of other signal:", np.shape(other_sig)
+    print "CS signal amp:", cs_signal_amp[2:5].real
+#     print "other signal amp:", other_sig[:,2:5]
 #     print "shape of cs signal amp:", np.shape(cs_signal_amp)
     print "CS noise amp:", cs_noise_amp
-    cs_error_ratio = cs_signal_amp / cs_noise_amp
-#     print "Shape cs error ratio:", np.shape(cs_error_ratio)
-    # 	print "cs error ratio:", cs_error_ratio
 
-    error_ratio_sigtop = cs_signal_amp / cs_noise_amp
+#     error_ratio_sigtop = cs_signal_amp / cs_noise_amp
     error_ratio_noisetop = cs_noise_amp / cs_signal_amp
     error_ratio_noisetop[10] = np.complex128(0)  # the bin with no signal
 
 #     print "error ratio, signal on top:", error_ratio_sigtop
-    print "error ratio, noise on top:", error_ratio_noisetop
+    print "error ratio, noise on top:", error_ratio_noisetop.real
 
     ## Taking the IFFT of the cross spectrum to get the CCF
     ccf = fftpack.ifft(cs_avg, axis=0)
@@ -266,8 +259,8 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 #     print "unfilt_ccf sum =", np.sum(ccf)
 #     print "filt_ccf sum=", np.sum(ccf_filtered)
 
-    print "CCF:", ccf_filtered[0, 0:4].real
-    print "CCF error:", ccf_error[0, 0:4]
+    print "CCF:", ccf_filtered[0, 2:5].real
+    print "CCF error:", ccf_error[0, 2:5]
     print "Shape of ccf error:", np.shape(ccf_error)
 
     # 	print "Other ccf error:", other_ccf_error[0,:]

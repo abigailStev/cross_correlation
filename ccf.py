@@ -74,7 +74,7 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         out.write("\n# Exposure time = %d seconds" \
                   % (num_segments * num_seconds))
         out.write("\n# Mean count rate of ci = %s" \
-        	% str(list(mean_rate_total_ci)))
+        	% str(list(mean_rate_whole_ci)))
         out.write("\n# Mean count rate of ref band = %.8f" \
                   % np.mean(mean_rate_whole_ref))
         out.write("\n# ")
@@ -211,10 +211,10 @@ def each_segment(rate_ci, rate_ref, n_bins, dt):
 
     fft_ref = np.repeat(fft_data_ref[:, np.newaxis], 64, axis=1)
     assert np.shape(fft_ref) == np.shape(fft_data_ci)
-
+	
     cs_segment = np.multiply(fft_data_ci, np.conj(fft_ref))
-
     # 	print "Shape of cs_segment", np.shape(cs_segment)
+    
     return cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
         power_ref
 
@@ -473,24 +473,30 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
             (signal_ref_pow, signal_ref_pow_stacked))
     assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
 	
+    old_settings = np.seterr(divide='ignore')
+
     temp = np.square(noise_ci * signal_ref_pow_stacked) + \
     	np.square(noise_ref_array * signal_ci_pow) + \
         np.square(noise_ci * noise_ref_array)
     # 	print "Shape of temp:", np.shape(temp)
-    cs_noise_amp = np.sqrt(np.sum(temp) / float(num_segments)) * df
-#     cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
-    cs_signal_amp = np.sqrt(np.sum(cs_avg[j_min:j_max, :], axis=0) / float(num_segments)) * df
-    print "Sum of cs signal amp:", np.sum(cs_signal_amp)
+    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(num_segments))
+    print "Shape of cs noise amp:", np.shape(cs_noise_amp)
+    
+#     temp_1 = np.square(noise_ci * signal_ci_pow) + \
+#     	np.square(noise_ci * signal_ci_pow) + \
+#         np.square(noise_ci * noise_ci)
+#     print "Shape of temp_1:", np.shape(temp_1)
+#     cs_noise_amp = np.sqrt(np.sum(temp_1, axis=0) / float(num_segments))
+    
+    temp1 = cs_avg[j_min:j_max, :] * (2.0 * dt / float(n_bins))
+    cs_signal_amp = np.sum(temp1, axis=0)
+    other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
+    	float(num_segments))	
 	
-    old_settings = np.seterr(divide='ignore')
-	
-    # 	temp2 = np.sqrt(np.square(signal_ref_pow * signal_ci_pow)) * df
-    # 	print "shape of temp2:", np.shape(temp2)
-    # 	cs_signal_amp = np.sqrt(np.sum(temp2, axis=0) / float(num_segments))
-    print "cs signal amp:", cs_signal_amp[2:5]
-    print "sum of cs signal amp:", np.sum(cs_signal_amp)
+    print "cs signal amp:", cs_signal_amp[2:5].real
+#     print "sum of cs signal amp:", np.sum(cs_signal_amp)
     # 	print "shape of cross signal amp:", np.shape(cs_signal_amp)
-    print "cs noise amp:", cs_noise_amp
+    print "cs noise amp:", cs_noise_amp[2:5].real
 	
     error_ratio_sigtop = cs_signal_amp / cs_noise_amp
     error_ratio_noisetop = cs_noise_amp / cs_signal_amp
@@ -502,7 +508,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     assert np.shape(ccf) == np.shape(ccf_filtered)
 	
 #     print "error ratio, signal on top:", error_ratio_sigtop
-#     print "error ratio, noise on top:", error_ratio_noisetop
+    print "error ratio, noise on top:", error_ratio_noisetop.real
 	
     ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
 	
@@ -512,7 +518,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     ccf_error *= (2.0 / float(n_bins) / rms_ref)
 	
 	
-    print "filt CCF:", ccf_filtered[0, 2:5]
+    print "CCF:", ccf_filtered[0, 2:5]
     print "Shape of ccf error:", np.shape(ccf_error)
     print "CCF error:", ccf_error[0, 2:5]
 	
