@@ -28,12 +28,15 @@ def main(tab_file, plot_root, propID):
 	phase_bins = table[:,0] 
 	n_bins = len(phase_bins)
 # 	print "n_bins = ", n_bins
-	CCF = [0 for x in range(0, 64)]
+	CCF = np.zeros((n_bins, 64))
+	y_err = np.zeros((n_bins, 64))
+	x_err = np.zeros(n_bins)
 # 	exit()
 	
 # 	for i in range(0, 64):
 	for i in range(6, 7):
-		CCF[i] = table[:, i+1] 
+		CCF[:,i] = table[:, i+1] 
+		y_err[:,i] = table[:, i+65]
 		c = i
 		if c >= 64: 
 			c -= 64
@@ -41,20 +44,17 @@ def main(tab_file, plot_root, propID):
 			plot_file = plot_root + "_chan_" + str(0) + str(c) + ".png"
 		else:
 			plot_file = plot_root + "_chan_" + str(c) + ".png"
-			
-# 		print "Band", i
-# 		print "Mean =", np.mean(CCF[i])
-# 		print "Max =", np.max(CCF[i])
-
+		
 		fig, ax = plt.subplots()
-		ax.plot(phase_bins, CCF[i], linewidth=1.5, label="Filtered CCF")
+# 		ax.plot(phase_bins, CCF[i], linewidth=1.5)
+		ax.errorbar(phase_bins, CCF[:, i], yerr=y_err[:, i], xerr=x_err)
 		plt.xlabel('Phase bins')
 		plt.ylabel('Photon count rate [photons / s]')
-		plt.xlim(0, n_bins)
-# 		plt.ylim(-100,100)
+		plt.xlim(15, 50)
+# 		plt.ylim(-2.0, 2.0)
 		#plt.xscale('symlog') # this works much better than 'log'
 		#plt.yscale('symlog')
-		title = propID + ", Energy channel " + str(c)
+		title = "CCF, "+ propID + ", Energy channel " + str(c)
 		plt.title(title)
 
 		## The following legend code was found on stack overflow
