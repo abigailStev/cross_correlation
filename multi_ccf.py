@@ -85,7 +85,7 @@ def multi_output(out_file, in_file_list, dt, n_bins, total_exposure,
             for i in xrange(0, 64):
                 out.write("\t%.6e" % ccf_filtered[j][i].real)
             for i in xrange(0, 64):
-                out.write("\t%.6e" % ccf_error[j][i].real)
+                out.write("\t%.6e" % ccf_error[i].real)
 
         ## End of for-loops
     ## End of with-block
@@ -188,11 +188,15 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 
     df = 1.0 / float(num_seconds)  # in Hz
 #     print "df =", df
-
+	
     ## Extracting only the signal frequencies of the mean powers
     signal_ci_pow = np.complex128(mean_power_ci[j_min:j_max, :])
     signal_ref_pow = np.complex128(mean_power_ref[j_min:j_max])
-
+    print np.shape(signal_ci_pow)
+    print np.shape(signal_ref_pow)
+    print j_min, j_max
+	
+	
     ## Putting powers into absolute rms2 normalization
     signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
 #     print "signal ci pow:", signal_ci_pow[:, 2:5]
@@ -214,53 +218,60 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
 
 
-    temp = np.square(noise_ci * signal_ref_pow_stacked) + \
-           np.square(noise_ref * signal_ci_pow) + \
-           np.square(noise_ci * noise_ref)
+    temp = (noise_ci * signal_ref_pow_stacked) + \
+           (noise_ref * signal_ci_pow) + \
+           (noise_ci * noise_ref)
 # 	print "Shape of temp:", np.shape(temp)
     cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(total_segments))
-    print "cs noise amp:", cs_noise_amp[2:5].real
+    print "cs noise amp:", cs_noise_amp[2:5]
 
-#     cs_signal_amp = np.sum(cs_avg[j_min:j_max, :], axis=0)
-    temp1 = cs_avg[j_min:j_max, :] * (2.0 * dt / float(n_bins))
+    temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * dt / float(n_bins))
     cs_signal_amp = np.sum(temp1, axis=0)
 #     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
 #     	float(total_segments))
 	
     print "Shape of cs signal amp:", np.shape(cs_signal_amp)
 #     print "Shape of other signal:", np.shape(other_sig)
-    print "CS signal amp:", cs_signal_amp[2:5].real
+    print "CS signal amp:", cs_signal_amp
 #     print "other signal amp:", other_sig[:,2:5]
 #     print "shape of cs signal amp:", np.shape(cs_signal_amp)
     print "CS noise amp:", cs_noise_amp
 
-#     error_ratio_sigtop = cs_signal_amp / cs_noise_amp
-    error_ratio_noisetop = cs_noise_amp / cs_signal_amp
-    error_ratio_noisetop[10] = np.complex128(0)  # the bin with no signal
+    error_ratio = cs_noise_amp / cs_signal_amp
+    error_ratio[10] = np.complex128(0)  # the bin with no signal
 
-#     print "error ratio, signal on top:", error_ratio_sigtop
-    print "error ratio, noise on top:", error_ratio_noisetop.real
-
+    print "error ratio, noise on top:", error_ratio
+    print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
+    
+    
+    print "Shape filt cs avg:", np.shape(filtered_cs_avg)
+    
     ## Taking the IFFT of the cross spectrum to get the CCF
     ccf = fftpack.ifft(cs_avg, axis=0)
+    print "Unfilt CCF, 2-4:", ccf[0,2:5]
     ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
+    print "Filt ccf, 2-4:", ccf_filtered[0,2:5]
     assert np.shape(ccf) == np.shape(ccf_filtered)
 
-    ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
+#     ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
 
-    ## Dividing ccf by integrated rms power of signal in reference band
+    ## Dividing ccf by rms of signal in reference band
     ccf *= (2.0 / float(n_bins) / rms_ref)
     ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
-    ccf_error *= (2.0 / float(n_bins) / rms_ref)
+    print "Unfilt norm CCF, 2-4:", ccf[0,2:5]
+    print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
+    
+    ## Computing the error on the ccf
+    ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0))
+    print "Shape of rms ci:", np.shape(ccf_rms_ci)
+    print "CCF rms ci:", ccf_rms_ci
+    print "Shape of error ratio:", np.shape(error_ratio)
+    ccf_error = ccf_rms_ci * error_ratio
+    
+#     ccf_error *= (2.0 / float(n_bins) / rms_ref)
 
-    # 	other_ccf_error = np.abs(cs_error_ratio) * np.abs(ccf_filtered)
-
-
-#     print "unfilt_ccf sum =", np.sum(ccf)
-#     print "filt_ccf sum=", np.sum(ccf_filtered)
-
-    print "CCF:", ccf_filtered[0, 2:5].real
-    print "CCF error:", ccf_error[0, 2:5]
+    print "CCF:", ccf_filtered[0, 2:5]
+    print "CCF error:", ccf_error[2:5]
     print "Shape of ccf error:", np.shape(ccf_error)
 
     # 	print "Other ccf error:", other_ccf_error[0,:]
