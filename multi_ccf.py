@@ -192,9 +192,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     ## Extracting only the signal frequencies of the mean powers
     signal_ci_pow = np.complex128(mean_power_ci[j_min:j_max, :])
     signal_ref_pow = np.complex128(mean_power_ref[j_min:j_max])
-    print np.shape(signal_ci_pow)
-    print np.shape(signal_ref_pow)
-    print j_min, j_max
+#     print np.shape(signal_ci_pow)
+#     print np.shape(signal_ref_pow)
+#     print j_min, j_max
 	
 	
     ## Putting powers into absolute rms2 normalization
@@ -248,9 +248,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     
     ## Taking the IFFT of the cross spectrum to get the CCF
     ccf = fftpack.ifft(cs_avg, axis=0)
-    print "Unfilt CCF, 2-4:", ccf[0,2:5]
+    print "Unfilt CCF, 0,2-4:", ccf[0,2:5]
     ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
-    print "Filt ccf, 2-4:", ccf_filtered[0,2:5]
+    print "Filt ccf, 0,2-4:", ccf_filtered[0,2:5]
     assert np.shape(ccf) == np.shape(ccf_filtered)
 
 #     ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
