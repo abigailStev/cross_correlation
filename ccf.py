@@ -475,9 +475,9 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
 	
     old_settings = np.seterr(divide='ignore')
 
-    temp = np.square(noise_ci * signal_ref_pow_stacked) + \
-    	np.square(noise_ref_array * signal_ci_pow) + \
-        np.square(noise_ci * noise_ref_array)
+    temp = (noise_ci * signal_ref_pow_stacked) + \
+    	(noise_ref_array * signal_ci_pow) + \
+        (noise_ci * noise_ref_array)
     # 	print "Shape of temp:", np.shape(temp)
     cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(num_segments))
     print "Shape of cs noise amp:", np.shape(cs_noise_amp)
@@ -488,15 +488,15 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
 #     print "Shape of temp_1:", np.shape(temp_1)
 #     cs_noise_amp = np.sqrt(np.sum(temp_1, axis=0) / float(num_segments))
     
-    temp1 = cs_avg[j_min:j_max, :] * (2.0 * dt / float(n_bins))
+    temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * dt / float(n_bins))
     cs_signal_amp = np.sum(temp1, axis=0)
     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
     	float(num_segments))	
 	
-    print "cs signal amp:", cs_signal_amp[2:5].real
+    print "cs signal amp:", cs_signal_amp.real
 #     print "sum of cs signal amp:", np.sum(cs_signal_amp)
     # 	print "shape of cross signal amp:", np.shape(cs_signal_amp)
-    print "cs noise amp:", cs_noise_amp[2:5].real
+    print "cs noise amp:", cs_noise_amp.real
 	
     error_ratio_sigtop = cs_signal_amp / cs_noise_amp
     error_ratio_noisetop = cs_noise_amp / cs_signal_amp
