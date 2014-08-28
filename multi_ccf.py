@@ -190,12 +190,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 #     print "df =", df
 	
     ## Extracting only the signal frequencies of the mean powers
-    signal_ci_pow = np.complex128(mean_power_ci[j_min:j_max, :])
-    signal_ref_pow = np.complex128(mean_power_ref[j_min:j_max])
-#     print np.shape(signal_ci_pow)
-#     print np.shape(signal_ref_pow)
+    signal_ci_pow = np.float64(mean_power_ci[j_min:j_max, :])
+    signal_ref_pow = np.float64(mean_power_ref[j_min:j_max])
 #     print j_min, j_max
-	
 	
     ## Putting powers into absolute rms2 normalization
     signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
@@ -241,10 +238,8 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     error_ratio[10] = np.complex128(0)  # the bin with no signal
 
     print "error ratio, noise on top:", error_ratio
-    print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
-    
-    
-    print "Shape filt cs avg:", np.shape(filtered_cs_avg)
+#     print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
+#     print "Shape filt cs avg:", np.shape(filtered_cs_avg)
     
     ## Taking the IFFT of the cross spectrum to get the CCF
     ccf = fftpack.ifft(cs_avg, axis=0)
