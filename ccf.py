@@ -157,8 +157,8 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
     # 	print j_min, j_max
     # 	print freq[j_min]
     # 	print freq[j_max-1]
-    zero_front = np.zeros((j_min, 64))
-    zero_end = np.zeros((len(freq_space_array) - j_max, 64))
+    zero_front = np.zeros((j_min, 64), dtype=np.complex128)
+    zero_end = np.zeros((len(freq_space_array) - j_max, 64), dtype=np.complex128)
     # 	print np.shape(zero_front)
     # 	print np.shape(freq_space_array[j_min:j_max,:])
     # 	print np.shape(zero_end)
@@ -267,7 +267,7 @@ def make_crossspec(in_file, n_bins, dt, test):
 
     ## Initializations
     num_segments = 0
-    sum_rate_whole_ci = np.zeros(64)
+    sum_rate_whole_ci = np.zeros(64, dtype=np.int64)
     sum_rate_whole_ref = 0
     cs_sum = np.zeros((n_bins, 64), dtype=np.complex128)
     time_ci = []
@@ -275,8 +275,8 @@ def make_crossspec(in_file, n_bins, dt, test):
     time_ref = []
     energy_ref = []
     start_time = -99
-    sum_power_ci = 0
-    sum_power_ref = 0
+    sum_power_ci = np.zeros((n_bins, 64), dtype=np.float64)
+    sum_power_ref = np.zeros(n_bins, dtype=np.float64)
 
     ## Reading only the first line of data to get the start time of the file
     with open(in_file, 'r') as fo:
@@ -319,8 +319,8 @@ def make_crossspec(in_file, n_bins, dt, test):
 
                         assert len(time_ci) == len(energy_ci)
                         assert len(time_ref) == len(energy_ref)
-                        mean_rate_segment_ci = np.zeros(64)
-                        mean_rate_segment_ref = np.zeros(64)
+                        mean_rate_segment_ci = np.zeros(64, dtype=np.int64)
+                        mean_rate_segment_ref = np.zeros(64, dtype=np.int64)
                         cs_segment = np.zeros((n_bins, 64), dtype=np.complex128)
 
                         rate_ci_2d, rate_ci_1d = lc.make_lightcurve(
