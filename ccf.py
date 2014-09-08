@@ -172,18 +172,21 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
 
 
 ###############################################################################
-def each_segment(rate_ci, rate_ref, n_bins, dt):
+def make_cs(rate_ci, rate_ref, n_bins, dt):
     """
-            each_segment
+            make_cs
 
-    Generating the cross spectrum for each segment of the light curve.
+    Generating the cross spectrum for one segment of the light curve.
 
-    Passed: rate_ci - The count rate for this segment of light curve 1.
-            rate_ref - The count rate for this segment of light curve 2.
+    Passed: rate_ci - The count rate for this segment of the channels of 
+    			interest.
+            rate_ref - The count rate for this segment of the reference band.
 
     Returns: cs_segment - The cross spectrum for this segment.
-             mean_rate_segment_ci - The mean photon count rate of lightcurve 1.
-             mean_rate_segment_ref - The mean photon count rate of lightcurve 2.
+             mean_rate_segment_ci - The mean photon count rate of the channels 
+             	of interest.
+             mean_rate_segment_ref - The mean photon count rate of the reference 
+             	band.
 
     """
     # 	print "Each segment"
@@ -219,17 +222,66 @@ def each_segment(rate_ci, rate_ref, n_bins, dt):
         power_ref
 
 
-## End of function 'each_segment'
+## End of function 'make_cs'
+
+def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments):
+	if len(time_ci) > 0 and len(time_ref) > 0:
+	# Only take a cross spectrum if there's stuff in both lists
+
+
+		assert len(time_ci) == len(energy_ci)
+		assert len(time_ref) == len(energy_ref)
+		mean_rate_segment_ci = np.zeros(64, dtype=np.int64)
+		mean_rate_segment_ref = np.zeros(64, dtype=np.int64)
+		cs_segment = np.zeros((n_bins, 64), dtype=np.complex128)
+
+		rate_ci_2d, rate_ci_1d = lc.make_lightcurve(
+			np.asarray(time_ci),
+			np.asarray(energy_ci), n_bins, dt, start_time)
+		rate_ref_2d, rate_ref_1d = lc.make_lightcurve(
+			np.asarray(time_ref),
+			np.asarray(energy_ref), n_bins, dt, start_time)
+
+		rate_ref = stack_reference_band(rate_ref_2d, obs_epoch)
+		cs_segment, mean_rate_segment_ci, \
+			mean_rate_segment_ref, power_ci, power_ref = \
+			make_cs(rate_ci_2d, rate_ref, n_bins, dt)
+
+		sum_rate_whole_ci += mean_rate_segment_ci
+		sum_rate_whole_ref += mean_rate_segment_ref
+		sum_power_ci += power_ci
+		sum_power_ref += power_ref
+		cs_sum += cs_segment  # This adds indices
+
+		num_segments += 1
+	
+	## End of 'if there are events in the segment time'
+	
+	## Clearing variables from memory
+	time_ci = None
+	energy_ci = None
+	time_ref = None
+	energy_ref = None
+	mean_rate_segment_ci = None
+	mean_rate_segment_ref = None
+	cs_segment = None
+	rate_ci_2d = None
+	rate_ref_2d = None
+	rate_ci_1d = None
+	rate_ref_1d = None
+	rate_ref = None
+		
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref
 
 
 ###############################################################################
-def make_crossspec(in_file, n_bins, dt, test):
+def read_and_use_segments(in_file, n_bins, dt, test):
     """
-            make_crossspec
+            read_and_use_segments
 
-    Making the cross spectrum. Reads in a clock-corrected GTI'd event list,
-    populates the light curves, computes cross spectra per energy channel and
-    keeps running average of cross spectra.
+    Reading in the eventlist to make the cross spectrum. Reads in a clock- 	
+    corrected GTI'd event list, populates the light curves, computes cross 
+    spectra per energy channel and keeps running average of cross spectra.
 
     Passed: in_file - The name of the event list with both reference and
                 interest events.
@@ -319,74 +371,55 @@ def make_crossspec(in_file, n_bins, dt, test):
                 else:
                     print "\n\tERROR: PCU is not 0 or 2. Exiting."
                     sys.exit()
-
-                if (next_time >= end_time) or (np.abs(current_time - final_time) <= dt):  # Triggered at end of a segment
-                # Maybe shouldn't be abs and be final - current
-                	# Because we want start_time <= times < end_time
-                    # Only take a cross spectrum if there's stuff in both lists
-                    if len(time_ci) > 0 and len(time_ref) > 0:
-
-                        assert len(time_ci) == len(energy_ci)
-                        assert len(time_ref) == len(energy_ref)
-                        mean_rate_segment_ci = np.zeros(64, dtype=np.int64)
-                        mean_rate_segment_ref = np.zeros(64, dtype=np.int64)
-                        cs_segment = np.zeros((n_bins, 64), dtype=np.complex128)
-
-                        rate_ci_2d, rate_ci_1d = lc.make_lightcurve(
-                            np.asarray(time_ci),
-                            np.asarray(energy_ci), n_bins, dt, start_time)
-                        rate_ref_2d, rate_ref_1d = lc.make_lightcurve(
-                            np.asarray(time_ref),
-                            np.asarray(energy_ref), n_bins, dt, start_time)
-
-                        rate_ref = stack_reference_band(rate_ref_2d, obs_epoch)
-                        cs_segment, mean_rate_segment_ci, \
-                            mean_rate_segment_ref, power_ci, power_ref = \
-                            each_segment(rate_ci_2d, rate_ref, n_bins, dt)
-
-                        sum_rate_whole_ci += mean_rate_segment_ci
-                        sum_rate_whole_ref += mean_rate_segment_ref
-                        sum_power_ci += power_ci
-                        sum_power_ref += power_ref
-                        cs_sum += cs_segment  # This adds indices
-
-                        num_segments += 1
-
-                        if num_segments % print_iterator == 0:
-                            print "\t", num_segments
-                        if num_segments > 600:
-                        	print "%.21f" % current_time
-					## End of 'if there are events in the segment time'
-                    ## Clearing variables from memory
-                    time_ci = None
-                    energy_ci = None
-                    time_ref = None
-                    energy_ref = None
-                    mean_rate_segment_ci = None
-                    mean_rate_segment_ref = None
-                    cs_segment = None
-                    rate_ci_2d = None
-                    rate_ref_2d = None
-                    rate_ci_1d = None
-                    rate_ref_1d = None
-                    rate_ref = None
-                    ## Incrementing counters and loop control variables.
-                    start_time = end_time
-                    end_time += (n_bins * dt)
-                    time_ci = []
-                    energy_ci = []
-                    time_ref = []
-                    energy_ref = []
                     
-#                     if num_segments > 600:
-#                         print line
-#                         print next_line
+                # if num_segments >= 610:
+#                 	print "%.21f" % current_time
+
+                if (next_time >= end_time):  # Triggered at end of a segment
+				# Because we want start_time <= times < end_time
+					cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
+						num_segments, sum_power_ci, sum_power_ref = \
+						each_segment(time_ci, time_ref, energy_ci, energy_ref, \
+						n_bins, dt, start_time, end_time, obs_epoch, \
+						sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, \
+						sum_power_ref, cs_sum, num_segments)
+					
+					if num_segments % print_iterator == 0:
+						print "\t", num_segments
+					if test is True and num_segments == 10:  # For testing
+						break
+					## Incrementing counters and loop control variables.
+					start_time = end_time
+					end_time += (n_bins * dt)
+					time_ci = []
+					energy_ci = []
+					time_ref = []
+					energy_ref = []
 						
-                    if test is True and num_segments == 10:  # For testing
-                        break
+                elif next_time == final_time:
+					print "Last segment!"
+# 					print "%.21f" % current_time
+					next_chan = np.int8(next_line[1])
+					next_pcu = np.int8(next_line[2])
+                	
+					if next_pcu == 2:  ## If pcu = 2
+						time_ci.append(next_time)
+						energy_ci.append(next_chan)
+					elif next_pcu == 0:  ## pcu = 0
+						time_ref.append(next_time)
+						energy_ref.append(next_chan)
+					else:
+						print "\n\tERROR: PCU is not 0 or 2. Exiting."
+						sys.exit()
+						
+					cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
+						num_segments, sum_power_ci, sum_power_ref = \
+						each_segment(time_ci, time_ref, energy_ci, energy_ref, \
+						n_bins, dt, start_time, end_time, obs_epoch, \
+						sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, \
+						sum_power_ref, cs_sum, num_segments)
 				## End of 'if it`s at the end of a segment'
 			## End of 'if the line is not a comment'
-# 		print f.readlines()
 		## End of for-loop
 	## End of with-block
 	print "Final end time is %.21f" % (end_time - (n_bins * dt))
@@ -394,7 +427,7 @@ def make_crossspec(in_file, n_bins, dt, test):
         sum_power_ci, sum_power_ref
 
 
-## End of function 'make_crossspec'
+## End of function 'read_and_use_segments'
 
 
 ###############################################################################
@@ -442,7 +475,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
 
     cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, \
-        sum_power_ref = make_crossspec(in_file, n_bins, dt, test)
+        sum_power_ref = read_and_use_segments(in_file, n_bins, dt, test)
 
     mean_rate_whole_ci = sum_rate_whole_ci / float(num_segments)
     mean_rate_whole_ref = sum_rate_whole_ref / float(num_segments)
