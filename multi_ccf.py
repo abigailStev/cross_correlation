@@ -4,7 +4,7 @@ from scipy import fftpack
 from datetime import datetime
 
 import tools
-from ccf import make_crossspec, filter_freq
+from ccf import read_and_use_segments, filter_freq
 
 """
 		multi_ccf.py
@@ -148,7 +148,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     ## Looping through all data files
     for in_file in input_files:
         cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-            sum_power_ci, sum_power_ref = make_crossspec(in_file, n_bins,
+            sum_power_ci, sum_power_ref = read_and_use_segments(in_file, n_bins,
             dt, test)
         total_segments += num_segments
         total_cs_sum += cs_sum
