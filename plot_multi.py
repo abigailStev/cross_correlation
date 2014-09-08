@@ -46,29 +46,29 @@ def main(file, plot_file, numsec):
 	# abs is from 0 to 254 inclusive
 
 	fig, ax = plt.subplots()
-	ax.plot(bins, data_0, linewidth=3, label="Chan 0")
-	ax.plot(bins, data_1, linewidth=3, label="Chan 1") #label="2.5 keV")
+	ax.plot(bins, data_0, linewidth=2, label="Chan 0")
+	ax.plot(bins, data_1, linewidth=2, label="Chan 1") #label="2.5 keV")
 	ax.plot(bins, data_15, linewidth=2, label="Chan 3")
 	ax.plot(bins, data_2, linewidth=2, label="Chan 6") #label="5 keV")
 	ax.plot(bins, data_25, linewidth=2, label="Chan 9")
-	ax.plot(bins, data_3, linewidth=1, label="Chan 11") #label="7 keV")
-	ax.plot(bins, data_4, linewidth=1, label="Chan 14") #label="10 keV")
-	ax.plot(bins, data_45, linewidth=1, ls='-.', label="Chan 16")
-	ax.plot(bins, data_5, linewidth=1, ls='-.', label="Chan 18") #label="13 keV")
-	ax.plot(bins, data_55, linewidth=1, ls='-.', label="Chan 19")
-	ax.plot(bins, data_6, linewidth=1, ls='-.', label="Chan 21") #label="20 keV")
-	ax.plot(bins, data_65, linewidth=1, ls='-.', label="Chan 23")
-	ax.plot(bins, data_7, linewidth=1, ls='-.', label="Chan 25")
+	ax.plot(bins, data_3, linewidth=2, label="Chan 11") #label="7 keV")
+	ax.plot(bins, data_4, linewidth=2, label="Chan 14") #label="10 keV")
+	ax.plot(bins, data_45, linewidth=2, ls='-.', label="Chan 16")
+	ax.plot(bins, data_5, linewidth=2, ls='-.', label="Chan 18") #label="13 keV")
+	ax.plot(bins, data_55, linewidth=2, ls='-.', label="Chan 19")
+	ax.plot(bins, data_6, linewidth=2, ls='-.', label="Chan 21") #label="20 keV")
+	ax.plot(bins, data_65, linewidth=2, ls='-.', label="Chan 23")
+	ax.plot(bins, data_7, linewidth=2, ls='-.', label="Chan 25")
 
 	plt.xlabel('Phase bins')
-	plt.ylabel('CCF amplitude')
+	plt.ylabel('Photon count rate [photons / s]')
 	# plt.xlim(0,20000)
-	plt.xlim(16,57)
+	plt.xlim(15,60)
 # 	plt.ylim(-0.0005,0.0005)
 	# plt.ylim(-2.5,3)
 	# plt.xscale('symlog') # this works much better than 'log'
 	# plt.yscale('symlog')
-	title_str = "CCF, "+str(numsec)+" sec segments, Filtered"
+	title_str = "CCF per energy channel"
 	plt.title(title_str)
 
 	## The following legend code was found on stack overflow I think, or a pyplot tutorial
