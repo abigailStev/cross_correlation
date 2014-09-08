@@ -154,6 +154,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
         total_cs_sum += cs_sum
         sum_rate_total_ci += sum_rate_whole_ci
         sum_rate_total_ref += sum_rate_whole_ref
+#         print sum_rate_total_ci[19:24]
         total_sum_power_ci += sum_power_ci
         total_sum_power_ref += sum_power_ref
         # 		print "cs sum shape", np.shape(cs_sum)
@@ -220,32 +221,34 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
            (noise_ci * noise_ref)
 # 	print "Shape of temp:", np.shape(temp)
     cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(total_segments))
-    print "cs noise amp:", cs_noise_amp[2:5]
+#     print "cs noise amp:", cs_noise_amp[2:5]
 
     temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * dt / float(n_bins))
     cs_signal_amp = np.sum(temp1, axis=0)
 #     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
 #     	float(total_segments))
 	
-    print "Shape of cs signal amp:", np.shape(cs_signal_amp)
+#     print "Shape of cs signal amp:", np.shape(cs_signal_amp)
 #     print "Shape of other signal:", np.shape(other_sig)
-    print "CS signal amp:", cs_signal_amp
+#     print "CS signal amp:", cs_signal_amp
 #     print "other signal amp:", other_sig[:,2:5]
 #     print "shape of cs signal amp:", np.shape(cs_signal_amp)
-    print "CS noise amp:", cs_noise_amp
+#     print "CS noise amp:", cs_noise_amp
 
-    error_ratio = cs_noise_amp / cs_signal_amp
-    error_ratio[10] = np.complex128(0)  # the bin with no signal
+	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
+    error_ratio = np.zeros(64, dtype=np.float64)
+    error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
+    error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
 
-    print "error ratio, noise on top:", error_ratio
+#     print "error ratio, noise on top:", error_ratio
 #     print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
 #     print "Shape filt cs avg:", np.shape(filtered_cs_avg)
     
     ## Taking the IFFT of the cross spectrum to get the CCF
     ccf = fftpack.ifft(cs_avg, axis=0)
-    print "Unfilt CCF, 0,2-4:", ccf[0,2:5]
+#     print "Unfilt CCF, 0,2-4:", ccf[0,2:5]
     ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
-    print "Filt ccf, 0,2-4:", ccf_filtered[0,2:5]
+#     print "Filt ccf, 0,2-4:", ccf_filtered[0,2:5]
     assert np.shape(ccf) == np.shape(ccf_filtered)
 
 #     ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
@@ -253,31 +256,31 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     ## Dividing ccf by rms of signal in reference band
     ccf *= (2.0 / float(n_bins) / rms_ref)
     ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
-    print "Unfilt norm CCF, 2-4:", ccf[0,2:5]
-    print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
+#     print "Unfilt norm CCF, 2-4:", ccf[0,2:5]
+#     print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
     
     ## Computing the error on the ccf
     ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0))
-    print "Shape of rms ci:", np.shape(ccf_rms_ci)
-    print "CCF rms ci:", ccf_rms_ci
-    print "Shape of error ratio:", np.shape(error_ratio)
+#     print "Shape of rms ci:", np.shape(ccf_rms_ci)
+#     print "CCF rms ci:", ccf_rms_ci
+#     print "Shape of error ratio:", np.shape(error_ratio)
     ccf_error = ccf_rms_ci * error_ratio
     
 #     ccf_error *= (2.0 / float(n_bins) / rms_ref)
 
-    print "CCF:", ccf_filtered[0, 2:5]
-    print "CCF error:", ccf_error[2:5]
-    print "Shape of ccf error:", np.shape(ccf_error)
+#     print "CCF:", ccf_filtered[0, 2:5]
+#     print "CCF error:", ccf_error[2:5]
+#     print "Shape of ccf error:", np.shape(ccf_error)
 
     # 	print "Other ccf error:", other_ccf_error[0,:]
 
     exposure = total_segments * num_seconds  # Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
     print "Total number of segments:", total_segments
-    # 	print "Total mean rate for ci:", mean_rate_total_ci
+#     print "Total mean rate for ci:", mean_rate_total_ci[19:24]
     # 	print "Mean mean rate for ci:", np.mean(mean_rate_total_ci)
     print "Sum of mean rate for ci:", np.sum(mean_rate_total_ci)
-    print "Mean rate for ref:", mean_rate_total_ref
+#     print "Mean rate for ref:", mean_rate_total_ref
 
     t = np.arange(0, n_bins)  # gives the 'front of the bin'
     # time = t * dt  # Converting to seconds
