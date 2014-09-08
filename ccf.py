@@ -117,10 +117,10 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
 
     if obs_epoch == 5:
         rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
-        # channel 2 to 25,
+        # channel 2 to 25 inclusive
     else:
         rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
-        # channel 3 to 28
+        # channel 3 to 28 inclusive
 
     # 	print "SHAPE OF RATE 2", np.shape(rate_ref)
     return rate_ref
@@ -275,6 +275,7 @@ def make_crossspec(in_file, n_bins, dt, test):
     time_ref = []
     energy_ref = []
     start_time = -99
+    final_time = -99
     sum_power_ci = np.zeros((n_bins, 64), dtype=np.float64)
     sum_power_ref = np.zeros(n_bins, dtype=np.float64)
 
@@ -284,11 +285,16 @@ def make_crossspec(in_file, n_bins, dt, test):
             if line[0].strip() != "#":
                 line = line.strip().split()
                 start_time = np.float64(line[0])
+                fo.seek(-36,2)
+                final_line = fo.readline().strip().split()
+                final_time = np.float64(final_line[0])
+                print "FINAL TIME: %.21f" % final_time
+    	
                 break
     end_time = start_time + (dt * n_bins)
-    # 	print "Start time is %.21f" % start_time
-    # 	print "End time of first seg is %.21f" % end_time
-    assert end_time > start_time
+    print "Start time is %.21f" % start_time
+# 	print "End time of first seg is %.21f" % end_time
+    assert final_time > start_time
 
     print "Segments computed:"
     with open(in_file, 'r') as f:
@@ -297,6 +303,7 @@ def make_crossspec(in_file, n_bins, dt, test):
                 line = line.strip().split()
                 next_line = next_line.strip().split()
                 current_time = np.float64(line[0])
+#                 print "%.21f" % current_time
                 current_chan = np.int8(line[1])
                 current_pcu = np.int8(line[2])
                 next_time = np.float64(next_line[0])
@@ -313,8 +320,10 @@ def make_crossspec(in_file, n_bins, dt, test):
                     print "\n\tERROR: PCU is not 0 or 2. Exiting."
                     sys.exit()
 
-                if (next_time > end_time):  # Triggered at end of a segment
-                    # Only take a cross spectrum if there's stuff in the list
+                if (next_time >= end_time) or (np.abs(current_time - final_time) <= dt):  # Triggered at end of a segment
+                # Maybe shouldn't be abs and be final - current
+                	# Because we want start_time <= times < end_time
+                    # Only take a cross spectrum if there's stuff in both lists
                     if len(time_ci) > 0 and len(time_ref) > 0:
 
                         assert len(time_ci) == len(energy_ci)
@@ -345,7 +354,9 @@ def make_crossspec(in_file, n_bins, dt, test):
 
                         if num_segments % print_iterator == 0:
                             print "\t", num_segments
-
+                        if num_segments > 600:
+                        	print "%.21f" % current_time
+					## End of 'if there are events in the segment time'
                     ## Clearing variables from memory
                     time_ci = None
                     energy_ci = None
@@ -360,19 +371,25 @@ def make_crossspec(in_file, n_bins, dt, test):
                     rate_ref_1d = None
                     rate_ref = None
                     ## Incrementing counters and loop control variables.
-                    start_time += (n_bins * dt)
+                    start_time = end_time
                     end_time += (n_bins * dt)
                     time_ci = []
                     energy_ci = []
                     time_ref = []
                     energy_ref = []
-
+                    
+#                     if num_segments > 600:
+#                         print line
+#                         print next_line
+						
                     if test is True and num_segments == 10:  # For testing
                         break
-
-                        ## End of 'if the line is not a comment'
-                        ## End of for-loop
-                        ## End of with-block
+				## End of 'if it`s at the end of a segment'
+			## End of 'if the line is not a comment'
+# 		print f.readlines()
+		## End of for-loop
+	## End of with-block
+	print "Final end time is %.21f" % (end_time - (n_bins * dt))
     return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
         sum_power_ci, sum_power_ref
 
@@ -455,9 +472,9 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     ## Putting powers into absolute rms2 normalization
     # 	print np.shape(signal_ci_pow)
     signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
-    print "signal ci pow:", signal_ci_pow[:, 2:5]
+#     print "signal ci pow:", signal_ci_pow[:, 2:5]
     signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
-    print "signal ref pow:", signal_ref_pow[2:5]
+#     print "signal ref pow:", signal_ref_pow[2:5]
 #     print "shape of signal ref pow:", np.shape(signal_ref_pow)
 	
     ## Getting rms of reference band, to normalize the ccf
@@ -486,13 +503,15 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
 #     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
 #     	float(num_segments))	
 	
-    print "cs signal amp:", cs_signal_amp
-#     print "sum of cs signal amp:", np.sum(cs_signal_amp)
-    # 	print "shape of cross signal amp:", np.shape(cs_signal_amp)
-    print "cs noise amp:", cs_noise_amp
+#   print "cs signal amp:", cs_signal_amp
+#   print "sum of cs signal amp:", np.sum(cs_signal_amp)
+# 	print "shape of cross signal amp:", np.shape(cs_signal_amp)
+#   print "cs noise amp:", cs_noise_amp
 	
-    error_ratio = cs_noise_amp / cs_signal_amp
-    error_ratio[10] = np.complex128(0)  # the bin with no signal
+	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
+    error_ratio = np.zeros(64, dtype=np.float64)
+    error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
+    error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
     
     ## Taking the IFFT of the cross spectrum to get the ccf
     ccf = fftpack.ifft(cs_avg, axis=0)
