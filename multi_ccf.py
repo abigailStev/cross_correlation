@@ -90,7 +90,6 @@ def multi_output(out_file, in_file_list, dt, n_bins, total_exposure,
         ## End of for-loops
     ## End of with-block
 
-
 ## End of function 'output'
 
 
@@ -377,7 +376,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 #     # 	print "Other ccf error:", other_ccf_error[0,:]
 	
 	
-    ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref)
+    ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, \
+    	total_segments, mean_rate_total_ci, mean_rate_total_ref, mean_power_ci,\
+    	mean_power_ref)
     
     exposure = total_segments * num_seconds  # Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
@@ -427,4 +428,4 @@ if __name__ == "__main__":
 
     main(args.infile_list, args.outfile, args.num_seconds, args.dt_mult, test)
 
-## End of the program 'multi_CCF.py'
+## End of the program 'multi_ccf.py'

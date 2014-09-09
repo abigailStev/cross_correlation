@@ -36,7 +36,7 @@ https://github.com/abigailStev/power_spectra
 """
 
 
-# ##############################################################################
+###############################################################################
 def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error):
     """
@@ -90,12 +90,13 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
                 out.write("\t%.6e" % ccf_filtered[j][i].real)
             for i in xrange(0, 64):
                 out.write("\t%.6e" % ccf_error[i].real)
-                # # End of for-loops
-                ## End of with-block
-                ## End of function 'output'
+        ## End of for-loops
+    ## End of with-block
+    
+## End of function 'output'
 
 
-# ##############################################################################
+###############################################################################
 def stack_reference_band(rate_ref_2d, obs_epoch):
     """
             stack_reference_band
@@ -123,8 +124,8 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
         # channel 3 to 28 inclusive
 
     # 	print "SHAPE OF RATE 2", np.shape(rate_ref)
+    
     return rate_ref
-
 
 ## End of function 'stack_reference_band'
 
@@ -165,8 +166,8 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
     filt_freq_space_array = np.concatenate((zero_front,
     freq_space_array[j_min:j_max, :], zero_end), axis=0)
     assert np.shape(freq_space_array) == np.shape(filt_freq_space_array)
+    
     return filt_freq_space_array, j_min, j_max
-
 
 ## End of function 'filter_freq'
 
@@ -285,8 +286,10 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_tim
 	rate_ref_1d = None
 	rate_ref = None
 		
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci
-	## End of function 'each_segment'
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+		sum_power_ci, sum_power_ref, sum_rate_ci
+		
+## End of function 'each_segment'
 	
 
 ###############################################################################
@@ -436,12 +439,14 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 			## End of 'if the line is not a comment'
 		## End of for-loop
 	## End of with-block
-	print "Final end time is %.21f" % (end_time - (n_bins * dt))
+	
+# 	print "Final end time is %.21f" % (end_time - (n_bins * dt))
+	
     return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
         sum_power_ci, sum_power_ref, sum_rate_ci
-
-
+        
 ## End of function 'read_and_use_segments'
+
 
 ###############################################################################
 def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref):
@@ -546,7 +551,8 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, mean_rate_t
 #     print "Shape of ccf error:", np.shape(ccf_error)
 	
     return ccf_filtered, ccf_error
-	## End of function 'cs_to_ccf_w_err'
+    
+## End of function 'cs_to_ccf_w_err'
 
 
 ###############################################################################
