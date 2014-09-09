@@ -95,6 +95,103 @@ def multi_output(out_file, in_file_list, dt, n_bins, total_exposure,
 
 
 ###############################################################################
+def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref):
+
+    filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
+    assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
+    
+    ## Absolute rms norms of poisson noise
+    noise_ci = 2.0 * mean_rate_total_ci
+    noise_ref = 2.0 * mean_rate_total_ref
+    # 	print np.shape(noise_ci)
+    # 	print np.shape(noise_ref)
+    noise_ref_array = np.repeat(noise_ref, 64)
+
+    df = 1.0 / float(num_seconds)  # in Hz
+#     print "df =", df
+	
+    ## Extracting only the signal frequencies of the mean powers
+    signal_ci_pow = np.float64(mean_power_ci[j_min:j_max, :])
+    signal_ref_pow = np.float64(mean_power_ref[j_min:j_max])
+#     print j_min, j_max
+	
+    ## Putting powers into absolute rms2 normalization
+    signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
+#     print "signal ci pow:", signal_ci_pow[:, 2:5]
+    signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
+#     print "signal ref pow:", signal_ref_pow[2:5]
+	
+	
+	## Getting rms of reference band, to normalize the ccf
+    signal_variance = np.sum(signal_ref_pow * df)
+    rms_ref = np.sqrt(
+        signal_variance)  # should be a few percent in fractional rms units
+    print "RMS of reference band:", rms_ref
+    
+    ## Putting signal_ref_pow in same shape as signal_ci_pow
+    signal_ref_pow_stacked = signal_ref_pow
+    for i in xrange(63):
+        signal_ref_pow_stacked = np.column_stack(
+            (signal_ref_pow, signal_ref_pow_stacked))
+    assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
+
+    temp = (noise_ci * signal_ref_pow_stacked) + \
+           (noise_ref * signal_ci_pow) + \
+           (noise_ci * noise_ref)
+# 	print "Shape of temp:", np.shape(temp)
+    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(total_segments))
+#     print "cs noise amp:", cs_noise_amp[2:5]
+
+    temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * dt / float(n_bins))
+    cs_signal_amp = np.sum(temp1, axis=0)
+#     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
+#     	float(total_segments))
+	
+#     print "Shape of cs signal amp:", np.shape(cs_signal_amp)
+#     print "Shape of other signal:", np.shape(other_sig)
+#     print "CS signal amp:", cs_signal_amp
+#     print "other signal amp:", other_sig[:,2:5]
+#     print "shape of cs signal amp:", np.shape(cs_signal_amp)
+#     print "CS noise amp:", cs_noise_amp
+
+	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
+    error_ratio = np.zeros(64, dtype=np.float64)
+    error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
+    error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
+
+#     print "error ratio, noise on top:", error_ratio
+#     print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
+#     print "Shape filt cs avg:", np.shape(filtered_cs_avg)
+    
+    ## Taking the IFFT of the cross spectrum to get the CCF
+    ccf = fftpack.ifft(cs_avg, axis=0)
+    ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
+    assert np.shape(ccf) == np.shape(ccf_filtered)
+    
+    ## Dividing ccf by rms of signal in reference band
+    ccf *= (2.0 / float(n_bins) / rms_ref)
+    ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
+#     print "Unfilt norm CCF, 2-4:", ccf[0,2:5]
+#     print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
+    
+    ## Computing the error on the ccf
+    ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0))
+#     print "Shape of rms ci:", np.shape(ccf_rms_ci)
+#     print "CCF rms ci:", ccf_rms_ci
+#     print "Shape of error ratio:", np.shape(error_ratio)
+    ccf_error = ccf_rms_ci * error_ratio
+    
+#     ccf_error *= (2.0 / float(n_bins) / rms_ref)
+
+#     print "CCF:", ccf_filtered[0, 2:5]
+#     print "CCF error:", ccf_error[2:5]
+#     print "Shape of ccf error:", np.shape(ccf_error)
+	
+    return ccf_filtered, ccf_error
+
+
+
+###############################################################################
 def main(in_file_list, out_file, num_seconds, dt_mult, test):
     """
 			main
@@ -144,11 +241,12 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
     total_sum_power_ref = 0
     total_sum_power_ci = 0
+    sum_rate_ci = 0
 
     ## Looping through all data files
     for in_file in input_files:
         cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-            sum_power_ci, sum_power_ref = read_and_use_segments(in_file, n_bins,
+            sum_power_ci, sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins,
             dt, test)
         total_segments += num_segments
         total_cs_sum += cs_sum
@@ -166,7 +264,10 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
         sum_power_ci = None
         sum_power_ref = None
     ## End of for-loop
-
+	
+	mean_ci = sum_rate_ci / float(total_segments)
+	print "Mean rate of ci: ", mean_ci
+	
     ## Dividing these (currently just a sum of the segments) by the number of
     ## segments to get an arithmetic average
     mean_rate_total_ci = sum_rate_total_ci / float(total_segments)
@@ -175,110 +276,113 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     mean_power_ref = total_sum_power_ref / float(total_segments)
     cs_avg = total_cs_sum / float(total_segments)
 
-    filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
-    assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
-
-    ## Absolute rms norms of poisson noise
-    noise_ci = 2.0 * mean_rate_total_ci
-    noise_ref = 2.0 * mean_rate_total_ref
-    # 	print np.shape(noise_ci)
-    # 	print np.shape(noise_ref)
-    noise_ref_array = np.repeat(noise_ref, 64)
-
-    old_settings = np.seterr(divide='ignore')
-
-    df = 1.0 / float(num_seconds)  # in Hz
-#     print "df =", df
+#     filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
+#     assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
+# 
+#     ## Absolute rms norms of poisson noise
+#     noise_ci = 2.0 * mean_rate_total_ci
+#     noise_ref = 2.0 * mean_rate_total_ref
+#     # 	print np.shape(noise_ci)
+#     # 	print np.shape(noise_ref)
+#     noise_ref_array = np.repeat(noise_ref, 64)
+# 
+#     old_settings = np.seterr(divide='ignore')
+# 
+#     df = 1.0 / float(num_seconds)  # in Hz
+# #     print "df =", df
+# 	
+#     ## Extracting only the signal frequencies of the mean powers
+#     signal_ci_pow = np.float64(mean_power_ci[j_min:j_max, :])
+#     signal_ref_pow = np.float64(mean_power_ref[j_min:j_max])
+# #     print j_min, j_max
+# 	
+#     ## Putting powers into absolute rms2 normalization
+#     signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
+# #     print "signal ci pow:", signal_ci_pow[:, 2:5]
+#     signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
+# #     print "signal ref pow:", signal_ref_pow[2:5]
+# 	
+# 	
+# 	## Getting rms of reference band, to normalize the ccf
+#     signal_variance = np.sum(signal_ref_pow * df)
+#     rms_ref = np.sqrt(
+#         signal_variance)  # should be a few percent in fractional rms units
+#     print "RMS of reference band:", rms_ref
+#     
+#     ## Putting signal_ref_pow in same shape as signal_ci_pow
+#     signal_ref_pow_stacked = signal_ref_pow
+#     for i in xrange(63):
+#         signal_ref_pow_stacked = np.column_stack(
+#             (signal_ref_pow, signal_ref_pow_stacked))
+#     assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
+# 
+# 
+#     temp = (noise_ci * signal_ref_pow_stacked) + \
+#            (noise_ref * signal_ci_pow) + \
+#            (noise_ci * noise_ref)
+# # 	print "Shape of temp:", np.shape(temp)
+#     cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(total_segments))
+# #     print "cs noise amp:", cs_noise_amp[2:5]
+# 
+#     temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * dt / float(n_bins))
+#     cs_signal_amp = np.sum(temp1, axis=0)
+# #     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
+# #     	float(total_segments))
+# 	
+# #     print "Shape of cs signal amp:", np.shape(cs_signal_amp)
+# #     print "Shape of other signal:", np.shape(other_sig)
+# #     print "CS signal amp:", cs_signal_amp
+# #     print "other signal amp:", other_sig[:,2:5]
+# #     print "shape of cs signal amp:", np.shape(cs_signal_amp)
+# #     print "CS noise amp:", cs_noise_amp
+# 
+# 	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
+#     error_ratio = np.zeros(64, dtype=np.float64)
+#     error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
+#     error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
+# 
+# #     print "error ratio, noise on top:", error_ratio
+# #     print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
+# #     print "Shape filt cs avg:", np.shape(filtered_cs_avg)
+#     
+#     ## Taking the IFFT of the cross spectrum to get the CCF
+#     ccf = fftpack.ifft(cs_avg, axis=0)
+# #     print "Unfilt CCF, 0,2-4:", ccf[0,2:5]
+#     ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
+# #     print "Filt ccf, 0,2-4:", ccf_filtered[0,2:5]
+#     assert np.shape(ccf) == np.shape(ccf_filtered)
+# 
+# #     ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
+# 
+#     ## Dividing ccf by rms of signal in reference band
+#     ccf *= (2.0 / float(n_bins) / rms_ref)
+#     ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
+# #     print "Unfilt norm CCF, 2-4:", ccf[0,2:5]
+# #     print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
+#     
+#     ## Computing the error on the ccf
+#     ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0))
+# #     print "Shape of rms ci:", np.shape(ccf_rms_ci)
+# #     print "CCF rms ci:", ccf_rms_ci
+# #     print "Shape of error ratio:", np.shape(error_ratio)
+#     ccf_error = ccf_rms_ci * error_ratio
+#     
+# #     ccf_error *= (2.0 / float(n_bins) / rms_ref)
+# 
+# #     print "CCF:", ccf_filtered[0, 2:5]
+# #     print "CCF error:", ccf_error[2:5]
+# #     print "Shape of ccf error:", np.shape(ccf_error)
+# 
+#     # 	print "Other ccf error:", other_ccf_error[0,:]
 	
-    ## Extracting only the signal frequencies of the mean powers
-    signal_ci_pow = np.float64(mean_power_ci[j_min:j_max, :])
-    signal_ref_pow = np.float64(mean_power_ref[j_min:j_max])
-#     print j_min, j_max
 	
-    ## Putting powers into absolute rms2 normalization
-    signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
-#     print "signal ci pow:", signal_ci_pow[:, 2:5]
-    signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
-#     print "signal ref pow:", signal_ref_pow[2:5]
-	
-	
-	## Getting rms of reference band, to normalize the ccf
-    signal_variance = np.sum(signal_ref_pow * df)
-    rms_ref = np.sqrt(
-        signal_variance)  # should be a few percent in fractional rms units
-    print "RMS of reference band:", rms_ref
+    ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref)
     
-    ## Putting signal_ref_pow in same shape as signal_ci_pow
-    signal_ref_pow_stacked = signal_ref_pow
-    for i in xrange(63):
-        signal_ref_pow_stacked = np.column_stack(
-            (signal_ref_pow, signal_ref_pow_stacked))
-    assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
-
-
-    temp = (noise_ci * signal_ref_pow_stacked) + \
-           (noise_ref * signal_ci_pow) + \
-           (noise_ci * noise_ref)
-# 	print "Shape of temp:", np.shape(temp)
-    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(total_segments))
-#     print "cs noise amp:", cs_noise_amp[2:5]
-
-    temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * dt / float(n_bins))
-    cs_signal_amp = np.sum(temp1, axis=0)
-#     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
-#     	float(total_segments))
-	
-#     print "Shape of cs signal amp:", np.shape(cs_signal_amp)
-#     print "Shape of other signal:", np.shape(other_sig)
-#     print "CS signal amp:", cs_signal_amp
-#     print "other signal amp:", other_sig[:,2:5]
-#     print "shape of cs signal amp:", np.shape(cs_signal_amp)
-#     print "CS noise amp:", cs_noise_amp
-
-	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
-    error_ratio = np.zeros(64, dtype=np.float64)
-    error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
-    error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
-
-#     print "error ratio, noise on top:", error_ratio
-#     print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
-#     print "Shape filt cs avg:", np.shape(filtered_cs_avg)
-    
-    ## Taking the IFFT of the cross spectrum to get the CCF
-    ccf = fftpack.ifft(cs_avg, axis=0)
-#     print "Unfilt CCF, 0,2-4:", ccf[0,2:5]
-    ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
-#     print "Filt ccf, 0,2-4:", ccf_filtered[0,2:5]
-    assert np.shape(ccf) == np.shape(ccf_filtered)
-
-#     ccf_error = np.absolute(error_ratio_noisetop) * np.absolute(ccf_filtered)
-
-    ## Dividing ccf by rms of signal in reference band
-    ccf *= (2.0 / float(n_bins) / rms_ref)
-    ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
-#     print "Unfilt norm CCF, 2-4:", ccf[0,2:5]
-#     print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
-    
-    ## Computing the error on the ccf
-    ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0))
-#     print "Shape of rms ci:", np.shape(ccf_rms_ci)
-#     print "CCF rms ci:", ccf_rms_ci
-#     print "Shape of error ratio:", np.shape(error_ratio)
-    ccf_error = ccf_rms_ci * error_ratio
-    
-#     ccf_error *= (2.0 / float(n_bins) / rms_ref)
-
-#     print "CCF:", ccf_filtered[0, 2:5]
-#     print "CCF error:", ccf_error[2:5]
-#     print "Shape of ccf error:", np.shape(ccf_error)
-
-    # 	print "Other ccf error:", other_ccf_error[0,:]
-
     exposure = total_segments * num_seconds  # Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
     print "Total number of segments:", total_segments
-#     print "Total mean rate for ci:", mean_rate_total_ci[19:24]
-    # 	print "Mean mean rate for ci:", np.mean(mean_rate_total_ci)
+    print "Total mean rate for ci:", mean_rate_total_ci
+    print "Mean rate for ci:", np.mean(mean_rate_total_ci) * 64
     print "Sum of mean rate for ci:", np.sum(mean_rate_total_ci)
 #     print "Mean rate for ref:", mean_rate_total_ref
 
