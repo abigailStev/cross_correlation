@@ -228,6 +228,16 @@ def make_cs(rate_ci, rate_ref, n_bins, dt):
 
 ###############################################################################
 def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci):
+	"""
+			each_segment
+	
+	Summary.
+	
+	Passed:
+	
+	Returns:
+	
+	"""
 	if len(time_ci) > 0 and len(time_ref) > 0:
 	# Only take a cross spectrum if there's stuff in both lists
 
@@ -276,7 +286,8 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_tim
 	rate_ref = None
 		
 	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci
-
+	## End of function 'each_segment'
+	
 
 ###############################################################################
 def read_and_use_segments(in_file, n_bins, dt, test):
@@ -376,9 +387,6 @@ def read_and_use_segments(in_file, n_bins, dt, test):
                 else:
                     print "\n\tERROR: PCU is not 0 or 2. Exiting."
                     sys.exit()
-                    
-                # if num_segments >= 610:
-#                 	print "%.21f" % current_time
 
                 if (next_time >= end_time):  # Triggered at end of a segment
 				# Because we want start_time <= times < end_time
@@ -437,7 +445,16 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 
 ###############################################################################
 def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref):
-
+	"""
+			cs_to_ccf_w_err
+	
+	Summary.
+	
+	Passed:
+	
+	Returns:
+	
+	"""
     filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
     assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
     
@@ -529,6 +546,7 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, mean_rate_t
 #     print "Shape of ccf error:", np.shape(ccf_error)
 	
     return ccf_filtered, ccf_error
+	## End of function 'cs_to_ccf_w_err'
 
 
 ###############################################################################
