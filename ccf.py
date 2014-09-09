@@ -89,7 +89,7 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
             for i in xrange(0, 64):
                 out.write("\t%.6e" % ccf_filtered[j][i].real)
             for i in xrange(0, 64):
-                out.write("\t%.6e" % ccf_error[j][i].real)
+                out.write("\t%.6e" % ccf_error[i].real)
                 # # End of for-loops
                 ## End of with-block
                 ## End of function 'output'
@@ -192,6 +192,8 @@ def make_cs(rate_ci, rate_ref, n_bins, dt):
     # 	print "Each segment"
     ## Computing the mean count rate of the segment
     mean_rate_segment_ci = np.mean(rate_ci, axis=0)
+    print np.mean(rate_ci) * 64
+    print mean_rate_segment_ci
     mean_rate_segment_ref = np.mean(rate_ref)
     # 	print "Sum of mean rate segment 1:", np.sum(mean_rate_segment_ci)
     # 	print "Shape of mean rate segment 1:", np.shape(mean_rate_segment_ci)
@@ -221,10 +223,11 @@ def make_cs(rate_ci, rate_ref, n_bins, dt):
     return cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
         power_ref
 
-
 ## End of function 'make_cs'
 
-def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments):
+
+###############################################################################
+def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci):
 	if len(time_ci) > 0 and len(time_ref) > 0:
 	# Only take a cross spectrum if there's stuff in both lists
 
@@ -235,23 +238,24 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_tim
 		mean_rate_segment_ref = np.zeros(64, dtype=np.int64)
 		cs_segment = np.zeros((n_bins, 64), dtype=np.complex128)
 
-		rate_ci_2d, rate_ci_1d = lc.make_lightcurve(
-			np.asarray(time_ci),
-			np.asarray(energy_ci), n_bins, dt, start_time)
-		rate_ref_2d, rate_ref_1d = lc.make_lightcurve(
-			np.asarray(time_ref),
-			np.asarray(energy_ref), n_bins, dt, start_time)
+		rate_ci_2d, rate_ci_1d = lc.make_lightcurve( \
+			np.asarray(time_ci), np.asarray(energy_ci), n_bins, dt, start_time)
+		rate_ref_2d, rate_ref_1d = lc.make_lightcurve( \
+			np.asarray(time_ref), np.asarray(energy_ref), n_bins, dt, \
+			start_time)
 
 		rate_ref = stack_reference_band(rate_ref_2d, obs_epoch)
 		cs_segment, mean_rate_segment_ci, \
 			mean_rate_segment_ref, power_ci, power_ref = \
 			make_cs(rate_ci_2d, rate_ref, n_bins, dt)
-
+		
 		sum_rate_whole_ci += mean_rate_segment_ci
 		sum_rate_whole_ref += mean_rate_segment_ref
 		sum_power_ci += power_ci
 		sum_power_ref += power_ref
 		cs_sum += cs_segment  # This adds indices
+		
+		sum_rate_ci += np.mean(rate_ci_1d)
 
 		num_segments += 1
 	
@@ -271,7 +275,7 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_tim
 	rate_ref_1d = None
 	rate_ref = None
 		
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci
 
 
 ###############################################################################
@@ -330,6 +334,7 @@ def read_and_use_segments(in_file, n_bins, dt, test):
     final_time = -99
     sum_power_ci = np.zeros((n_bins, 64), dtype=np.float64)
     sum_power_ref = np.zeros(n_bins, dtype=np.float64)
+    sum_rate_ci = 0
 
     ## Reading only the first line of data to get the start time of the file
     with open(in_file, 'r') as fo:
@@ -378,11 +383,11 @@ def read_and_use_segments(in_file, n_bins, dt, test):
                 if (next_time >= end_time):  # Triggered at end of a segment
 				# Because we want start_time <= times < end_time
 					cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
-						num_segments, sum_power_ci, sum_power_ref = \
+						num_segments, sum_power_ci, sum_power_ref, sum_rate_ci = \
 						each_segment(time_ci, time_ref, energy_ci, energy_ref, \
 						n_bins, dt, start_time, end_time, obs_epoch, \
 						sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, \
-						sum_power_ref, cs_sum, num_segments)
+						sum_power_ref, cs_sum, num_segments, sum_rate_ci)
 					
 					if num_segments % print_iterator == 0:
 						print "\t", num_segments
@@ -396,38 +401,134 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 					time_ref = []
 					energy_ref = []
 						
-                elif next_time == final_time:
-					print "Last segment!"
-# 					print "%.21f" % current_time
-					next_chan = np.int8(next_line[1])
-					next_pcu = np.int8(next_line[2])
-                	
-					if next_pcu == 2:  ## If pcu = 2
-						time_ci.append(next_time)
-						energy_ci.append(next_chan)
-					elif next_pcu == 0:  ## pcu = 0
-						time_ref.append(next_time)
-						energy_ref.append(next_chan)
-					else:
-						print "\n\tERROR: PCU is not 0 or 2. Exiting."
-						sys.exit()
-						
-					cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
-						num_segments, sum_power_ci, sum_power_ref = \
-						each_segment(time_ci, time_ref, energy_ci, energy_ref, \
-						n_bins, dt, start_time, end_time, obs_epoch, \
-						sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, \
-						sum_power_ref, cs_sum, num_segments)
+#                 elif next_time == final_time:
+# 					print "Last segment!"
+# # 					print "%.21f" % current_time
+# 					next_chan = np.int8(next_line[1])
+# 					next_pcu = np.int8(next_line[2])
+#                 	
+# 					if next_pcu == 2:  ## If pcu = 2
+# 						time_ci.append(next_time)
+# 						energy_ci.append(next_chan)
+# 					elif next_pcu == 0:  ## pcu = 0
+# 						time_ref.append(next_time)
+# 						energy_ref.append(next_chan)
+# 					else:
+# 						print "\n\tERROR: PCU is not 0 or 2. Exiting."
+# 						sys.exit()
+# 						
+# 					cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
+# 						num_segments, sum_power_ci, sum_power_ref = \
+# 						each_segment(time_ci, time_ref, energy_ci, energy_ref, \
+# 						n_bins, dt, start_time, end_time, obs_epoch, \
+# 						sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, \
+# 						sum_power_ref, cs_sum, num_segments)
+
 				## End of 'if it`s at the end of a segment'
 			## End of 'if the line is not a comment'
 		## End of for-loop
 	## End of with-block
 	print "Final end time is %.21f" % (end_time - (n_bins * dt))
     return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-        sum_power_ci, sum_power_ref
+        sum_power_ci, sum_power_ref, sum_rate_ci
 
 
 ## End of function 'read_and_use_segments'
+
+###############################################################################
+def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref):
+
+    filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
+    assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
+    
+    ## Absolute rms norms of poisson noise
+    noise_ci = 2.0 * mean_rate_total_ci
+    noise_ref = 2.0 * mean_rate_total_ref
+    # 	print np.shape(noise_ci)
+    # 	print np.shape(noise_ref)
+    noise_ref_array = np.repeat(noise_ref, 64)
+
+    df = 1.0 / float(num_seconds)  # in Hz
+#     print "df =", df
+	
+    ## Extracting only the signal frequencies of the mean powers
+    signal_ci_pow = np.float64(mean_power_ci[j_min:j_max, :])
+    signal_ref_pow = np.float64(mean_power_ref[j_min:j_max])
+#     print j_min, j_max
+	
+    ## Putting powers into absolute rms2 normalization
+    signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
+#     print "signal ci pow:", signal_ci_pow[:, 2:5]
+    signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
+#     print "signal ref pow:", signal_ref_pow[2:5]
+	
+	
+	## Getting rms of reference band, to normalize the ccf
+    signal_variance = np.sum(signal_ref_pow * df)
+    rms_ref = np.sqrt(
+        signal_variance)  # should be a few percent in fractional rms units
+    print "RMS of reference band:", rms_ref
+    
+    ## Putting signal_ref_pow in same shape as signal_ci_pow
+    signal_ref_pow_stacked = signal_ref_pow
+    for i in xrange(63):
+        signal_ref_pow_stacked = np.column_stack(
+            (signal_ref_pow, signal_ref_pow_stacked))
+    assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
+
+    temp = (noise_ci * signal_ref_pow_stacked) + \
+           (noise_ref * signal_ci_pow) + \
+           (noise_ci * noise_ref)
+# 	print "Shape of temp:", np.shape(temp)
+    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(total_segments))
+#     print "cs noise amp:", cs_noise_amp[2:5]
+
+    temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * dt / float(n_bins))
+    cs_signal_amp = np.sum(temp1, axis=0)
+#     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
+#     	float(total_segments))
+	
+#     print "Shape of cs signal amp:", np.shape(cs_signal_amp)
+#     print "Shape of other signal:", np.shape(other_sig)
+#     print "CS signal amp:", cs_signal_amp
+#     print "other signal amp:", other_sig[:,2:5]
+#     print "shape of cs signal amp:", np.shape(cs_signal_amp)
+#     print "CS noise amp:", cs_noise_amp
+
+	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
+    error_ratio = np.zeros(64, dtype=np.float64)
+    error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
+    error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
+
+#     print "error ratio, noise on top:", error_ratio
+#     print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
+#     print "Shape filt cs avg:", np.shape(filtered_cs_avg)
+    
+    ## Taking the IFFT of the cross spectrum to get the CCF
+    ccf = fftpack.ifft(cs_avg, axis=0)
+    ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
+    assert np.shape(ccf) == np.shape(ccf_filtered)
+    
+    ## Dividing ccf by rms of signal in reference band
+    ccf *= (2.0 / float(n_bins) / rms_ref)
+    ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
+#     print "Unfilt norm CCF, 2-4:", ccf[0,2:5]
+#     print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
+    
+    ## Computing the error on the ccf
+    ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0))
+#     print "Shape of rms ci:", np.shape(ccf_rms_ci)
+#     print "CCF rms ci:", ccf_rms_ci
+#     print "Shape of error ratio:", np.shape(error_ratio)
+    ccf_error = ccf_rms_ci * error_ratio
+    
+#     ccf_error *= (2.0 / float(n_bins) / rms_ref)
+
+#     print "CCF:", ccf_filtered[0, 2:5]
+#     print "CCF error:", ccf_error[2:5]
+#     print "Shape of ccf error:", np.shape(ccf_error)
+	
+    return ccf_filtered, ccf_error
 
 
 ###############################################################################
@@ -474,8 +575,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     ccf_filtered = np.zeros((n_bins, 64))
     cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
 
-    cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, \
-        sum_power_ref = read_and_use_segments(in_file, n_bins, dt, test)
+    cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, dt, test)
 
     mean_rate_whole_ci = sum_rate_whole_ci / float(num_segments)
     mean_rate_whole_ref = sum_rate_whole_ref / float(num_segments)
@@ -483,95 +583,11 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     mean_power_ref = sum_power_ref / float(num_segments)
     cs_avg = cs_sum / float(num_segments)
 
-    filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
-    assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
-
-
-    ## Absolute rms norms of poisson noise
-    noise_ci = 2.0 * mean_rate_whole_ci
-    noise_ref = 2.0 * mean_rate_whole_ref
-    # 	print np.shape(noise_ci)
-    # 	print np.shape(noise_ref)
-    noise_ref_array = np.repeat(noise_ref, 64)
-
-    df = 1 / float(num_seconds)  # in Hz
-
-    # 	np.savetxt('cs_avg.dat', cs_avg.real)
-	
-	## Extracting only the signal frequencies of the mean powers
-    signal_ci_pow = np.complex128(mean_power_ci[j_min:j_max, :])
-    signal_ref_pow = np.complex128(mean_power_ref[j_min:j_max])
-
-    ## Putting powers into absolute rms2 normalization
-    # 	print np.shape(signal_ci_pow)
-    signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
-#     print "signal ci pow:", signal_ci_pow[:, 2:5]
-    signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
-#     print "signal ref pow:", signal_ref_pow[2:5]
-#     print "shape of signal ref pow:", np.shape(signal_ref_pow)
-	
-    ## Getting rms of reference band, to normalize the ccf
-    print signal_ref_pow
-    signal_variance = np.sum(signal_ref_pow * df)
-    rms_ref = np.sqrt(signal_variance)  # should be few % of mean_rate_ref
-    print "RMS of reference band:", rms_ref
-    
-    ## Putting signal_ref_pow in same shape as signal_ci_pow
-    signal_ref_pow_stacked = signal_ref_pow  
-    for i in xrange(63):
-        signal_ref_pow_stacked = np.column_stack(
-            (signal_ref_pow, signal_ref_pow_stacked))
-    assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
-	
-    old_settings = np.seterr(divide='ignore')
-
-    temp = (noise_ci * signal_ref_pow_stacked) + \
-    	(noise_ref_array * signal_ci_pow) + \
-        (noise_ci * noise_ref_array)
-    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(num_segments))
-    print "Shape of cs noise amp:", np.shape(cs_noise_amp)
-    
-    temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * dt / float(n_bins))
-    cs_signal_amp = np.sum(temp1, axis=0)
-#     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
-#     	float(num_segments))	
-	
-#   print "cs signal amp:", cs_signal_amp
-#   print "sum of cs signal amp:", np.sum(cs_signal_amp)
-# 	print "shape of cross signal amp:", np.shape(cs_signal_amp)
-#   print "cs noise amp:", cs_noise_amp
-	
-	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
-    error_ratio = np.zeros(64, dtype=np.float64)
-    error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
-    error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
-    
-    ## Taking the IFFT of the cross spectrum to get the ccf
-    ccf = fftpack.ifft(cs_avg, axis=0)
-    ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
-    assert np.shape(ccf) == np.shape(ccf_filtered)
-	
-    print "error ratio, noise on top:", error_ratio
-	
-    ccf_error = np.absolute(error_ratio) * np.absolute(ccf_filtered)
-	
-    ## Dividing ccf by rms power of signal frequencies in reference band
-    ccf *= (2.0 / float(n_bins) / rms_ref)
-    ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
-    print "Unfilt norm CCF, 2-4:", ccf[0,2:5]
-    print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
-    
-    ## Computing the error on the ccf
-    ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0))
-    print "Shape of rms ci:", np.shape(ccf_rms_ci)
-    print "CCF rms ci:", ccf_rms_ci
-    print "Shape of error ratio:", np.shape(error_ratio)
-    ccf_error = ccf_rms_ci * error_ratio
-	
+    ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, mean_rate_whole_ci, mean_rate_whole_ref, mean_power_ci, mean_power_ref)
 	
     print "CCF:", ccf_filtered[0, 2:5]
     print "Shape of ccf error:", np.shape(ccf_error)
-    print "CCF error:", ccf_error[0, 2:5]
+    print "CCF error:", ccf_error[2:5]
 	
     print "Number of segments:", num_segments
     # 	print "Mean rate for ci:", mean_rate_whole_ci
@@ -580,9 +596,8 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     print "Mean rate for ref:", np.mean(mean_rate_whole_ref)
 	
     t = np.arange(0, n_bins)
-    ## Converting to seconds
-    time = t * dt
-	
+    # time = t * dt  # Converting to seconds
+
     ## Calling 'output' function
     output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
