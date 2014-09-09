@@ -8,8 +8,8 @@ exe_dir="$home_dir/Dropbox/Research/cross_correlation"
 out_dir="$exe_dir/out_ccf"
 propID="P70080"
 obsID="70080-01-01-02"
-# in_file="$home_dir/Reduced_data/$propID/$obsID/eventlist_1.dat"
-in_file="$home_dir/Dropbox/Research/sample_data/eventlist_1.dat"
+in_file="$home_dir/Reduced_data/$propID/$obsID/eventlist_1.dat"
+# in_file="$home_dir/Dropbox/Research/sample_data/eventlist_1.dat"
 
 if [ ! -d "$out_dir" ]; then
 	mkdir -p "$out_dir"
@@ -17,7 +17,7 @@ fi
 
 dt=1
 numsec=4
-testing=0   # 0 for no, 1 for yes
+testing=1  # 0 for no, 1 for yes
 
 if (( $testing == 0 )); then
 	out_file="$out_dir/${obsID}_${day}_t${dt}_${numsec}sec"
