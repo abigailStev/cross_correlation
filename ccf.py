@@ -347,7 +347,7 @@ def read_and_use_segments(in_file, n_bins, dt, test):
     fits_file = in_file[0:-4] + ".fits"
     # 	print fits_file
     obs_epoch = obs_epoch_rxte(fits_file)
-    print "Observation epoch:", obs_epoch
+#     print "Observation epoch:", obs_epoch
 
     ## Initializations
     num_segments = 0
@@ -370,16 +370,11 @@ def read_and_use_segments(in_file, n_bins, dt, test):
             if line[0].strip() != "#":
                 line = line.strip().split()
                 start_time = np.float64(line[0])
-                fo.seek(-36,2)
-                final_line = fo.readline().strip().split()
-                final_time = np.float64(final_line[0])
-                print "FINAL TIME: %.21f" % final_time
     	
                 break
     end_time = start_time + (dt * n_bins)
-    print "Start time is %.21f" % start_time
+#     print "Start time is %.21f" % start_time
 # 	print "End time of first seg is %.21f" % end_time
-    assert final_time > start_time
 
     print "Segments computed:"
     with open(in_file, 'r') as f:
@@ -453,9 +448,7 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 			## End of 'if the line is not a comment'
 		## End of for-loop
 	## End of with-block
-	
-# 	print "Final end time is %.21f" % (end_time - (n_bins * dt))
-	
+		
     return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
         sum_power_ci, sum_power_ref, sum_rate_ci
         
