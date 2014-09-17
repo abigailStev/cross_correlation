@@ -241,13 +241,14 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
     total_sum_power_ref = 0
     total_sum_power_ci = 0
-    sum_rate_ci = 0
+    sum_rate_ci = np.zeros(64)
 
     ## Looping through all data files
     for in_file in input_files:
         cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
             sum_power_ci, sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins,
             dt, test)
+            
         total_segments += num_segments
         total_cs_sum += cs_sum
         sum_rate_total_ci += sum_rate_whole_ci
