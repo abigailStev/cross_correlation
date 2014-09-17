@@ -231,9 +231,9 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     ## Initializations -- 'total' is over all data files,
     ## 'whole' is over one data file
     total_segments = 0
-    sum_rate_total_ci = np.zeros(64)
+    sum_rate_total_ci = np.zeros(64, dtype=np.float64)
     sum_rate_total_ref = 0
-    mean_rate_total_ci = np.zeros(64)
+    mean_rate_total_ci = np.zeros(64, dtype=np.float64)
     mean_rate_total_ref = 0
     ccf = np.zeros((n_bins, 64))
     ccf_filtered = np.zeros((n_bins, 64))
@@ -267,7 +267,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     ## End of for-loop
 	
 	mean_ci = sum_rate_ci / float(total_segments)
-	print "Mean rate of ci: ", mean_ci
+# 	print "Mean rate of ci: ", mean_ci
 	
     ## Dividing these (currently just a sum of the segments) by the number of
     ## segments to get an arithmetic average
@@ -384,10 +384,10 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     exposure = total_segments * num_seconds  # Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
     print "Total number of segments:", total_segments
-    print "Total mean rate for ci:", mean_rate_total_ci
-    print "Mean rate for ci:", np.mean(mean_rate_total_ci) * 64
-    print "Sum of mean rate for ci:", np.sum(mean_rate_total_ci)
-#     print "Mean rate for ref:", mean_rate_total_ref
+#     print "Total mean rate for ci:", mean_rate_total_ci
+#     print "Mean rate for ci:", np.mean(mean_rate_total_ci) * 64
+    print "Mean rate for all of ci:", np.sum(mean_rate_total_ci)
+    print "Mean rate for ref:", mean_rate_total_ref
 
     t = np.arange(0, n_bins)  # gives the 'front of the bin'
     # time = t * dt  # Converting to seconds
