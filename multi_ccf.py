@@ -391,7 +391,13 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 
     t = np.arange(0, n_bins)  # gives the 'front of the bin'
     # time = t * dt  # Converting to seconds
-
+#     mean_ci_file = "/Users/abigailstevens/Dropbox/Research/simulate/mean_ci.txt"
+#     np.savetxt(mean_ci_file, mean_rate_total_ci)
+#     amp_ci_file = "/Users/abigailstevens/Dropbox/Research/simulate/amp_ci.txt"    
+#     amps_ci = [np.absolute(ccf_filtered[:,x])[0] for x in range(0,64)]
+#     np.savetxt(amp_ci_file, amps_ci)
+#     print amps
+	
     multi_output(out_file, in_file_list, dt, n_bins, exposure,
         mean_rate_total_ci, mean_rate_total_ref, t, ccf_filtered, ccf_error)
 
