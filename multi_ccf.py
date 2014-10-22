@@ -422,11 +422,11 @@ if __name__ == "__main__":
         Must be an integer power of two.")
     parser.add_argument('-m', '--dt_mult', type=int, default=1, dest='dt_mult',
         help="Multiple of 1/8192 seconds for timestep between bins.")
-    # parser.add_argument('-f', '--filter', help="True if applying filter \
-    #   above and below 401Hz, False if not filtering in frequency.")
-    parser.add_argument('-t', '--test', type=int, default=0,
-        choices=xrange(0, 2), dest='test', help="1 if computing 1 segment for \
-        testing, 0 if computing all segments.")
+    # parser.add_argument('--filter', action='store_true', help="If present, \
+    # filter will be applied above and below 401 Hz.")
+    parser.add_argument('-t', '--test', type=int, default=0, choices={0,1}, 
+    	dest='test', help="1 if computing 1 segment for testing, 0 if \
+    	computing all segments.")
     args = parser.parse_args()
 
     test = False
