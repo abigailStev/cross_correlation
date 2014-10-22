@@ -5,7 +5,7 @@ from scipy import fftpack
 from datetime import datetime
 
 import populate_lightcurve as lc
-from tools import power_of_two, pairwise, obs_epoch_rxte
+import tools
 
 """
         ccf.py
@@ -146,10 +146,15 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
             signal_freq - The frequency, in Hz, of the signal we want to filter
             around.
 
-    Returns: filt_freq_space_array
+    Returns: filt_freq_space_array - The cross-spectrum filtered in 
+    		 	Fourier-frequency-space.
+    		 j_min - The first frequency bin in which we keep the signal.
+    		 j_max - 1+ the last frequency bin in which we keep the signal.
+    		 
+    The signal goes from j_min to j_max+1, so freq[j_min:j_max] gives you only 
+    the bins with the kept frequencies.
 
     """
-
     freq = fftpack.fftfreq(n_bins, d=dt)
     min_freq_mask = freq < signal_freq  # we want the last 'True' element
     max_freq_mask = freq > signal_freq  # we want the first 'True' element
@@ -234,11 +239,36 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_tim
 	"""
 			each_segment
 	
-	Summary.
+	Turns the event list into a populated histogram, stacks the reference band, 
+	and makes the cross spectrum, per segment of light curve.
 	
-	Passed:
+	Passed: time_ci - List of times of events in ci.
+			time_ref - List of times of events in ref.
+			energy_ci - List of energies of events in ci.
+			energy_ref - List of energies of events in ref.
+			n_bins - Number of bins in one segment of the light curve. Must be
+                a power of 2.
+			dt - Time step between bins, in seconds. Must be a power of 2.
+			start_time - The start time of the segment.
+			end_time - The end time of the segment.
+			obs_epoch - The RXTE observational epoch.
+			sum_rate_whole_ci - The sum of the count rates in ci.
+			sum_rate_whole_ref - The sum of the count rates in ref.
+			sum_power_ci - The sum of the power spectra in ci.
+			sum_power_ref - The sum of the power spectra in ref.
+			cs_sum - The sum of the cross spectra.
+			num_segments - The number of segments computed.
+			sum_rate_ci - The sum of the count rates in ci, not split per energy 		
+				band.
 	
-	Returns:
+	Returns: cs_sum - The sum of all the cross spectra.
+			 sum_rate_whole_ci - The sum of the count rates in ci.
+			 sum_rate_whole_ref - The sum of the count rates in ref.
+			 num_segments - The number of segments computed.
+			 sum_power_ci - The sum of the power spectra in ci.
+			 sum_power_ref - The sum of the power spectra in ref.
+			 sum_rate_ci - The sum of the count rates in ci, not split per 
+			 	energy band.
 	
 	"""
 	if len(time_ci) > 0 and len(time_ref) > 0:
@@ -331,8 +361,7 @@ def read_and_use_segments(in_file, n_bins, dt, test):
              num_segments - Number of segments computed.
 
     """
-    assert power_of_two(n_bins)
-    assert power_of_two(int(1.0 / dt))
+    assert tools.power_of_two(n_bins)
 
     print "Input file: %s" % in_file
 
@@ -346,7 +375,7 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 
     fits_file = in_file[0:-4] + ".fits"
     # 	print fits_file
-    obs_epoch = obs_epoch_rxte(fits_file)
+    obs_epoch = tools.obs_epoch_rxte(fits_file)
 #     print "Observation epoch:", obs_epoch
 
     ## Initializations
@@ -378,7 +407,7 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 
     print "Segments computed:"
     with open(in_file, 'r') as f:
-        for line, next_line in pairwise(f):
+        for line, next_line in tools.pairwise(f):
             if line[0].strip() != "#":  # If the line is not a comment
                 line = line.strip().split()
                 next_line = next_line.strip().split()
@@ -411,7 +440,7 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 					
 					if num_segments % print_iterator == 0:
 						print "\t", num_segments
-					if test is True and num_segments == 10:  # For testing
+					if test is True and num_segments == 1:  # For testing
 						break
 					## Incrementing counters and loop control variables.
 					start_time = end_time
@@ -461,11 +490,23 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	"""
 			cs_to_ccf_w_err
 	
-	Summary.
+	Takes the iFFT of the filtered cross spectrum to get the cross-correlation 
+	function, and computes the error on the cross-correlation function.
 	
-	Passed:
+	Passed: cs_avg - Averaged cross spectrum of the data.
+			dt - Time step between bins, in seconds.
+			n_bins - Number of bins per Fourier segment. Must be a power of 2.
+			num_seconds - Number of seconds per Fourier segment.
+			total_segments - Total number of Fourier segments computed.
+			mean_rate_total_ci - 
+			mean_rate_total_ref - 
+			mean_power_ci - 
+			mean_power_ref - 
 	
-	Returns:
+	Returns: ccf_filtered - The cross-correlation function of the frequency-
+				filtered data.
+			 ccf_error - The error on the frequency-filtered cross-correlation
+			 	function amplitudes.
 	
 	"""
 	filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
@@ -593,7 +634,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     # 	assert num_seconds > 0 # num_seconds must be a positive integer
     assert n_bins > 0  # number of bins must be a positive integer
     assert dt > 0
-    assert power_of_two(n_bins)  # n_bins must be a power of 2 for the FFT
+    assert tools.power_of_two(n_bins)  # n_bins must be a power of 2 for the FFT
 
     # 	print "dt =", dt, "seconds"
     # 	print "bins =", n_bins
@@ -639,20 +680,18 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Computes the cross-\
         correlation function of a channel of interest with a reference band.')
-    parser.add_argument('-i', '--infile', required=True, dest='infile',
-        help='Name of (ASCII/txt/dat) input file event list containing both \
-        the reference band and the channels of interest. Assumes ref band = \
-        PCU 0, interest = PCU 2.')
-    parser.add_argument('-o', '--outfile', required=True, dest='outfile',
-        help='The full path of the (ASCII/txt) file to write the frequency \
-        and power to.')
-    parser.add_argument('-n', '--num_seconds', type=int, default=1,
-        dest='num_seconds', help='Number of seconds in each Fourier segment. \
-        Must be a power of 2.')
-    parser.add_argument('-m', '--dt_mult', type=int, default=1, dest='dt_mult',
-        help='Multiple of 1/8192 seconds for timestep between bins.')
-    parser.add_argument('-t', '--test', type=int, default=0,
-        choices=range(0, 2),
+    parser.add_argument('infile', help='Name of (ASCII/txt/dat) event list \
+    	containing both the reference band and the channels of interest. \
+    	Assumes ref band = PCU 0, interest = PCU 2.')
+    parser.add_argument('outfile', help='The full path of the (ASCII/txt) file \
+    	to write the frequency and power to.')
+    parser.add_argument('-n', '--num_seconds', type=tools.type_power_of_two, \
+    	default=1, dest='num_seconds', help='Number of seconds in each Fourier \
+    	segment. Must be a power of 2.')
+    parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two, \
+    	default=1, dest='dt_mult', help='Multiple of 1/8192 seconds for \
+    	timestep between bins.')
+    parser.add_argument('-t', '--test', type=int, default=0, choices={0,1},
         dest='test', help='1 if only computing one segment for testing, 0 if \
         computing all segments.')
     args = parser.parse_args()
