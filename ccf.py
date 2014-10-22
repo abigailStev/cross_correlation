@@ -14,16 +14,17 @@ Computes the cross-correlation function of two light curves, to do phase-
 resolved spectroscopy. Able to read light curves from data with the program
 'populate_lightcurve'.
 
-Arguments:
+Required arguments:
 in_file - Name of (ASCII/txt/dat) input file event list containing both the
     reference band and the channels of interest. Assumes ref band = PCU 0,
     interest = PCU 2.
 out_file - Name of (ASCII/txt/dat) output file which the table of
     cross-correlation function data will be written to.
+    
+Optional arguments:
 num_seconds - Number of seconds in each Fourier segment. Must be a power of 2.
 dt_mult - Multiple of 1/8192 seconds for timestep between bins.
-test - 1 if only computing one segment for testing, 0 if computing all
-    segments.
+test - 1 if computing one segment for testing, 0 if doing full run.
 
 Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
 
@@ -678,8 +679,11 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
 ###############################################################################
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Computes the cross-\
-        correlation function of a channel of interest with a reference band.')
+    parser = argparse.ArgumentParser(usage='ccf.py infile outfile [-n \
+    	NUM_SECONDS] [-m DT_MULT] [-t {0,1}]', description='Computes the cross-\
+        correlation function of a channel of interest with a reference band.', \
+        epilog='For optional arguments, default values are given in brackets \
+        at end of description.')
     parser.add_argument('infile', help='Name of (ASCII/txt/dat) event list \
     	containing both the reference band and the channels of interest. \
     	Assumes ref band = PCU 0, interest = PCU 2.')
@@ -687,13 +691,13 @@ if __name__ == "__main__":
     	to write the frequency and power to.')
     parser.add_argument('-n', '--num_seconds', type=tools.type_power_of_two, \
     	default=1, dest='num_seconds', help='Number of seconds in each Fourier \
-    	segment. Must be a power of 2.')
+    	segment. Must be a power of 2. [1]')
     parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two, \
     	default=1, dest='dt_mult', help='Multiple of 1/8192 seconds for \
-    	timestep between bins.')
+    	timestep between bins. [1]')
     parser.add_argument('-t', '--test', type=int, default=0, choices={0,1},
         dest='test', help='1 if only computing one segment for testing, 0 if \
-        computing all segments.')
+        computing all segments. [0]')
     args = parser.parse_args()
 
     test = False
