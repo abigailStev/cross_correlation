@@ -30,7 +30,7 @@ fi
 tab_ext="dat"
 
 if [ -e "$in_file" ]; then
-	time python "$exe_dir"/ccf.py -i "${in_file}" -o "${out_file}.${tab_ext}" -n "$numsec" -m "$dt" -t "$testing"
+	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${tab_ext}" -n "$numsec" -m "$dt" -t "$testing"
 fi
 
 ccfs_plot="$exe_dir/ccf_plot.png"
