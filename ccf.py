@@ -103,6 +103,9 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
             stack_reference_band
 
     Stacks the photons in the reference band from 3-20 keV to make one 'band'.
+    Assumes that we are in epoch 5 or 3.
+    Should I be using the FTOOL rbnpha or grppha to assist with this?
+    
     Epoch 1: abs channels 10 - 74
     Epoch 2: abs channels 9 - 62
     Epoch 3: abs channels 7 - 54
@@ -116,15 +119,14 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
     Returns: rate_ref - The reference band, from 3 - 20 keV.
 
     """
-
     if obs_epoch == 5:
         rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
         # channel 2 to 25 inclusive
-    else:
+    elif obs_epoch == 3:
         rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
         # channel 3 to 28 inclusive
-
-    # 	print "SHAPE OF RATE 2", np.shape(rate_ref)
+    else:
+    	rate_ref = np.sum(rate_ref_2d[:, 3:32], axis=1)  # TEMP, NOT FOR REALS
     
     return rate_ref
 
@@ -196,7 +198,6 @@ def make_cs(rate_ci, rate_ref, n_bins, dt):
              	band.
 
     """
-    # 	print "Each segment"
     ## Computing the mean count rate of the segment
     mean_rate_segment_ci = np.mean(rate_ci, axis=0)
 #     print "CI make:", np.mean(rate_ci) * 64
@@ -274,7 +275,6 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_tim
 	"""
 	if len(time_ci) > 0 and len(time_ref) > 0:
 	# Only take a cross spectrum if there's stuff in both lists
-
 
 		assert len(time_ci) == len(energy_ci)
 		assert len(time_ref) == len(energy_ref)
@@ -625,8 +625,6 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     Returns: nothing
 
     """
-    pass
-
     t_res = 1.0 / 8192.0
     dt = dt_mult * t_res
     n_bins = num_seconds * int(1.0 / dt)
