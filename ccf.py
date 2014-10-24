@@ -144,7 +144,7 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
 
     Passed: freq_space_array - The average cross spectrum over all segments (and
                 all files, if applicable).
-            dt - Time step between bins, in seconds. Must be a power of 2.
+            dt - Time step between bins, in seconds.
             n_bins - Number of bins in one segment.
             signal_freq - The frequency, in Hz, of the signal we want to filter
             around.
@@ -188,8 +188,10 @@ def make_cs(rate_ci, rate_ref, n_bins, dt):
     Generating the cross spectrum for one segment of the light curve.
 
     Passed: rate_ci - The count rate for this segment of the channels of 
-    			interest.
+    			interest. Index orientation: (n_bins, energy_channels)
             rate_ref - The count rate for this segment of the reference band.
+            n_bins - Number of bins in one segment.
+            dt - Time step between bins, in seconds.
 
     Returns: cs_segment - The cross spectrum for this segment.
              mean_rate_segment_ci - The mean photon count rate of the channels 
@@ -640,7 +642,6 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
 
     mean_rate_whole_ci = np.zeros(64)
     mean_rate_whole_ref = 0
-    ccf = np.zeros((n_bins, 64))
     ccf_filtered = np.zeros((n_bins, 64))
     cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
 
