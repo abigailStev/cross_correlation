@@ -6,6 +6,7 @@ from datetime import datetime
 
 import populate_lightcurve as lc
 import tools
+import warnings
 
 """
         ccf.py
@@ -291,9 +292,8 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_tim
 			start_time)
 
 		rate_ref = stack_reference_band(rate_ref_2d, obs_epoch)
-		cs_segment, mean_rate_segment_ci, \
-			mean_rate_segment_ref, power_ci, power_ref = \
-			make_cs(rate_ci_2d, rate_ref, n_bins, dt)
+		cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
+			power_ref = make_cs(rate_ci_2d, rate_ref, n_bins, dt)
 # 		print mean_rate_segment_ci
 # 		print "CI each:", np.sum(mean_rate_segment_ci)
 # 		print "Ref each:", mean_rate_segment_ref
@@ -568,9 +568,9 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 
 	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
 	error_ratio = np.zeros(64, dtype=np.float64)
+	## A divide-by-zero RuntimeWarning in the following two lines means that there's no signal in that energy band, which is ok!
 	error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
 	error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
-
 #     print "error ratio, noise on top:", error_ratio
 #     print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
 #     print "Shape filt cs avg:", np.shape(filtered_cs_avg)

@@ -36,7 +36,7 @@ fi
 ccfs_plot="$exe_dir/ccf_plot.png"
 
 if [ -e "${out_file}.${tab_ext}" ]; then
-	python "$exe_dir"/plot_ccf.py -i "${out_file}.${tab_ext}" -o "${plot_root}" -p "${propID}/${obsID}"
+	python "$exe_dir"/plot_ccf.py "${out_file}.${tab_ext}" -o "${plot_root}" -p "${propID}/${obsID}"
 # 	open -a ImageJ "${plot_root}_chan_06.png"
 	
 	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" "${numsec}"

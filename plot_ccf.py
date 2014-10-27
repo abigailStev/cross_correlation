@@ -75,14 +75,14 @@ def main(tab_file, plot_root, propID):
 if __name__ == "__main__":
 	
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-i', '--intable', required=True, dest='tab_file',
-        help="The input table file, in ASCII/txt/dat format, with frequency in \
-        column 1, CCF amplitudes in columns 2-65, error in columns 66-129.")
-	parser.add_argument('-o', '--outroot', required=True, dest='plot_root',
-        help="The root of the filename to save the plot to. Energy channel will\
-         be appended to name before saving.")
-	parser.add_argument('-p', '--propID', required=True, dest='propID',
-        help="The proposal ID of the data.")
+	parser.add_argument('tab_file', help="The input table file, in .dat format,\
+		with frequency in column 1, CCF amplitudes in columns 2-65, error in \
+		columns 66-129.")
+	parser.add_argument('-o', '--out_root', dest='out_root', default="./ccf", \
+		help="The root of the filename to save the plot to. Energy channel will\
+		be appended to name before saving.")
+	parser.add_argument('-p', '--propID', dest='propID', default="Pxxxxx", \
+		help="The proposal ID of the data.")
 	args = parser.parse_args()
 
-	main(args.tab_file, args.plot_root, args.propID)
+	main(args.tab_file, args.out_root, args.propID)
