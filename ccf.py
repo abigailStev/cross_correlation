@@ -655,9 +655,9 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
 
     ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, mean_rate_whole_ci, mean_rate_whole_ref, mean_power_ci, mean_power_ref)
 	
-    print "CCF:", ccf_filtered[0, 2:5]
-    print "Shape of ccf error:", np.shape(ccf_error)
-    print "CCF error:", ccf_error[2:5]
+#     print "CCF:", ccf_filtered[0, 2:5]
+#     print "Shape of ccf error:", np.shape(ccf_error)
+#     print "CCF error:", ccf_error[2:5]
 	
     print "Number of segments:", num_segments
     # 	print "Mean rate for ci:", mean_rate_whole_ci
