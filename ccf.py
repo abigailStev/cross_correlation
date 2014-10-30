@@ -32,8 +32,7 @@ Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
 All scientific modules imported above, as well as python 2.7, can be downloaded
 in the Anaconda package, https://store.continuum.io/cshop/anaconda/
 
-'tools.py' and 'populate_lightcurve.py' are available on GitHub at 
-https://github.com/abigailStev/power_spectra
+'tools.py' and 'populate_lightcurve.py' are available on my GitHub
 
 """
 
@@ -537,7 +536,7 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	
 	## Getting rms of reference band, to normalize the ccf
 	signal_variance = np.sum(signal_ref_pow * df)
-	rms_ref = np.sqrt(signal_variance)  # should be a few percent in fractional rms units
+	rms_ref = np.sqrt(signal_variance)  # should be a few percent in fractional rms units -- here it's in absolute rms units!!
 	print "RMS of reference band:", rms_ref
     
     ## Putting signal_ref_pow in same shape as signal_ci_pow
@@ -571,6 +570,9 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	## A divide-by-zero RuntimeWarning in the following two lines means that there's no signal in that energy band, which is ok!
 	error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
 	error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
+	
+	error_ratio[np.where(np.isnan(error_ratio))] = 0.0
+	
 #     print "error ratio, noise on top:", error_ratio
 #     print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
 #     print "Shape filt cs avg:", np.shape(filtered_cs_avg)
@@ -587,7 +589,7 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 #     print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
     
     ## Computing the error on the ccf
-	ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0))
+	ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0, ddof=1))
 #     print "Shape of rms ci:", np.shape(ccf_rms_ci)
 #     print "CCF rms ci:", ccf_rms_ci
 #     print "Shape of error ratio:", np.shape(error_ratio)
