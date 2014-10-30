@@ -17,7 +17,7 @@ fi
 
 dt=1
 numsec=4
-testing=1  # 0 for no, 1 for yes
+testing=0  # 0 for no, 1 for yes
 
 if (( $testing == 0 )); then
 	out_file="$out_dir/${obsID}_${day}_t${dt}_${numsec}sec"
