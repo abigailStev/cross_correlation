@@ -3,8 +3,9 @@ import numpy as np
 import sys
 from scipy import fftpack
 from datetime import datetime
+import os
+from astropy.io import fits
 
-import populate_lightcurve as lc
 import tools
 import warnings
 
@@ -32,18 +33,18 @@ Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
 All scientific modules imported above, as well as python 2.7, can be downloaded
 in the Anaconda package, https://store.continuum.io/cshop/anaconda/
 
-'tools.py' and 'populate_lightcurve.py' are available on my GitHub
+'tools.py' is available in my public GitHub repo 'whizzy_scripts'
 
 """
 
 
 ###############################################################################
-def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
+def dat_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error):
     """
-            output
+            dat_output
 
-    Writes the cross-correlation function to an output file.
+    Writes the cross-correlation function to a .dat output file.
 
     Passed: out_file - Name of output file.
             in_file - Name of event list with both reference and interest bands.
@@ -62,7 +63,7 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
     Returns: nothing
 
     """
-    print "Output sent to %s" % out_file
+    print "Output sent to: %s" % out_file
 
     with open(out_file, 'w') as out:
         out.write("#\t\tCross-correlation function data")
@@ -94,8 +95,77 @@ def output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         ## End of for-loops
     ## End of with-block
     
-## End of function 'output'
+## End of function 'dat_output'
 
+
+###############################################################################
+def fits_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
+        mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error):
+    """
+            fits_output
+
+    Writes the cross-correlation function to a .fits output file.
+
+    Passed: out_file - Name of output file.
+            in_file - Name of event list with both reference and interest bands.
+            dt - Size of each time bin, in seconds.
+            n_bins - Number of (time) bins per segment.
+            num_seconds - Number of seconds in each Fourier segment.
+            num_segments - Number of segments the light curve was split up into.
+            mean_rate_whole_ci - Mean count rate of light curve 1, averaged over
+                all segments.
+            mean_rate_whole_ref - Mean count rate of light curve 2, averaged
+                over all segments.
+            t - Integer time bins to plot against the ccf.
+            ccf_filtered - CCF amplitudes, filtered in frequency space.
+            ccf_error - Error on the filtered CCF.
+
+    Returns: nothing
+    """
+    print "Output sent to: %s" % out_file
+
+    ## Making header for standard power spectrum
+    prihdr = fits.Header()
+    prihdr.set('TYPE', "Cross-correlation data")
+    prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
+    prihdr.set('EVTLIST', in_file)
+    prihdr.set('DT', dt, "seconds")
+    prihdr.set('N_BINS', n_bins, "time bins per segment")
+    prihdr.set('SEGMENTS', num_segments, "segments in the whole light curve")
+    prihdr.set('EXPOSURE', num_segments * n_bins * dt, \
+    	"seconds, of light curve")
+    prihdr.set('RATE_CI', str(mean_rate_whole_ci.tolist()), "counts/second")
+    prihdr.set('RATE_REF', mean_rate_whole_ref, "counts/second")
+    prihdu = fits.PrimaryHDU(header=prihdr)
+    
+    chan = np.arange(0,65)
+    energy_channels = np.tile(chan, len(t))
+    time_bins = np.repeat(t, len(chan))
+#     print len(energy_channels)
+#     print len(time_bins)
+    assert len(energy_channels) == len(time_bins)
+    
+    ## Making FITS table for standard power spectrum
+    col1 = fits.Column(name='TIME_BIN', format='K', array=time_bins)
+    col2 = fits.Column(name='CCF', unit='', format='D', \
+    	array=ccf_filtered.real.flatten('C'))
+    col3 = fits.Column(name='ERROR', unit='', format='D', \
+    	array=ccf_error.flatten('C'))
+    col4 = fits.Column(name='CHANNEL', unit='', format='I', \
+    	array=energy_channels)
+    cols = fits.ColDefs([col1, col2, col3, col4])
+    tbhdu = fits.BinTableHDU.from_columns(cols)
+    
+    ## If the file already exists, remove it (still working on just updating it)
+    assert out_file[-4:].lower() == "fits", 'ERROR: Output file must have extension ".fits".'
+    if os.path.isfile(out_file):
+    	os.remove(out_file)
+    ## Writing the standard power spectrum to a FITS file
+    thdulist = fits.HDUList([prihdu, tbhdu])
+    thdulist.writeto(out_file)	
+    
+	## End of function 'fits_output'
+	
 
 ###############################################################################
 def stack_reference_band(rate_ref_2d, obs_epoch):
@@ -284,9 +354,9 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_tim
 		mean_rate_segment_ref = np.zeros(64, dtype=np.float64)
 		cs_segment = np.zeros((n_bins, 64), dtype=np.complex128)
 
-		rate_ci_2d, rate_ci_1d = lc.make_lightcurve( \
+		rate_ci_2d, rate_ci_1d = tools.make_lightcurve( \
 			np.asarray(time_ci), np.asarray(energy_ci), n_bins, dt, start_time)
-		rate_ref_2d, rate_ref_1d = lc.make_lightcurve( \
+		rate_ref_2d, rate_ref_1d = tools.make_lightcurve( \
 			np.asarray(time_ref), np.asarray(energy_ref), n_bins, dt, \
 			start_time)
 
@@ -336,7 +406,11 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_tim
 		sum_power_ci, sum_power_ref, sum_rate_ci
 		
 ## End of function 'each_segment'
-	
+
+
+###############################################################################
+def fits_read_and_use_segments(in_file, n_bins, dt, test):
+
 
 ###############################################################################
 def read_and_use_segments(in_file, n_bins, dt, test):
@@ -401,7 +475,6 @@ def read_and_use_segments(in_file, n_bins, dt, test):
             if line[0].strip() != "#":
                 line = line.strip().split()
                 start_time = np.float64(line[0])
-    	
                 break
     end_time = start_time + (dt * n_bins)
 #     print "Start time is %.21f" % start_time
@@ -670,8 +743,8 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     t = np.arange(0, n_bins)
     # time = t * dt  # Converting to seconds
 
-    ## Calling 'output' function
-    output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
+    ## Calling output function
+    fits_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
 	
 ## End of function 'main'
