@@ -338,84 +338,133 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_tim
 	Returns: cs_sum - The sum of all the cross spectra.
 			 sum_rate_whole_ci - The sum of the count rates in ci.
 			 sum_rate_whole_ref - The sum of the count rates in ref.
-			 num_segments - The number of segments computed.
 			 sum_power_ci - The sum of the power spectra in ci.
 			 sum_power_ref - The sum of the power spectra in ref.
 			 sum_rate_ci - The sum of the count rates in ci, not split per 
 			 	energy band.
 	
 	"""
-	if len(time_ci) > 0 and len(time_ref) > 0:
-	# Only take a cross spectrum if there's stuff in both lists
 
-		assert len(time_ci) == len(energy_ci)
-		assert len(time_ref) == len(energy_ref)
-		mean_rate_segment_ci = np.zeros(64, dtype=np.float64)
-		mean_rate_segment_ref = np.zeros(64, dtype=np.float64)
-		cs_segment = np.zeros((n_bins, 64), dtype=np.complex128)
+	assert len(time_ci) == len(energy_ci)
+	assert len(time_ref) == len(energy_ref)
+	mean_rate_segment_ci = np.zeros(64, dtype=np.float64)
+	mean_rate_segment_ref = np.zeros(64, dtype=np.float64)
+	cs_segment = np.zeros((n_bins, 64), dtype=np.complex128)
 
-		rate_ci_2d, rate_ci_1d = tools.make_lightcurve( \
-			np.asarray(time_ci), np.asarray(energy_ci), n_bins, dt, start_time)
-		rate_ref_2d, rate_ref_1d = tools.make_lightcurve( \
-			np.asarray(time_ref), np.asarray(energy_ref), n_bins, dt, \
-			start_time)
+	rate_ci_2d, rate_ci_1d = tools.make_lightcurve( \
+		np.asarray(time_ci), np.asarray(energy_ci), n_bins, dt, start_time)
+	rate_ref_2d, rate_ref_1d = tools.make_lightcurve( \
+		np.asarray(time_ref), np.asarray(energy_ref), n_bins, dt, \
+		start_time)
 
-		rate_ref = stack_reference_band(rate_ref_2d, obs_epoch)
-		cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
-			power_ref = make_cs(rate_ci_2d, rate_ref, n_bins, dt)
+	rate_ref = stack_reference_band(rate_ref_2d, obs_epoch)
+	cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
+		power_ref = make_cs(rate_ci_2d, rate_ref, n_bins, dt)
 # 		print mean_rate_segment_ci
 # 		print "CI each:", np.sum(mean_rate_segment_ci)
 # 		print "Ref each:", mean_rate_segment_ref
 # 		print "From rateci2d:", np.sum(np.mean(rate_ci_2d, axis=0))
-		sum_rate_whole_ci += mean_rate_segment_ci
+	sum_rate_whole_ci += mean_rate_segment_ci
 # 		print sum_rate_whole_ci
-		sum_rate_whole_ref += mean_rate_segment_ref
-		sum_power_ci += power_ci
-		sum_power_ref += power_ref
-		cs_sum += cs_segment  # This adds indices
-		
-		
-		sum_rate_ci += np.mean(rate_ci_1d)
+	sum_rate_whole_ref += mean_rate_segment_ref
+	sum_power_ci += power_ci
+	sum_power_ref += power_ref
+	cs_sum += cs_segment  # This adds indices
+	
+	
+	sum_rate_ci += np.mean(rate_ci_1d)
 # 		print "CI real:", np.mean(rate_ci_1d)
-		num_segments += 1
 # 		print "1d", np.sum(rate_ci_1d)
 # 		print "2d", np.sum(rate_ci_2d)
 
-		
-		
-	## End of 'if there are events in the segment time'
-	
-# 	print np.sum(sum_rate_whole_ci)
-# 	print sum_rate_ci
-	
-	## Clearing variables from memory
-	time_ci = None
-	energy_ci = None
-	time_ref = None
-	energy_ref = None
+	cs_segment = None
 	mean_rate_segment_ci = None
 	mean_rate_segment_ref = None
-	cs_segment = None
+	power_ci = None
+	power_ref = None
+	rate_ref = None
 	rate_ci_2d = None
 	rate_ref_2d = None
 	rate_ci_1d = None
 	rate_ref_1d = None
-	rate_ref = None
 		
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 		
 ## End of function 'each_segment'
 
 
 ###############################################################################
-def fits_read_and_use_segments(in_file, n_bins, dt, test):
+def fits_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
+	"""
+			fits_input
+	"""
+	
+	fits_hdu = fits.open(in_file)
+	header = fits_hdu[0].header	 # Header info is in ext 0, data is in ext 1
+	data = fits_hdu[1].data
+	fits_hdu.close()
+	
+	
+	## Initializations
+	num_segments = 0
+	sum_rate_whole_ci = np.zeros(64, dtype=np.float64)
+	sum_rate_whole_ref = 0
+	cs_sum = np.zeros((n_bins, 64), dtype=np.complex128)
+	sum_power_ci = np.zeros((n_bins, 64), dtype=np.float64)
+	sum_power_ref = np.zeros(n_bins, dtype=np.float64)
+	sum_rate_ci = 0
+	
+	start_time = data.field('TIME')[0]
+	final_time = data.field('TIME')[-1]
+	end_time = start_time + (dt * n_bins)
+	
+	PCU2_mask = data.field('PCUID') == 2
+	data_pcu2 = data[PCU2_mask]
+	all_time_ci = np.asarray(data_pcu2.field('TIME'), dtype=np.float64)
+	all_energy_ci = np.asarray(data_pcu2.field('CHANNEL'), dtype=np.float64)
+	
+	PCU0_mask = data.field('PCUID') == 0
+	data_pcu0 = data[PCU0_mask]
+	all_time_ref = np.asarray(data_pcu0.field('TIME'), dtype=np.float64)
+	all_energy_ref = np.asarray(data_pcu0.field('CHANNEL'), dtype=np.float64)
+	
+	while end_time < final_time:
+		time_ci = all_time_ci[np.where(all_time_ci < end_time)]
+		energy_ci = all_energy_ci[np.where(all_time_ci < end_time)]
+		for_next_iteration_ci = np.where(all_time_ci >= end_time)
+		all_time_ci = all_time_ci[for_next_iteration_ci]
+		all_energy_ci = all_energy_ci[for_next_iteration_ci]
+		
+		time_ref = all_time_ref[np.where(all_time_ref < end_time)]
+		energy_ref = all_energy_ref[np.where(all_time_ref < end_time)]
+		for_next_iteration_ref = np.where(all_time_ref >= end_time)
+		all_time_ref = all_time_ref[for_next_iteration_ref]
+		all_energy_ref = all_energy_ref[for_next_iteration_ref]
+		
+		if len(time_ci) > 0 and len(time_ref) > 0:
+			num_segments += 1
+			cs_sum, sum_rate_whole_ci, sum_rate_whole_ref,  sum_power_ci, sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci)
+			if num_segments % print_iterator == 0:
+				print "\t", num_segments
+			if test is True and num_segments == 1:  # For testing
+				break
+			
+		## End of 'if there are counts in this segment'
+		
+		start_time += (n_bins * dt)
+		end_time += (n_bins * dt)
+		
+	## End of while-loop
+	
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci
 
+## End of function 'fits_input'
 
 ###############################################################################
-def read_and_use_segments(in_file, n_bins, dt, test):
+def dat_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
     """
-            read_and_use_segments
+            dat_input
 
     Reading in the eventlist to make the cross spectrum. Reads in a clock- 	
     corrected GTI'd event list, populates the light curves, computes cross 
@@ -426,43 +475,32 @@ def read_and_use_segments(in_file, n_bins, dt, test):
             n_bins - Number of bins in one segment of the light curve. Must be
                 a power of 2.
             dt - Time step between bins, in seconds. Must be a power of 2.
+            print_iterator - 
             test - True if computing one segment, False if computing all.
+            obs_epoch - 
 
     Returns: cs_sum - The sum of the cross spectra over all segments of the
                 light curves, one per energy channel.
              sum_rate_whole_ci - Sum of the mean count rates of all segments of
-                light curve 1, per energy channel.
+                channel of interest light curve, per energy channel.
              sum_rate_whole_ref - Sum of the mean count rates of all segments
-                of light curve 2, per energy channel.
+                reference light curve, per energy channel.
              num_segments - Number of segments computed.
-
+             sum_power_ci - 
+             sum_power_ref - 
+             sum_rate_ci - 
+    
     """
-    assert tools.power_of_two(n_bins)
-
-    print "Input file: %s" % in_file
-
-    if n_bins == 32768:
-        print_iterator = int(10)
-    elif n_bins < 32768:
-        print_iterator = int(10)
-    else:
-        print_iterator = int(1)
-    # 	print "Print iterator =", print_iterator
-
-    fits_file = in_file[0:-4] + ".fits"
-    # 	print fits_file
-    obs_epoch = tools.obs_epoch_rxte(fits_file)
-#     print "Observation epoch:", obs_epoch
 
     ## Initializations
     num_segments = 0
     sum_rate_whole_ci = np.zeros(64, dtype=np.float64)
     sum_rate_whole_ref = 0
     cs_sum = np.zeros((n_bins, 64), dtype=np.complex128)
-    time_ci = []
-    energy_ci = []
-    time_ref = []
-    energy_ref = []
+    time_ci = np.asarray([])
+    energy_ci = np.asarray([])
+    time_ref = np.asarray([])
+    energy_ref = np.asarray([])
     start_time = -99
     final_time = -99
     sum_power_ci = np.zeros((n_bins, 64), dtype=np.float64)
@@ -480,7 +518,6 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 #     print "Start time is %.21f" % start_time
 # 	print "End time of first seg is %.21f" % end_time
 
-    print "Segments computed:"
     with open(in_file, 'r') as f:
         for line, next_line in tools.pairwise(f):
             if line[0].strip() != "#":  # If the line is not a comment
@@ -493,61 +530,40 @@ def read_and_use_segments(in_file, n_bins, dt, test):
                 next_time = np.float64(next_line[0])
 
                 if current_pcu == 2:  ## If pcu = 2
-                    time_ci.append(current_time)
-                    energy_ci.append(current_chan)
-
+                    time_ci = np.append(time_ci, current_time)
+                    energy_ci = np.append(energy_ci, current_chan)
                 elif current_pcu == 0:  ## pcu = 0
-                    time_ref.append(current_time)
-                    energy_ref.append(current_chan)
-
+                    time_ref = np.append(time_ref, current_time)
+                    energy_ref = np.append(energy_ref, current_chan)
                 else:
-                    print "\n\tERROR: PCU is not 0 or 2. Exiting."
-                    sys.exit()
+#                 	raise Exception("ERROR: PCU is not 0 or 2. Exiting.")
+					pass
+                next_time = float(next_line[0])
+                next_end_time = end_time + (dt * n_bins)
 
-                if (next_time >= end_time):  # Triggered at end of a segment
-				# Because we want start_time <= times < end_time
-					cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
-						num_segments, sum_power_ci, sum_power_ref, sum_rate_ci = \
-						each_segment(time_ci, time_ref, energy_ci, energy_ref, \
-						n_bins, dt, start_time, end_time, obs_epoch, \
-						sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, \
-						sum_power_ref, cs_sum, num_segments, sum_rate_ci)
-					
-					if num_segments % print_iterator == 0:
-						print "\t", num_segments
-					if test is True and num_segments == 1:  # For testing
-						break
-					## Incrementing counters and loop control variables.
-					start_time = end_time
-					end_time += (n_bins * dt)
-					time_ci = []
-					energy_ci = []
-					time_ref = []
-					energy_ref = []
-						
-#                 elif next_time == final_time:
-# 					print "Last segment!"
-# # 					print "%.21f" % current_time
-# 					next_chan = np.int8(next_line[1])
-# 					next_pcu = np.int8(next_line[2])
-#                 	
-# 					if next_pcu == 2:  ## If pcu = 2
-# 						time_ci.append(next_time)
-# 						energy_ci.append(next_chan)
-# 					elif next_pcu == 0:  ## pcu = 0
-# 						time_ref.append(next_time)
-# 						energy_ref.append(next_chan)
-# 					else:
-# 						print "\n\tERROR: PCU is not 0 or 2. Exiting."
-# 						sys.exit()
-# 						
-# 					cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
-# 						num_segments, sum_power_ci, sum_power_ref = \
-# 						each_segment(time_ci, time_ref, energy_ci, energy_ref, \
-# 						n_bins, dt, start_time, end_time, obs_epoch, \
-# 						sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, \
-# 						sum_power_ref, cs_sum, num_segments)
-
+                if next_time >= end_time:  # Triggered at end of a segment
+                	if len(time_ci) > 0:
+                		num_segments += 1
+                		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref,  sum_power_ci, sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci)
+                		if num_segments % print_iterator == 0:
+                			print "\t", num_segments
+                		if test is True and num_segments == 1:  # For testing
+                			break
+                		time_ci = []
+                		energy_ci = []
+                		time_ref = []
+                		energy_ref = []
+                	## End of 'if there are counts in this segment'
+                	start_time += (n_bins * dt)
+                	end_time += (n_bins * dt)
+                	
+                	## This next bit helps it handle gappy data; keep in mind 
+                	## that end_time has already been incremented here
+                	if next_time >= end_time:
+                		while next_time >= end_time:
+                			start_time += (n_bins * dt)
+                			end_time += (n_bins * dt)
+			
 				## End of 'if it`s at the end of a segment'
 			## End of 'if the line is not a comment'
 		## End of for-loop
@@ -555,6 +571,43 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 		
     return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
         sum_power_ci, sum_power_ref, sum_rate_ci
+        
+## End of function 'dat_input'
+    
+    
+###############################################################################
+def read_and_use_segments(in_file, n_bins, dt, test):
+	"""
+	
+	"""
+  	assert tools.power_of_two(n_bins)
+  	
+  	print "Input file: %s" % in_file
+  	
+  	if n_bins == 32768:
+  		print_iterator = int(10)
+  	elif n_bins < 32768:
+  		print_iterator = int(10)
+  	else:
+  		print_iterator = int(1)
+  	
+	print "Segments computed:"
+
+	## data from dat and fits need to be populated as a light curve before a 
+	## power spectrum can be taken, whereas data from lc was made in seextrct 
+	## and so it's already populated as a light curve
+	if (in_file[-5:].lower() == ".fits"):
+		obs_epoch = tools.obs_epoch_rxte(in_file)
+		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci = fits_input(in_file, n_bins, dt, print_iterator, test, obs_epoch)
+		
+	elif (in_file[-4:].lower() == ".dat"):
+		fits_file = in_file[0:-4] + ".fits"
+  		obs_epoch = tools.obs_epoch_rxte(fits_file)
+		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci = dat_input(in_file, n_bins, dt, print_iterator, test, obs_epoch)
+	else:
+		raise Exception("ERROR: Input file type not recognized. Must be .dat or .fits.")
+	
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci
         
 ## End of function 'read_and_use_segments'
 
