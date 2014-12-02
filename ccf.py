@@ -63,6 +63,8 @@ def dat_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
     Returns: nothing
 
     """
+    if out_file[-4:].lower() == "fits":
+		out_file = out_file[:-4]+"dat"
     print "Output sent to: %s" % out_file
 
     with open(out_file, 'w') as out:
@@ -124,7 +126,7 @@ def fits_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
     """
     print "Output sent to: %s" % out_file
 
-    ## Making header for standard power spectrum
+    ## Making header
     prihdr = fits.Header()
     prihdr.set('TYPE', "Cross-correlation data")
     prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
@@ -138,19 +140,20 @@ def fits_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
     prihdr.set('RATE_REF', mean_rate_whole_ref, "counts/second")
     prihdu = fits.PrimaryHDU(header=prihdr)
     
-    chan = np.arange(0,65)
+    chan = np.arange(0,64)
     energy_channels = np.tile(chan, len(t))
+    ccf_error = np.tile(ccf_error, len(t))
     time_bins = np.repeat(t, len(chan))
 #     print len(energy_channels)
 #     print len(time_bins)
     assert len(energy_channels) == len(time_bins)
     
-    ## Making FITS table for standard power spectrum
+    ## Making FITS table
     col1 = fits.Column(name='TIME_BIN', format='K', array=time_bins)
-    col2 = fits.Column(name='CCF', unit='', format='D', \
+    col2 = fits.Column(name='CCF', unit='Counts/second', format='D', \
     	array=ccf_filtered.real.flatten('C'))
     col3 = fits.Column(name='ERROR', unit='', format='D', \
-    	array=ccf_error.flatten('C'))
+    	array=ccf_error)
     col4 = fits.Column(name='CHANNEL', unit='', format='I', \
     	array=energy_channels)
     cols = fits.ColDefs([col1, col2, col3, col4])
@@ -160,7 +163,7 @@ def fits_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
     assert out_file[-4:].lower() == "fits", 'ERROR: Output file must have extension ".fits".'
     if os.path.isfile(out_file):
     	os.remove(out_file)
-    ## Writing the standard power spectrum to a FITS file
+    ## Writing to a FITS file
     thdulist = fits.HDUList([prihdu, tbhdu])
     thdulist.writeto(out_file)	
     
@@ -309,7 +312,9 @@ def make_cs(rate_ci, rate_ref, n_bins, dt):
 
 
 ###############################################################################
-def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci):
+def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, \
+	start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, \
+	sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci):
 	"""
 			each_segment
 	
@@ -444,7 +449,11 @@ def fits_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 		
 		if len(time_ci) > 0 and len(time_ref) > 0:
 			num_segments += 1
-			cs_sum, sum_rate_whole_ci, sum_rate_whole_ref,  sum_power_ci, sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci)
+			cs_sum, sum_rate_whole_ci, sum_rate_whole_ref,  sum_power_ci, \
+				sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, \
+				energy_ci, energy_ref, n_bins, dt, start_time, end_time, \
+				obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci,\
+				sum_power_ref, cs_sum, num_segments, sum_rate_ci)
 			if num_segments % print_iterator == 0:
 				print "\t", num_segments
 			if test is True and num_segments == 1:  # For testing
@@ -457,7 +466,8 @@ def fits_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 		
 	## End of while-loop
 	
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+		sum_power_ci, sum_power_ref, sum_rate_ci
 
 ## End of function 'fits_input'
 
@@ -544,7 +554,8 @@ def dat_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
                 if next_time >= end_time:  # Triggered at end of a segment
                 	if len(time_ci) > 0:
                 		num_segments += 1
-                		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref,  sum_power_ci, sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci)
+                		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
+                			sum_power_ci, sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci)
                 		if num_segments % print_iterator == 0:
                 			print "\t", num_segments
                 		if test is True and num_segments == 1:  # For testing
@@ -598,23 +609,28 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 	## and so it's already populated as a light curve
 	if (in_file[-5:].lower() == ".fits"):
 		obs_epoch = tools.obs_epoch_rxte(in_file)
-		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci = fits_input(in_file, n_bins, dt, print_iterator, test, obs_epoch)
+		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+			sum_power_ci, sum_power_ref, sum_rate_ci = fits_input(in_file, \
+			n_bins, dt, print_iterator, test, obs_epoch)
 		
 	elif (in_file[-4:].lower() == ".dat"):
 		fits_file = in_file[0:-4] + ".fits"
   		obs_epoch = tools.obs_epoch_rxte(fits_file)
-		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci = dat_input(in_file, n_bins, dt, print_iterator, test, obs_epoch)
+		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+			sum_power_ci, sum_power_ref, sum_rate_ci = dat_input(in_file, \
+			n_bins, dt, print_iterator, test, obs_epoch)
 	else:
 		raise Exception("ERROR: Input file type not recognized. Must be .dat or .fits.")
 	
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+		sum_power_ci, sum_power_ref, sum_rate_ci
         
 ## End of function 'read_and_use_segments'
 
 
 ###############################################################################
 def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
-	mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref):
+	mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref, noisy):
 	"""
 			cs_to_ccf_w_err
 	
@@ -630,6 +646,8 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 			mean_rate_total_ref - 
 			mean_power_ci - 
 			mean_power_ref - 
+			noisy - True if data has Poisson noise; only False if using this 
+				function with a simulation
 	
 	Returns: ccf_filtered - The cross-correlation function of the frequency-
 				filtered data.
@@ -643,7 +661,15 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
     ## Absolute rms norms of poisson noise
 	noise_ci = 2.0 * mean_rate_total_ci
 	noise_ref = 2.0 * mean_rate_total_ref
+# 	print np.shape(noise_ci)
+# 	print np.shape(noise_ref)
+	
+	if not noisy:
+		noise_ci = np.zeros(64)
+		noise_ref = 0
+	
 	noise_ref_array = np.repeat(noise_ref, 64)
+# 	print np.shape(noise_ref_array)
 
 	df = 1.0 / float(num_seconds)  # in Hz
 #     print "df =", df
@@ -651,6 +677,7 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
     ## Extracting only the signal frequencies of the mean powers
 	signal_ci_pow = np.float64(mean_power_ci[j_min:j_max, :])
 	signal_ref_pow = np.float64(mean_power_ref[j_min:j_max])
+# 	print signal_ci_pow
 #     print j_min, j_max
 	
     ## Putting powers into absolute rms2 normalization
@@ -658,12 +685,14 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 #     print "signal ci pow:", signal_ci_pow[:, 2:5]
 	signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
 #     print "signal ref pow:", signal_ref_pow[2:5]
-	
+	print signal_ref_pow
 	
 	## Getting rms of reference band, to normalize the ccf
 	signal_variance = np.sum(signal_ref_pow * df)
-	rms_ref = np.sqrt(signal_variance)  # should be a few percent in fractional rms units -- here it's in absolute rms units!!
-	print "RMS of reference band:", rms_ref
+	print "Signal variance:", signal_variance
+	rms_ref = np.sqrt(signal_variance)  
+	print "Frac RMS of reference band:", rms_ref / mean_rate_total_ref  
+	# in frac rms units here -- should be few percent
     
     ## Putting signal_ref_pow in same shape as signal_ci_pow
 	signal_ref_pow_stacked = signal_ref_pow
@@ -781,7 +810,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     mean_power_ref = sum_power_ref / float(num_segments)
     cs_avg = cs_sum / float(num_segments)
 
-    ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, mean_rate_whole_ci, mean_rate_whole_ref, mean_power_ci, mean_power_ref)
+    ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, mean_rate_whole_ci, mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
 	
 #     print "CCF:", ccf_filtered[0, 2:5]
 #     print "Shape of ccf error:", np.shape(ccf_error)
@@ -798,6 +827,8 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
 
     ## Calling output function
     fits_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
+        mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
+    dat_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
 	
 ## End of function 'main'
