@@ -2,10 +2,15 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
+"""
+		plot_multi.py
+
+Plots multiple CCFs together on one plot.
+
+"""
 
 ##########################
 def main(file, plot_file, numsec):
-	pass
 	# table_1 = np.loadtxt(file_1, comments='#')
 	# table_2 = np.loadtxt(file_2, comments='#')
 	# table_3 = np.loadtxt(file_3, comments='#')
@@ -19,49 +24,70 @@ def main(file, plot_file, numsec):
 	# data_4 = table_4[:,0]
 	# data_5 = table_5[:,0]
 	# data_6 = table_6[:,0]
-
+	if file[-3:].lower() == "dat":
 # 	file="/Users/abigailstevens/Dropbox/Research/power_spectra/out_ccf/140610_t1_4sec.dat"
-	table = np.loadtxt(file, comments='#')
-# 	data_1 = table[:,65] # chan 1, abs 5
-# 	data_2 = table[:,70] # chan 6, abs 11
-# 	data_3 = table[:,76] # chan 11, abs 16
-# 	data_4 = table[:,78] # chan 14, abs 23
-# 	data_5 = table[:,81] # chan 18, abs 31
-# 	data_6 = table[:,87] # chan 21, abs 48
-	bins = table[:,0]
-	data_0 = table[:,1]
-	data_1 = table[:,2] # chan 1, abs 5
-	data_15 = table[:,4]
-	data_2 = table[:,7] # chan 6, abs 11
-	data_25 = table[:,10]
-	data_3 = table[:,12] # chan 11, abs 16
-	data_4 = table[:,15] # chan 14, abs 23
-	data_45 = table[:,17]
-	data_5 = table[:,19] # chan 18, abs 31
-	data_55 = table[:,20]
-	data_6 = table[:,22] # chan 21, abs 48
-	data_65 = table[:,24]
-	data_7 = table[:,26]
-	# chan is from 0 to 63 inclusive
-	# abs is from 0 to 254 inclusive
-
+		table = np.loadtxt(file, comments='#')
+	# 	data_1 = table[:,65] # chan 1, abs 5
+	# 	data_2 = table[:,70] # chan 6, abs 11
+	# 	data_3 = table[:,76] # chan 11, abs 16
+	# 	data_4 = table[:,78] # chan 14, abs 23
+	# 	data_5 = table[:,81] # chan 18, abs 31
+	# 	data_6 = table[:,87] # chan 21, abs 48
+		bins = table[:,0]
+		data_0 = table[:,1]
+		data_1 = table[:,2] # chan 1, abs 5
+		data_3 = table[:,4]
+		data_6 = table[:,7] # chan 6, abs 11
+		data_9 = table[:,10]
+		data_11 = table[:,12] # chan 11, abs 16
+		data_14 = table[:,15] # chan 14, abs 23
+		data_16 = table[:,17]
+		data_18 = table[:,19] # chan 18, abs 31
+		data_19 = table[:,20]
+		data_21 = table[:,22] # chan 21, abs 48
+		data_23 = table[:,24]
+		data_25 = table[:,26]
+		# chan is from 0 to 63 inclusive
+		# abs is from 0 to 254 inclusive
+	elif file[-4:].lower() == "fits":
+		file_hdu = fits.open(args.tab_file)
+		table = file_hdu[1].data
+		file_hdu.close()
+		bins = table[table.field('CHANNEL') == 0].field('TIME_BIN')
+		data_0 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_1 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_3 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_6 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_9 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_11 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_14 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_16 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_18 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_19 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_21 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_23 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_25 = table[table.field('CHANNEL') == 0].field('CCF')
+		
+	else:
+		raise Exception("ERROR: File type not recognized. Must have extension .dat or .fits.")
+		
 	fig, ax = plt.subplots()
 	ax.plot(bins, data_0, linewidth=2, label="Chan 0")
 	ax.plot(bins, data_1, linewidth=2, label="Chan 1") #label="2.5 keV")
-	ax.plot(bins, data_15, linewidth=2, label="Chan 3")
-	ax.plot(bins, data_2, linewidth=2, label="Chan 6") #label="5 keV")
-	ax.plot(bins, data_25, linewidth=2, label="Chan 9")
-	ax.plot(bins, data_3, linewidth=2, label="Chan 11") #label="7 keV")
-	ax.plot(bins, data_4, linewidth=2, label="Chan 14") #label="10 keV")
-	ax.plot(bins, data_45, linewidth=2, ls='-.', label="Chan 16")
-	ax.plot(bins, data_5, linewidth=2, ls='-.', label="Chan 18") #label="13 keV")
-	ax.plot(bins, data_55, linewidth=2, ls='-.', label="Chan 19")
-	ax.plot(bins, data_6, linewidth=2, ls='-.', label="Chan 21") #label="20 keV")
-	ax.plot(bins, data_65, linewidth=2, ls='-.', label="Chan 23")
-	ax.plot(bins, data_7, linewidth=2, ls='-.', label="Chan 25")
+	ax.plot(bins, data_3, linewidth=2, label="Chan 3")
+	ax.plot(bins, data_6, linewidth=2, label="Chan 6") #label="5 keV")
+	ax.plot(bins, data_9, linewidth=2, label="Chan 9")
+	ax.plot(bins, data_11, linewidth=2, label="Chan 11") #label="7 keV")
+	ax.plot(bins, data_14, linewidth=2, label="Chan 14") #label="10 keV")
+	ax.plot(bins, data_16, linewidth=2, ls='-.', label="Chan 16")
+	ax.plot(bins, data_18, linewidth=2, ls='-.', label="Chan 18") #label="13 keV")
+	ax.plot(bins, data_19, linewidth=2, ls='-.', label="Chan 19")
+	ax.plot(bins, data_21, linewidth=2, ls='-.', label="Chan 21") #label="20 keV")
+	ax.plot(bins, data_23, linewidth=2, ls='-.', label="Chan 23")
+	ax.plot(bins, data_25, linewidth=2, ls='-.', label="Chan 25")
 
-	plt.xlabel('Phase bins')
-	plt.ylabel('Photon count rate [photons / s]')
+	plt.xlabel('Arbitrary time bins')
+	plt.ylabel('Deviation from mean count rate [photons / s]')
 	# plt.xlim(0,20000)
 	plt.xlim(15,60)
 # 	plt.ylim(-0.0005,0.0005)
