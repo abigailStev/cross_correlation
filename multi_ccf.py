@@ -12,15 +12,6 @@ from ccf import read_and_use_segments, filter_freq, cs_to_ccf_w_err
 Computes the cross-correlation function of a band of interest with a reference
 band, over multiple data files.
 
-Arguments:
-data_file_list - The full path of the (ASCII/txt/dat) input file listing the
-    event lists to be used. One file per line. Assuming that both PCU0 and PCU2
-    are in the event list.
-out_file - Name of output file for cross-correlation function.
-num_seconds - Number of seconds in a segment (must be a power of 2).
-dt_mult - Multiple of 1/8192 seconds for timestep between bins.
-test - 1 if only computing one segment for testing, 0 if computing all segments.
-
 Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
 
 All scientific modules imported above, as well as python 2.7, can be downloaded
@@ -264,7 +255,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 # #     print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
 #     
 #     ## Computing the error on the ccf
-#     ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0))
+#     ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0, ddof=1))
 # #     print "Shape of rms ci:", np.shape(ccf_rms_ci)
 # #     print "CCF rms ci:", ccf_rms_ci
 # #     print "Shape of error ratio:", np.shape(error_ratio)
@@ -281,7 +272,7 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 	
     ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, \
     	total_segments, mean_rate_total_ci, mean_rate_total_ref, mean_power_ci,\
-    	mean_power_ref)
+    	mean_power_ref, True)
     
     exposure = total_segments * num_seconds  # Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
