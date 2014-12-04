@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from astropy.io import fits
 
 """
 		plot_multi.py
@@ -50,7 +51,7 @@ def main(file, plot_file, numsec):
 		# chan is from 0 to 63 inclusive
 		# abs is from 0 to 254 inclusive
 	elif file[-4:].lower() == "fits":
-		file_hdu = fits.open(args.tab_file)
+		file_hdu = fits.open(file)
 		table = file_hdu[1].data
 		file_hdu.close()
 		bins = table[table.field('CHANNEL') == 0].field('TIME_BIN')
