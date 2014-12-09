@@ -5,9 +5,10 @@ from scipy import fftpack
 from datetime import datetime
 import os
 from astropy.io import fits
-
 import tools
 import warnings
+
+__author__ ="Abigail Stevens <A.L.Stevens@uva.nl>"
 
 """
         ccf.py
@@ -15,18 +16,6 @@ import warnings
 Computes the cross-correlation function of two light curves, to do phase-
 resolved spectroscopy. Able to read light curves from data with the program
 'populate_lightcurve'.
-
-Required arguments:
-in_file - Name of (ASCII/txt/dat) input file event list containing both the
-    reference band and the channels of interest. Assumes ref band = PCU 0,
-    interest = PCU 2.
-out_file - Name of (ASCII/txt/dat) output file which the table of
-    cross-correlation function data will be written to.
-    
-Optional arguments:
-num_seconds - Number of seconds in each Fourier segment. Must be a power of 2.
-dt_mult - Multiple of 1/8192 seconds for timestep between bins.
-test - 1 if computing one segment for testing, 0 if doing full run.
 
 Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
 
@@ -171,42 +160,6 @@ def fits_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
 	
 
 ###############################################################################
-def stack_reference_band(rate_ref_2d, obs_epoch):
-    """
-            stack_reference_band
-
-    Stacks the photons in the reference band from 3-20 keV to make one 'band'.
-    Assumes that we are in epoch 5 or 3.
-    Should I be using the FTOOL rbnpha or grppha to assist with this?
-    
-    Epoch 1: abs channels 10 - 74
-    Epoch 2: abs channels 9 - 62
-    Epoch 3: abs channels 7 - 54
-    Epoch 4: abs channels 6 - 46
-    Epoch 5: abs channels 6 - 48
-
-    Passed: rate_ref_2d - The populated 2-dimensional light curve for the
-                reference band, split up by energy channel (0-63 inclusive).
-            obs_epoch - The RXTE observational epoch of the data
-
-    Returns: rate_ref - The reference band, from 3 - 20 keV.
-
-    """
-    if obs_epoch == 5:
-        rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
-        # channel 2 to 25 inclusive
-    elif obs_epoch == 3:
-        rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
-        # channel 3 to 28 inclusive
-    else:
-    	rate_ref = np.sum(rate_ref_2d[:, 3:32], axis=1)  # TEMP, NOT FOR REALS
-    
-    return rate_ref
-
-## End of function 'stack_reference_band'
-
-
-###############################################################################
 def filter_freq(freq_space_array, dt, n_bins, signal_freq):
     """
             filter_freq
@@ -251,6 +204,175 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
     return filt_freq_space_array, j_min, j_max
 
 ## End of function 'filter_freq'
+	
+
+###############################################################################
+def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
+	mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref, noisy):
+	"""
+			cs_to_ccf_w_err
+	
+	Takes the iFFT of the filtered cross spectrum to get the cross-correlation 
+	function, and computes the error on the cross-correlation function.
+	
+	Passed: cs_avg - Averaged cross spectrum of the data.
+			dt - Time step between bins, in seconds.
+			n_bins - Number of bins per Fourier segment. Must be a power of 2.
+			num_seconds - Number of seconds per Fourier segment.
+			total_segments - Total number of Fourier segments computed.
+			mean_rate_total_ci - 
+			mean_rate_total_ref - 
+			mean_power_ci - 
+			mean_power_ref - 
+			noisy - True if data has Poisson noise; only False if using this 
+				function with a simulation
+	
+	Returns: ccf_filtered - The cross-correlation function of the frequency-
+				filtered data.
+			 ccf_error - The error on the frequency-filtered cross-correlation
+			 	function amplitudes.
+	
+	"""
+	filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
+	assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
+    
+    ## Absolute rms norms of poisson noise
+	noise_ci = 2.0 * mean_rate_total_ci
+	noise_ref = 2.0 * mean_rate_total_ref
+# 	print np.shape(noise_ci)
+# 	print np.shape(noise_ref)
+	
+	if not noisy:
+		noise_ci = np.zeros(64)
+		noise_ref = 0
+	
+	noise_ref_array = np.repeat(noise_ref, 64)
+# 	print np.shape(noise_ref_array)
+
+	df = 1.0 / float(num_seconds)  # in Hz
+#     print "df =", df
+	
+    ## Extracting only the signal frequencies of the mean powers
+	signal_ci_pow = np.float64(mean_power_ci[j_min:j_max, :])
+	signal_ref_pow = np.float64(mean_power_ref[j_min:j_max])
+# 	print signal_ci_pow
+#     print j_min, j_max
+	
+    ## Putting powers into absolute rms2 normalization
+	signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
+#     print "signal ci pow:", signal_ci_pow[:, 2:5]
+	signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
+#     print "signal ref pow:", signal_ref_pow[2:5]
+# 	print signal_ref_pow
+	
+	## Getting rms of reference band, to normalize the ccf
+	signal_variance = np.sum(signal_ref_pow * df)
+	print "Signal variance:", signal_variance
+	rms_ref = np.sqrt(signal_variance)  
+	print "Frac RMS of reference band:", rms_ref / mean_rate_total_ref  
+	# in frac rms units here -- should be few percent
+    
+    ## Putting signal_ref_pow in same shape as signal_ci_pow
+	signal_ref_pow_stacked = signal_ref_pow
+	for i in xrange(63):
+		signal_ref_pow_stacked = np.column_stack(
+			(signal_ref_pow, signal_ref_pow_stacked))
+	assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
+
+	temp = (noise_ci * signal_ref_pow_stacked) + \
+		(noise_ref * signal_ci_pow) + \
+		(noise_ci * noise_ref)
+# 	print "Shape of temp:", np.shape(temp)
+	cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(total_segments))
+#     print "cs noise amp:", cs_noise_amp[2:5]
+
+	temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * dt / float(n_bins))
+	cs_signal_amp = np.sum(temp1, axis=0)
+#     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
+#     	float(total_segments))
+	
+#     print "Shape of cs signal amp:", np.shape(cs_signal_amp)
+#     print "Shape of other signal:", np.shape(other_sig)
+#     print "CS signal amp:", cs_signal_amp
+#     print "other signal amp:", other_sig[:,2:5]
+#     print "shape of cs signal amp:", np.shape(cs_signal_amp)
+#     print "CS noise amp:", cs_noise_amp
+
+	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
+	error_ratio = np.zeros(64, dtype=np.float64)
+	## A divide-by-zero RuntimeWarning in the following two lines means that there's no signal in that energy band, which is ok!
+	error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
+	error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
+	
+	error_ratio[np.where(np.isnan(error_ratio))] = 0.0
+	
+#     print "error ratio, noise on top:", error_ratio
+#     print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
+#     print "Shape filt cs avg:", np.shape(filtered_cs_avg)
+    
+    ## Taking the IFFT of the cross spectrum to get the CCF
+	ccf = fftpack.ifft(cs_avg, axis=0)
+	ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
+	assert np.shape(ccf) == np.shape(ccf_filtered)
+    
+    ## Dividing ccf by rms of signal in reference band
+	ccf *= (2.0 / float(n_bins) / rms_ref)
+	ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
+#     print "Unfilt norm CCF, 2-4:", ccf[0,2:5]
+#     print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
+    
+    ## Computing the error on the ccf
+	ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0, ddof=1))
+#     print "Shape of rms ci:", np.shape(ccf_rms_ci)
+#     print "CCF rms ci:", ccf_rms_ci
+#     print "Shape of error ratio:", np.shape(error_ratio)
+	ccf_error = ccf_rms_ci * error_ratio
+    
+#     ccf_error *= (2.0 / float(n_bins) / rms_ref)
+
+#     print "CCF:", ccf_filtered[0, 2:5]
+#     print "CCF error:", ccf_error[2:5]
+#     print "Shape of ccf error:", np.shape(ccf_error)
+	
+	return ccf_filtered, ccf_error
+    
+## End of function 'cs_to_ccf_w_err'
+
+
+###############################################################################
+def stack_reference_band(rate_ref_2d, obs_epoch):
+    """
+            stack_reference_band
+
+    Stacks the photons in the reference band from 3-20 keV to make one 'band'.
+    Assumes that we are in epoch 5 or 3.
+    Should I be using the FTOOL rbnpha or grppha to assist with this?
+    
+    Epoch 1: abs channels 10 - 74
+    Epoch 2: abs channels 9 - 62
+    Epoch 3: abs channels 7 - 54
+    Epoch 4: abs channels 6 - 46
+    Epoch 5: abs channels 6 - 48
+
+    Passed: rate_ref_2d - The populated 2-dimensional light curve for the
+                reference band, split up by energy channel (0-63 inclusive).
+            obs_epoch - The RXTE observational epoch of the data
+
+    Returns: rate_ref - The reference band, from 3 - 20 keV.
+
+    """
+    if obs_epoch == 5:
+        rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
+        # channel 2 to 25 inclusive
+    elif obs_epoch == 3:
+        rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
+        # channel 3 to 28 inclusive
+    else:
+    	rate_ref = np.sum(rate_ref_2d[:, 3:32], axis=1)  # TEMP, NOT FOR REALS
+    
+    return rate_ref
+
+## End of function 'stack_reference_band'
 
 
 ###############################################################################
@@ -376,7 +498,6 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, \
 	sum_power_ref += power_ref
 	cs_sum += cs_segment  # This adds indices
 	
-	
 	sum_rate_ci += np.mean(rate_ci_1d)
 # 		print "CI real:", np.mean(rate_ci_1d)
 # 		print "1d", np.sum(rate_ci_1d)
@@ -458,18 +579,21 @@ def fits_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 				print "\t", num_segments
 			if test is True and num_segments == 1:  # For testing
 				break
+	
+			start_time += (n_bins * dt)
+			end_time += (n_bins * dt)
 			
+		elif len(time_ci) == 0 or len(time_ref) == 0:
+			start_time = min(all_time_ci[0], all_time_ref[0])
+			end_time = start_time + (n_bins * dt)
 		## End of 'if there are counts in this segment'
-		
-		start_time += (n_bins * dt)
-		end_time += (n_bins * dt)
-		
 	## End of while-loop
 	
 	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
 ## End of function 'fits_input'
+
 
 ###############################################################################
 def dat_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
@@ -555,7 +679,12 @@ def dat_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
                 	if len(time_ci) > 0:
                 		num_segments += 1
                 		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
-                			sum_power_ci, sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci)
+                			sum_power_ci, sum_power_ref, sum_rate_ci = \
+                			each_segment(time_ci, time_ref, energy_ci, \
+                			energy_ref, n_bins, dt, start_time, end_time, \
+                			obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, \
+                			sum_power_ci, sum_power_ref, cs_sum, num_segments, \
+                			sum_rate_ci)
                 		if num_segments % print_iterator == 0:
                 			print "\t", num_segments
                 		if test is True and num_segments == 1:  # For testing
@@ -571,9 +700,8 @@ def dat_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
                 	## This next bit helps it handle gappy data; keep in mind 
                 	## that end_time has already been incremented here
                 	if next_time >= end_time:
-                		while next_time >= end_time:
-                			start_time += (n_bins * dt)
-                			end_time += (n_bins * dt)
+                		start_time = next_time
+                		end_time = start_time + (n_bins * dt)
 			
 				## End of 'if it`s at the end of a segment'
 			## End of 'if the line is not a comment'
@@ -629,139 +757,6 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 
 
 ###############################################################################
-def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
-	mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref, noisy):
-	"""
-			cs_to_ccf_w_err
-	
-	Takes the iFFT of the filtered cross spectrum to get the cross-correlation 
-	function, and computes the error on the cross-correlation function.
-	
-	Passed: cs_avg - Averaged cross spectrum of the data.
-			dt - Time step between bins, in seconds.
-			n_bins - Number of bins per Fourier segment. Must be a power of 2.
-			num_seconds - Number of seconds per Fourier segment.
-			total_segments - Total number of Fourier segments computed.
-			mean_rate_total_ci - 
-			mean_rate_total_ref - 
-			mean_power_ci - 
-			mean_power_ref - 
-			noisy - True if data has Poisson noise; only False if using this 
-				function with a simulation
-	
-	Returns: ccf_filtered - The cross-correlation function of the frequency-
-				filtered data.
-			 ccf_error - The error on the frequency-filtered cross-correlation
-			 	function amplitudes.
-	
-	"""
-	filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
-	assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
-    
-    ## Absolute rms norms of poisson noise
-	noise_ci = 2.0 * mean_rate_total_ci
-	noise_ref = 2.0 * mean_rate_total_ref
-# 	print np.shape(noise_ci)
-# 	print np.shape(noise_ref)
-	
-	if not noisy:
-		noise_ci = np.zeros(64)
-		noise_ref = 0
-	
-	noise_ref_array = np.repeat(noise_ref, 64)
-# 	print np.shape(noise_ref_array)
-
-	df = 1.0 / float(num_seconds)  # in Hz
-#     print "df =", df
-	
-    ## Extracting only the signal frequencies of the mean powers
-	signal_ci_pow = np.float64(mean_power_ci[j_min:j_max, :])
-	signal_ref_pow = np.float64(mean_power_ref[j_min:j_max])
-# 	print signal_ci_pow
-#     print j_min, j_max
-	
-    ## Putting powers into absolute rms2 normalization
-	signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
-#     print "signal ci pow:", signal_ci_pow[:, 2:5]
-	signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
-#     print "signal ref pow:", signal_ref_pow[2:5]
-	print signal_ref_pow
-	
-	## Getting rms of reference band, to normalize the ccf
-	signal_variance = np.sum(signal_ref_pow * df)
-	print "Signal variance:", signal_variance
-	rms_ref = np.sqrt(signal_variance)  
-	print "Frac RMS of reference band:", rms_ref / mean_rate_total_ref  
-	# in frac rms units here -- should be few percent
-    
-    ## Putting signal_ref_pow in same shape as signal_ci_pow
-	signal_ref_pow_stacked = signal_ref_pow
-	for i in xrange(63):
-		signal_ref_pow_stacked = np.column_stack(
-			(signal_ref_pow, signal_ref_pow_stacked))
-	assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
-
-	temp = (noise_ci * signal_ref_pow_stacked) + \
-		(noise_ref * signal_ci_pow) + \
-		(noise_ci * noise_ref)
-# 	print "Shape of temp:", np.shape(temp)
-	cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(total_segments))
-#     print "cs noise amp:", cs_noise_amp[2:5]
-
-	temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * dt / float(n_bins))
-	cs_signal_amp = np.sum(temp1, axis=0)
-#     other_sig = np.sqrt(np.square(signal_ci_pow * signal_ref_pow_stacked) / \
-#     	float(total_segments))
-	
-#     print "Shape of cs signal amp:", np.shape(cs_signal_amp)
-#     print "Shape of other signal:", np.shape(other_sig)
-#     print "CS signal amp:", cs_signal_amp
-#     print "other signal amp:", other_sig[:,2:5]
-#     print "shape of cs signal amp:", np.shape(cs_signal_amp)
-#     print "CS noise amp:", cs_noise_amp
-
-	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
-	error_ratio = np.zeros(64, dtype=np.float64)
-	## A divide-by-zero RuntimeWarning in the following two lines means that there's no signal in that energy band, which is ok!
-	error_ratio[:10] = cs_noise_amp[:10] / cs_signal_amp[:10]
-	error_ratio[11:] = cs_noise_amp[11:] / cs_signal_amp[11:]
-	
-	error_ratio[np.where(np.isnan(error_ratio))] = 0.0
-	
-#     print "error ratio, noise on top:", error_ratio
-#     print "Filtered cs, un-norm:", filtered_cs_avg[j_min:j_max,:]
-#     print "Shape filt cs avg:", np.shape(filtered_cs_avg)
-    
-    ## Taking the IFFT of the cross spectrum to get the CCF
-	ccf = fftpack.ifft(cs_avg, axis=0)
-	ccf_filtered = fftpack.ifft(filtered_cs_avg, axis=0)
-	assert np.shape(ccf) == np.shape(ccf_filtered)
-    
-    ## Dividing ccf by rms of signal in reference band
-	ccf *= (2.0 / float(n_bins) / rms_ref)
-	ccf_filtered *= (2.0 / float(n_bins) / rms_ref)
-#     print "Unfilt norm CCF, 2-4:", ccf[0,2:5]
-#     print "Filt norm ccf, 2-4:", ccf_filtered[0,2:5]
-    
-    ## Computing the error on the ccf
-	ccf_rms_ci = np.sqrt(np.var(ccf_filtered, axis=0, ddof=1))
-#     print "Shape of rms ci:", np.shape(ccf_rms_ci)
-#     print "CCF rms ci:", ccf_rms_ci
-#     print "Shape of error ratio:", np.shape(error_ratio)
-	ccf_error = ccf_rms_ci * error_ratio
-    
-#     ccf_error *= (2.0 / float(n_bins) / rms_ref)
-
-#     print "CCF:", ccf_filtered[0, 2:5]
-#     print "CCF error:", ccf_error[2:5]
-#     print "Shape of ccf error:", np.shape(ccf_error)
-	
-	return ccf_filtered, ccf_error
-    
-## End of function 'cs_to_ccf_w_err'
-
-
-###############################################################################
 def main(in_file, out_file, num_seconds, dt_mult, test):
     """
             main
@@ -802,7 +797,9 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     ccf_filtered = np.zeros((n_bins, 64))
     cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
 
-    cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, dt, test)
+    cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, \
+    	sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, \
+    	dt, test)
 
     mean_rate_whole_ci = sum_rate_whole_ci / float(num_segments)
     mean_rate_whole_ref = sum_rate_whole_ref / float(num_segments)
@@ -810,7 +807,9 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     mean_power_ref = sum_power_ref / float(num_segments)
     cs_avg = cs_sum / float(num_segments)
 
-    ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, mean_rate_whole_ci, mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
+    ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, \
+    	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, mean_power_ci, \
+    	mean_power_ref, True)
 	
 #     print "CCF:", ccf_filtered[0, 2:5]
 #     print "Shape of ccf error:", np.shape(ccf_error)
