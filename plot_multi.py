@@ -3,10 +3,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
 
+__author__ = "Abigail Stevens"
+__author_email__ = "A.L.Stevens@uva.nl"
+__year__ = "2014"
+__description__ = "Plots multiple CCFs together on one plot."
+
 """
 		plot_multi.py
 
-Plots multiple CCFs together on one plot.
+Written in Python 2.7.
 
 """
 
