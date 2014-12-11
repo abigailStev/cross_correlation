@@ -2,22 +2,20 @@ import argparse
 import numpy as np
 from scipy import fftpack
 from datetime import datetime
-
-import tools
+from astropy.io import fits
+import tools  # https://github.com/abigailStev/whizzy_scripts
 from ccf import read_and_use_segments, filter_freq, cs_to_ccf_w_err
+
+__author__ = "Abigail Stevens"
+__author_email__ = "A.L.Stevens@uva.nl"
+__year__ = "2014"
+__description__ = "Computes the cross-correlation function of a band of \
+interest with a reference band, over multiple RXTE event-mode data files."
 
 """
 		multi_ccf.py
 
-Computes the cross-correlation function of a band of interest with a reference
-band, over multiple data files.
-
-Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
-
-All scientific modules imported above, as well as python 2.7, can be downloaded
-in the Anaconda package, https://store.continuum.io/cshop/anaconda/
-
-'tools.py' is available at https://github.com/abigailStev/whizzy_scripts
+Written in Python 2.7.
 
 """
 
@@ -28,24 +26,6 @@ def multi_output(out_file, in_file_list, dt, n_bins, total_exposure,
 			multi_output
 			
 	Writes the cross-correlation function to an output file.
-		
-	Passed: out_file - Name of output file for cross-correlation function.
-			data_file_list - Name of file containing lists of files with count
-			    rate input data.
-			reference_band - Name of file with the reference band count rate,
-			    n-bins long.
-			dt - Size of time bin, in seconds (must be power of 2).
-			n_bins - Number of time bins in a segment (must be power of 2).
-			total_exposure - Total exposure of the light curves used for ci.
-			mean_rate_total_ci -  Mean count rate of all curves used for
-			    channels of interest.
-			mean_rate_total_ref - Mean count rate of all curves used for
-			    reference band.
-			t - Integer 'time' bins for CCF.
-			ccf_filtered - Frequency-filtered CCF
-			ccf_error - Error on frequency-filtered CCF.
-			
-	Returns: nothing
 		
 	"""
 
@@ -80,7 +60,6 @@ def multi_output(out_file, in_file_list, dt, n_bins, total_exposure,
 
         ## End of for-loops
     ## End of with-block
-
 ## End of function 'output'
 
 
@@ -91,20 +70,6 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 		
 	Reads in a FITS file, takes FFT of data, makes power spectrum, writes to a
 	file.
-	
-	Passed: in_file_list - Name of the file with a list of data files. 
-				One file per line.
-			out_file - Name of output file for standard power spectrum.
-			num_seconds - Number of seconds for each segment of the light curve.
-				Must be a power of 2.
-			dt_mult - Multiple of 1/8192 seconds for timestep between bins.
-			test - True if computing one segment, False if computing all.
-			
-		future option:
-			filter - True if filtering the cross spectrum above and below 401Hz,
-				False if leaving other frequencies untouched.
-	
-	Returns: nothing
 	
 	"""
 
@@ -302,7 +267,8 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Computes the cross-\
-        correlation function of a channel of interest with a reference band.')
+        correlation function of a channel of interest with a reference band, \
+        over multiple RXTE event-mode data files.')
     parser.add_argument('-i', '--infile_list', required=True,
         dest='infile_list', help="The full path of the (ASCII/txt/dat) input \
         file listing the event lists to be used. One file per line. Assuming \
