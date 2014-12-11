@@ -5,51 +5,29 @@ from scipy import fftpack
 from datetime import datetime
 import os
 from astropy.io import fits
-import tools
 import warnings
+import tools  # https://github.com/abigailStev/whizzy_scripts
 
-__author__ ="Abigail Stevens <A.L.Stevens@uva.nl>"
+__author__ = "Abigail Stevens"
+__author_email__ = "A.L.Stevens@uva.nl"
+__year__ = "2014"
+__description__ = "Computes the cross-correlation function of a band of \
+interest with a reference band from RXTE event-mode data."
 
 """
         ccf.py
 
-Computes the cross-correlation function of two light curves, to do phase-
-resolved spectroscopy. Able to read light curves from data with the program
-'populate_lightcurve'.
-
-Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
-
-All scientific modules imported above, as well as python 2.7, can be downloaded
-in the Anaconda package, https://store.continuum.io/cshop/anaconda/
-
-'tools.py' is available in my public GitHub repo 'whizzy_scripts'
+Written in Python 2.7.
 
 """
 
-
 ###############################################################################
-def dat_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
+def dat_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error):
     """
-            dat_output
+            dat_out
 
     Writes the cross-correlation function to a .dat output file.
-
-    Passed: out_file - Name of output file.
-            in_file - Name of event list with both reference and interest bands.
-            dt - Size of each time bin, in seconds.
-            n_bins - Number of (time) bins per segment.
-            num_seconds - Number of seconds in each Fourier segment.
-            num_segments - Number of segments the light curve was split up into.
-            mean_rate_whole_ci - Mean count rate of light curve 1, averaged over
-                all segments.
-            mean_rate_whole_ref - Mean count rate of light curve 2, averaged
-                over all segments.
-            t - Integer time bins to plot against the ccf.
-            ccf_filtered - CCF amplitudes, filtered in frequency space.
-            ccf_error - Error on the filtered CCF.
-
-    Returns: nothing
 
     """
     if out_file[-4:].lower() == "fits":
@@ -85,33 +63,17 @@ def dat_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
                 out.write("\t%.6e" % ccf_error[i].real)
         ## End of for-loops
     ## End of with-block
-    
-## End of function 'dat_output'
+## End of function 'dat_out'
 
 
 ###############################################################################
-def fits_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
+def fits_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error):
     """
-            fits_output
+            fits_out
 
     Writes the cross-correlation function to a .fits output file.
-
-    Passed: out_file - Name of output file.
-            in_file - Name of event list with both reference and interest bands.
-            dt - Size of each time bin, in seconds.
-            n_bins - Number of (time) bins per segment.
-            num_seconds - Number of seconds in each Fourier segment.
-            num_segments - Number of segments the light curve was split up into.
-            mean_rate_whole_ci - Mean count rate of light curve 1, averaged over
-                all segments.
-            mean_rate_whole_ref - Mean count rate of light curve 2, averaged
-                over all segments.
-            t - Integer time bins to plot against the ccf.
-            ccf_filtered - CCF amplitudes, filtered in frequency space.
-            ccf_error - Error on the filtered CCF.
-
-    Returns: nothing
+    
     """
     print "Output sent to: %s" % out_file
 
@@ -149,15 +111,126 @@ def fits_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
     tbhdu = fits.BinTableHDU.from_columns(cols)
     
     ## If the file already exists, remove it (still working on just updating it)
-    assert out_file[-4:].lower() == "fits", 'ERROR: Output file must have extension ".fits".'
+    assert out_file[-4:].lower() == "fits", \
+    	'ERROR: Output file must have extension ".fits".'
     if os.path.isfile(out_file):
     	os.remove(out_file)
     ## Writing to a FITS file
     thdulist = fits.HDUList([prihdu, tbhdu])
     thdulist.writeto(out_file)	
-    
-	## End of function 'fits_output'
+## End of function 'fits_out'
+
+
+###############################################################################
+def get_phase_err(cs_avg, power_ci, power_ref, n, M):
+	"""
+			get_phase_err
 	
+	Computes the error on the complex phase (in radians).
+	
+	"""
+	coherence = np.abs(cs_avg)**2 / (power_ci * power_ref)
+	phase_err = np.sqrt((1 - coherence) / ( 2 * coherence * n * M))
+# 	phase_err[np.where(coherence == 0.)] == 0.
+	return phase_err
+## End of function 'get_phase_err'
+
+
+###############################################################################
+def phase_to_tlags(phase, freq):
+	"""
+			phase_to_tlags
+	
+	Converts a complex phase (in radians) to a time lag (in seconds).
+	
+	"""
+	f = np.repeat(freq[:, np.newaxis], 64, axis=1)
+	print np.shape(f)
+	print np.shape(phase)
+	tlags =  phase / (2.0 * np.pi * f)
+	tlags[np.where(f == 0.)] = 0.
+	return tlags
+## End of function 'phase_to_tlags'
+
+
+###############################################################################
+def time_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
+	mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, power_ci, power_ref):
+	"""
+			time_lags
+			
+	Computes the phase lag and time lag from the average cross spectrum, and 
+	writes the lag information to a .fits output file.
+	
+	"""
+	freq = fftpack.fftfreq(n_bins, d=dt)
+	max_index = np.argmax(freq)+1  # because in python, the scipy fft makes the 
+								   # nyquist frequency negative, and we want it 
+								   # to be positive! (it is actually both pos 
+								   # and neg)
+	freq = np.abs(freq[1:max_index + 1])  # because it slices at end-1, and we 
+										  # want to include 'max_index'; abs is
+										  # because the nyquist freq is both pos
+										  # and neg, and we want it pos here.
+										  # but we don't want freq=0 because 
+										  # that gives errors.
+	cs_avg = cs_avg[1:max_index + 1]
+	power_ci = power_ci[1:max_index + 1]
+	power_ref = power_ref[1:max_index + 1]
+	phase = np.arctan2(cs_avg.real, cs_avg.imag)
+	err_phase = get_phase_err(cs_avg, power_ci, \
+		np.repeat(power_ref[:, np.newaxis], 64, axis=1), 1, num_segments)
+	tlag = phase_to_tlags(phase, freq)
+	err_tlag = phase_to_tlags(err_phase, freq)
+    
+	print phase[0:5, 0]
+	chan = np.arange(0,64)
+	energy_channels = np.tile(chan, len(freq))
+	print np.shape(energy_channels)
+	bins = np.repeat(freq, len(chan))
+	assert len(energy_channels) == len(bins)
+    
+    
+	out_file = out_file.replace("cross_correlation/out_ccf", "lags/out_lags")
+	print "Output sent to: %s" % out_file
+	## Making header
+	prihdr = fits.Header()
+	prihdr.set('TYPE', "Time lag data")
+	prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
+	prihdr.set('EVTLIST', in_file)
+	prihdr.set('DT', dt, "seconds")
+	prihdr.set('N_BINS', n_bins, "time bins per segment")
+	prihdr.set('SEGMENTS', num_segments, "segments in the whole light curve")
+	prihdr.set('EXPOSURE', num_segments * n_bins * dt, \
+		"seconds, of light curve")
+	prihdr.set('RATE_CI', str(mean_rate_whole_ci.tolist()), "counts/second")
+	prihdr.set('RATE_REF', mean_rate_whole_ref, "counts/second")
+	prihdu = fits.PrimaryHDU(header=prihdr)
+
+    ## Making FITS table
+	col1 = fits.Column(name='FREQUENCY', format='D', array=bins)
+	col2 = fits.Column(name='PHASE', unit='radians', format='D', \
+		array=phase.flatten('C'))
+	col3 = fits.Column(name='PHASE_ERR', unit='radians', format='D', \
+		array=err_phase.flatten('C'))
+	col4 = fits.Column(name='TIME_LAG', unit='s', format='D', array=tlag.flatten('C'))
+	col5 = fits.Column(name='TIME_LAG_ERR', unit='s', format='D', array=err_tlag.flatten('C'))
+	col6 = fits.Column(name='CHANNEL', unit='', format='I', \
+		array=energy_channels)
+	cols = fits.ColDefs([col1, col2, col3, col4, col5, col6])
+	tbhdu = fits.BinTableHDU.from_columns(cols)
+    
+	## If the file already exists, remove it (still working on just updating it)
+	assert out_file[-4:].lower() == "fits", \
+		'ERROR: Output file must have extension ".fits".'
+	if os.path.isfile(out_file):
+		os.remove(out_file)
+	## Writing to a FITS file
+	thdulist = fits.HDUList([prihdu, tbhdu])
+	thdulist.writeto(out_file)	
+	
+## End of function 'time_lags'
+
 
 ###############################################################################
 def filter_freq(freq_space_array, dt, n_bins, signal_freq):
@@ -167,21 +240,6 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
     Applying a filter to the averaged cross-spectrum per energy channel (in
     frequency space). Any cross spectrum amplitudes above or below signal_freq
     get zeroed out.
-
-    Passed: freq_space_array - The average cross spectrum over all segments (and
-                all files, if applicable).
-            dt - Time step between bins, in seconds.
-            n_bins - Number of bins in one segment.
-            signal_freq - The frequency, in Hz, of the signal we want to filter
-            around.
-
-    Returns: filt_freq_space_array - The cross-spectrum filtered in 
-    		 	Fourier-frequency-space.
-    		 j_min - The first frequency bin in which we keep the signal.
-    		 j_max - 1+ the last frequency bin in which we keep the signal.
-    		 
-    The signal goes from j_min to j_max+1, so freq[j_min:j_max] gives you only 
-    the bins with the kept frequencies.
 
     """
     freq = fftpack.fftfreq(n_bins, d=dt)
@@ -193,7 +251,8 @@ def filter_freq(freq_space_array, dt, n_bins, signal_freq):
     # 	print freq[j_min]
     # 	print freq[j_max-1]
     zero_front = np.zeros((j_min, 64), dtype=np.complex128)
-    zero_end = np.zeros((len(freq_space_array) - j_max, 64), dtype=np.complex128)
+    zero_end = np.zeros((len(freq_space_array) - j_max, 64), \
+    	dtype=np.complex128)
     # 	print np.shape(zero_front)
     # 	print np.shape(freq_space_array[j_min:j_max,:])
     # 	print np.shape(zero_end)
@@ -215,26 +274,11 @@ def cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	Takes the iFFT of the filtered cross spectrum to get the cross-correlation 
 	function, and computes the error on the cross-correlation function.
 	
-	Passed: cs_avg - Averaged cross spectrum of the data.
-			dt - Time step between bins, in seconds.
-			n_bins - Number of bins per Fourier segment. Must be a power of 2.
-			num_seconds - Number of seconds per Fourier segment.
-			total_segments - Total number of Fourier segments computed.
-			mean_rate_total_ci - 
-			mean_rate_total_ref - 
-			mean_power_ci - 
-			mean_power_ref - 
-			noisy - True if data has Poisson noise; only False if using this 
-				function with a simulation
-	
-	Returns: ccf_filtered - The cross-correlation function of the frequency-
-				filtered data.
-			 ccf_error - The error on the frequency-filtered cross-correlation
-			 	function amplitudes.
-	
 	"""
 	filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
-	assert np.shape(filtered_cs_avg) == np.shape(cs_avg)
+	assert np.shape(filtered_cs_avg) == np.shape(cs_avg), \
+		"ERROR: Frequency-filtered cross spectrum should have the same size as \
+		the original cross-spectrum. Something went wrong."
     
     ## Absolute rms norms of poisson noise
 	noise_ci = 2.0 * mean_rate_total_ci
@@ -354,12 +398,6 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
     Epoch 4: abs channels 6 - 46
     Epoch 5: abs channels 6 - 48
 
-    Passed: rate_ref_2d - The populated 2-dimensional light curve for the
-                reference band, split up by energy channel (0-63 inclusive).
-            obs_epoch - The RXTE observational epoch of the data
-
-    Returns: rate_ref - The reference band, from 3 - 20 keV.
-
     """
     if obs_epoch == 5:
         rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
@@ -381,18 +419,6 @@ def make_cs(rate_ci, rate_ref, n_bins, dt):
             make_cs
 
     Generating the cross spectrum for one segment of the light curve.
-
-    Passed: rate_ci - The count rate for this segment of the channels of 
-    			interest. Index orientation: (n_bins, energy_channels)
-            rate_ref - The count rate for this segment of the reference band.
-            n_bins - Number of bins in one segment.
-            dt - Time step between bins, in seconds.
-
-    Returns: cs_segment - The cross spectrum for this segment.
-             mean_rate_segment_ci - The mean photon count rate of the channels 
-             	of interest.
-             mean_rate_segment_ref - The mean photon count rate of the reference 
-             	band.
 
     """
     ## Computing the mean count rate of the segment
@@ -443,35 +469,7 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, \
 	Turns the event list into a populated histogram, stacks the reference band, 
 	and makes the cross spectrum, per segment of light curve.
 	
-	Passed: time_ci - List of times of events in ci.
-			time_ref - List of times of events in ref.
-			energy_ci - List of energies of events in ci.
-			energy_ref - List of energies of events in ref.
-			n_bins - Number of bins in one segment of the light curve. Must be
-                a power of 2.
-			dt - Time step between bins, in seconds. Must be a power of 2.
-			start_time - The start time of the segment.
-			end_time - The end time of the segment.
-			obs_epoch - The RXTE observational epoch.
-			sum_rate_whole_ci - The sum of the count rates in ci.
-			sum_rate_whole_ref - The sum of the count rates in ref.
-			sum_power_ci - The sum of the power spectra in ci.
-			sum_power_ref - The sum of the power spectra in ref.
-			cs_sum - The sum of the cross spectra.
-			num_segments - The number of segments computed.
-			sum_rate_ci - The sum of the count rates in ci, not split per energy 		
-				band.
-	
-	Returns: cs_sum - The sum of all the cross spectra.
-			 sum_rate_whole_ci - The sum of the count rates in ci.
-			 sum_rate_whole_ref - The sum of the count rates in ref.
-			 sum_power_ci - The sum of the power spectra in ci.
-			 sum_power_ref - The sum of the power spectra in ref.
-			 sum_rate_ci - The sum of the count rates in ci, not split per 
-			 	energy band.
-	
 	"""
-
 	assert len(time_ci) == len(energy_ci)
 	assert len(time_ref) == len(energy_ref)
 	mean_rate_segment_ci = np.zeros(64, dtype=np.float64)
@@ -521,16 +519,20 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, \
 
 
 ###############################################################################
-def fits_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
+def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	"""
-			fits_input
-	"""
+			fits_in
 	
+	Reading in an eventlist in .fits format to make the cross spectrum. Reads 
+	in a clock-corrected GTI'd event list, populates the light curves, computes 
+	cross spectrum per energy channel and keeps running average of the cross 
+	spectra.
+	
+	"""
 	fits_hdu = fits.open(in_file)
 	header = fits_hdu[0].header	 # Header info is in ext 0, data is in ext 1
 	data = fits_hdu[1].data
 	fits_hdu.close()
-	
 	
 	## Initializations
 	num_segments = 0
@@ -592,40 +594,19 @@ def fits_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
-## End of function 'fits_input'
+## End of function 'fits_in'
 
 
 ###############################################################################
-def dat_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
+def dat_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
     """
-            dat_input
+            dat_in
 
     Reading in the eventlist to make the cross spectrum. Reads in a clock- 	
     corrected GTI'd event list, populates the light curves, computes cross 
-    spectra per energy channel and keeps running average of cross spectra.
-
-    Passed: in_file - The name of the event list with both reference and
-                interest events.
-            n_bins - Number of bins in one segment of the light curve. Must be
-                a power of 2.
-            dt - Time step between bins, in seconds. Must be a power of 2.
-            print_iterator - 
-            test - True if computing one segment, False if computing all.
-            obs_epoch - 
-
-    Returns: cs_sum - The sum of the cross spectra over all segments of the
-                light curves, one per energy channel.
-             sum_rate_whole_ci - Sum of the mean count rates of all segments of
-                channel of interest light curve, per energy channel.
-             sum_rate_whole_ref - Sum of the mean count rates of all segments
-                reference light curve, per energy channel.
-             num_segments - Number of segments computed.
-             sum_power_ci - 
-             sum_power_ref - 
-             sum_rate_ci - 
+    spectrum per energy channel and keeps running average of the cross spectra.
     
     """
-
     ## Initializations
     num_segments = 0
     sum_rate_whole_ci = np.zeros(64, dtype=np.float64)
@@ -711,13 +692,17 @@ def dat_input(in_file, n_bins, dt, print_iterator, test, obs_epoch):
     return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
         sum_power_ci, sum_power_ref, sum_rate_ci
         
-## End of function 'dat_input'
+## End of function 'dat_in'
     
     
 ###############################################################################
 def read_and_use_segments(in_file, n_bins, dt, test):
 	"""
+			read_and_use_segments
 	
+	Reads in segments of a light curve from a .dat or .fits file. Split into 
+	'fits_in' and 'dat_in' for easier readability.
+		
 	"""
   	assert tools.power_of_two(n_bins)
   	
@@ -738,14 +723,14 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 	if (in_file[-5:].lower() == ".fits"):
 		obs_epoch = tools.obs_epoch_rxte(in_file)
 		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-			sum_power_ci, sum_power_ref, sum_rate_ci = fits_input(in_file, \
+			sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file, \
 			n_bins, dt, print_iterator, test, obs_epoch)
 		
 	elif (in_file[-4:].lower() == ".dat"):
 		fits_file = in_file[0:-4] + ".fits"
   		obs_epoch = tools.obs_epoch_rxte(fits_file)
 		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-			sum_power_ci, sum_power_ref, sum_rate_ci = dat_input(in_file, \
+			sum_power_ci, sum_power_ref, sum_rate_ci = dat_in(in_file, \
 			n_bins, dt, print_iterator, test, obs_epoch)
 	else:
 		raise Exception("ERROR: Input file type not recognized. Must be .dat or .fits.")
@@ -766,17 +751,6 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     each segment per energy channel and then averaged cross spectrum of all the
     segments per energy channel, and then computes the cross-correlation
     function (ccf) per energy channel.
-
-    Passed: in_file - Name of (ASCII/txt/dat) input file event list containing
-                both the reference band and the channels of interest. Assumes
-                ref band = PCU 0, interest = PCU 2.
-            out_file - Name of (ASCII/txt/dat) output file for ccf.
-            num_seconds - Number of seconds in each Fourier segment. Must be a
-                power of 2.
-            dt_mult - Multiple of 1/8192 seconds for timestep between bins.
-            test - True if computing one segment, False if computing all.
-
-    Returns: nothing
 
     """
     t_res = 1.0 / 8192.0
@@ -806,7 +780,11 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     mean_power_ci = sum_power_ci / float(num_segments)
     mean_power_ref = sum_power_ref / float(num_segments)
     cs_avg = cs_sum / float(num_segments)
-
+    
+    time_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
+		mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, mean_power_ci, \
+		mean_power_ref)
+	
     ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, \
     	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, mean_power_ci, \
     	mean_power_ref, True)
@@ -825,10 +803,10 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     # time = t * dt  # Converting to seconds
 
     ## Calling output function
-    fits_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
+    fits_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
-    dat_output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
-        mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
+#     dat_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
+#         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
 	
 ## End of function 'main'
 
