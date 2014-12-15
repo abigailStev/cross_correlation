@@ -23,7 +23,7 @@ Written in Python 2.7.
 
 ###############################################################################
 def dat_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
-        mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error):
+        mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error):
     """
             dat_out
 
@@ -35,7 +35,7 @@ def dat_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
     print "Output sent to: %s" % out_file
 
     with open(out_file, 'w') as out:
-        out.write("#\t\tCross-correlation function data")
+        out.write("#\t\tCross-correlation function")
         out.write("\n# Date(YYYY-MM-DD localtime): %s" % str(datetime.now()))
         out.write("\n# Event list: %s" % in_file)
         out.write("\n# Time bin size = %.21f seconds" % dt)
@@ -58,7 +58,7 @@ def dat_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         for j in xrange(0, n_bins):
             out.write("\n%d" % t[j])
             for i in xrange(0, 64):
-                out.write("\t%.6e" % ccf_filtered[j][i].real)
+                out.write("\t%.6e" % ccf[j][i].real)
             for i in xrange(0, 64):
                 out.write("\t%.6e" % ccf_error[i].real)
         ## End of for-loops
@@ -68,7 +68,7 @@ def dat_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
 
 ###############################################################################
 def fits_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
-        mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error):
+        mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error):
     """
             fits_out
 
@@ -79,7 +79,7 @@ def fits_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
 
     ## Making header
     prihdr = fits.Header()
-    prihdr.set('TYPE', "Cross-correlation data")
+    prihdr.set('TYPE', "Cross-correlation function")
     prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
     prihdr.set('EVTLIST', in_file)
     prihdr.set('DT', dt, "seconds")
@@ -102,7 +102,7 @@ def fits_out(out_file, in_file, dt, n_bins, num_seconds, num_segments,
     ## Making FITS table
     col1 = fits.Column(name='TIME_BIN', format='K', array=time_bins)
     col2 = fits.Column(name='CCF', unit='Counts/second', format='D', \
-    	array=ccf_filtered.real.flatten('C'))
+    	array=ccf.real.flatten('C'))
     col3 = fits.Column(name='ERROR', unit='', format='D', \
     	array=ccf_error)
     col4 = fits.Column(name='CHANNEL', unit='', format='I', \
@@ -154,10 +154,10 @@ def phase_to_tlags(phase, freq):
 
 
 ###############################################################################
-def time_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
+def make_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
 	mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, power_ci, power_ref):
 	"""
-			time_lags
+			make_lags
 			
 	Computes the phase lag and time lag from the average cross spectrum, and 
 	writes the lag information to a .fits output file.
@@ -229,7 +229,7 @@ def time_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
 	thdulist = fits.HDUList([prihdu, tbhdu])
 	thdulist.writeto(out_file)	
 	
-## End of function 'time_lags'
+## End of function 'make_lags'
 
 
 ###############################################################################
@@ -781,7 +781,7 @@ def main(in_file, out_file, num_seconds, dt_mult, test):
     mean_power_ref = sum_power_ref / float(num_segments)
     cs_avg = cs_sum / float(num_segments)
     
-    time_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
+    make_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
 		mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, mean_power_ci, \
 		mean_power_ref)
 	
