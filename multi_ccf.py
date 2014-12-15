@@ -6,7 +6,7 @@ from scipy import fftpack
 from datetime import datetime
 from astropy.io import fits
 import tools  # https://github.com/abigailStev/whizzy_scripts
-from ccf import read_and_use_segments, filter_freq, cs_to_ccf_w_err
+from ccf import read_and_use_segments, filter_freq, cs_to_ccf_w_err, make_lags
 
 __author__ = "Abigail Stevens"
 __author_email__ = "A.L.Stevens@uva.nl"
@@ -24,41 +24,33 @@ Written in Python 2.7.
 ###############################################################################
 def dat_out(out_file, in_file_list, dt, n_bins, total_exposure, 
 	mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error):
-    """
-			dat_out
-			
-	Writes the cross-correlation function to an output file.
-		
 	"""
-
-    print "Output sent to %s" % out_file
-
-    with open(out_file, 'w') as out:
-        out.write("#\t\tCross correlation function of multiple data files")
-        out.write("\n# Date(YYYY-MM-DD localtime): %s" % str(datetime.now()))
-        out.write("\n# List of event lists: %s" % in_file_list)
-        out.write("\n# Time bin size = %.21f seconds" % dt)
-        out.write("\n# Number of bins per segment = %d" % n_bins)
-        out.write("\n# Total exposure time = %d seconds" \
-        	% total_exposure)
-        out.write("\n# Mean count rate of ci = %s" \
-        	% str(list(mean_rate_total_ci)))
-        out.write("\n# Mean count rate of ref band = %.5f" \
-        	% mean_rate_total_ref)
-        # 		if filter:
-        # 			out.write("\n# Filter applied in frequency domain to eliminate \
-        #               excess noise.")
-        out.write("\n# ")
-        out.write("\n# Column 1: Time bins")
-        out.write("\n# Column 2-65: CCF per energy channel [count rate]")
-        out.write("\n# Column 66-129: Error on ccf per energy channel [count rate]")
-        out.write("\n# ")
-        for j in xrange(0, n_bins):
-            out.write("\n%d" % t[j])
-            for i in xrange(0, 64):
-                out.write("\t%.6e" % ccf[j][i].real)
-            for i in xrange(0, 64):
-                out.write("\t%.6e" % ccf_error[i].real)
+	dat_out
+	Writes the cross-correlation function to an output file.
+	"""
+	if out_file[-4:].lower() == "fits":
+		out_file = out_file[:-4]+"dat"
+	print "Output sent to: %s" % out_file
+	with open(out_file, 'w') as out:
+		out.write("#\t\tCross correlation function of multiple data files")
+		out.write("\n# Date(YYYY-MM-DD localtime): %s" % str(datetime.now()))
+		out.write("\n# List of event lists: %s" % in_file_list)
+		out.write("\n# Time bin size = %.21f seconds" % dt)
+		out.write("\n# Number of bins per segment = %d" % n_bins)
+		out.write("\n# Total exposure time = %d seconds" % total_exposure)
+		out.write("\n# Mean count rate of ci = %s" % str(list(mean_rate_total_ci)))
+		out.write("\n# Mean count rate of ref band = %.5f" % mean_rate_total_ref)
+		out.write("\n# ")
+		out.write("\n# Column 1: Time bins")
+		out.write("\n# Column 2-65: CCF per energy channel [count rate]")
+		out.write("\n# Column 66-129: Error on ccf per energy channel [count rate]")
+		out.write("\n# ")
+		for j in xrange(0, n_bins):
+			out.write("\n%d" % t[j])
+			for i in xrange(0, 64):
+				out.write("\t%.6e" % ccf[j][i].real)
+			for i in xrange(0, 64):
+				out.write("\t%.6e" % ccf_error[i].real)
 
         ## End of for-loops
     ## End of with-block
@@ -191,6 +183,10 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     mean_power_ci = total_sum_power_ci / float(total_segments)
     mean_power_ref = total_sum_power_ref / float(total_segments)
     cs_avg = total_cs_sum / float(total_segments)
+    
+    make_lags(out_file, in_file_list, dt, n_bins, num_seconds, total_segments, \
+    	mean_rate_total_ci, mean_rate_total_ref, cs_avg, mean_power_ci, \
+    	mean_power_ref)
 	
     ccf_filtered, ccf_error = cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, \
     	total_segments, mean_rate_total_ci, mean_rate_total_ref, mean_power_ci,\
@@ -205,18 +201,10 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
     print "Mean rate for ref:", mean_rate_total_ref
 
     t = np.arange(0, n_bins)  # gives the 'front of the bin'
-    # time = t * dt  # Converting to seconds
-#     mean_ci_file = "/Users/abigailstevens/Dropbox/Research/simulate/mean_ci.txt"
-#     np.savetxt(mean_ci_file, mean_rate_total_ci)
-#     amp_ci_file = "/Users/abigailstevens/Dropbox/Research/simulate/amp_ci.txt"    
-#     amps_ci = [np.absolute(ccf_filtered[:,x])[0] for x in range(0,64)]
-#     np.savetxt(amp_ci_file, amps_ci)
-#     print amps
-	
-# 	dat_out(out_file, in_file_list, dt, n_bins, exposure,
-#         mean_rate_total_ci, mean_rate_total_ref, t, ccf_filtered, ccf_error)
+    dat_out(out_file, in_file_list, dt, n_bins, exposure,
+		mean_rate_total_ci, mean_rate_total_ref, t, ccf_filtered, ccf_error)
     fits_out(out_file, in_file_list, dt, n_bins, exposure, total_segments, 
-		mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error)
+		mean_rate_total_ci, mean_rate_total_ref, t, ccf_filtered, ccf_error)
 ## End of the function 'main'
 
 
