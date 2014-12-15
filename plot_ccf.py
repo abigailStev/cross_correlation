@@ -25,7 +25,7 @@ in the Anaconda package, https://store.continuum.io/cshop/anaconda/
 def make_plot(x_bins, ccf_amps, ccf_err, propID, plot_file, chan):
 	font_prop = font_manager.FontProperties(size=16)
 
-	fig, ax = plt.subplots()
+	fig, ax = plt.subplots(1,1)
 	ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=2, c='black', elinewidth=2, capsize=2)
 	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
 	ax.set_ylabel('Deviation from mean count rate [photons / s]', fontproperties=font_prop)
