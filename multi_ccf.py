@@ -1,5 +1,7 @@
 import argparse
 import numpy as np
+import os
+# import sys
 from scipy import fftpack
 from datetime import datetime
 from astropy.io import fits
@@ -20,10 +22,10 @@ Written in Python 2.7.
 """
 
 ###############################################################################
-def multi_output(out_file, in_file_list, dt, n_bins, total_exposure, 
-	mean_rate_total_ci, mean_rate_total_ref, t, ccf_filtered, ccf_error):
+def dat_out(out_file, in_file_list, dt, n_bins, total_exposure, 
+	mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error):
     """
-			multi_output
+			dat_out
 			
 	Writes the cross-correlation function to an output file.
 		
@@ -54,13 +56,68 @@ def multi_output(out_file, in_file_list, dt, n_bins, total_exposure,
         for j in xrange(0, n_bins):
             out.write("\n%d" % t[j])
             for i in xrange(0, 64):
-                out.write("\t%.6e" % ccf_filtered[j][i].real)
+                out.write("\t%.6e" % ccf[j][i].real)
             for i in xrange(0, 64):
                 out.write("\t%.6e" % ccf_error[i].real)
 
         ## End of for-loops
     ## End of with-block
-## End of function 'output'
+## End of function 'dat_out'
+
+
+###############################################################################
+def fits_out(out_file, in_file_list, dt, n_bins, total_exposure, total_segments, 
+	mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error):
+    """
+            fits_out
+
+    Writes the cross-correlation function to a .fits output file.
+    
+    """
+    print "Output sent to: %s" % out_file
+
+    ## Making header
+    prihdr = fits.Header()
+    prihdr.set('TYPE', "Cross-correlation function of multiple data files")
+    prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
+    prihdr.set('EVTLIST', in_file_list)
+    prihdr.set('DT', dt, "seconds")
+    prihdr.set('N_BINS', n_bins, "time bins per segment")
+    prihdr.set('SEGMENTS', total_segments, "segments, of all data")
+    prihdr.set('EXPOSURE', total_exposure, \
+    	"seconds, of all data")
+    prihdr.set('RATE_CI', str(mean_rate_total_ci.tolist()), "counts/second")
+    prihdr.set('RATE_REF', mean_rate_total_ref, "counts/second")
+    prihdu = fits.PrimaryHDU(header=prihdr)
+    
+    chan = np.arange(0,64)
+    energy_channels = np.tile(chan, len(t))
+    ccf_error = np.tile(ccf_error, len(t))
+    time_bins = np.repeat(t, len(chan))
+#     print len(energy_channels)
+#     print len(time_bins)
+    assert len(energy_channels) == len(time_bins)
+    
+    ## Making FITS table
+    col1 = fits.Column(name='TIME_BIN', format='K', array=time_bins)
+    col2 = fits.Column(name='CCF', unit='Counts/second', format='D', \
+    	array=ccf.real.flatten('C'))
+    col3 = fits.Column(name='ERROR', unit='', format='D', \
+    	array=ccf_error)
+    col4 = fits.Column(name='CHANNEL', unit='', format='I', \
+    	array=energy_channels)
+    cols = fits.ColDefs([col1, col2, col3, col4])
+    tbhdu = fits.BinTableHDU.from_columns(cols)
+    
+    ## If the file already exists, remove it (still working on just updating it)
+    assert out_file[-4:].lower() == "fits", \
+    	'ERROR: Output file must have extension ".fits".'
+    if os.path.isfile(out_file):
+    	os.remove(out_file)
+    ## Writing to a FITS file
+    thdulist = fits.HDUList([prihdu, tbhdu])
+    thdulist.writeto(out_file)	
+## End of function 'fits_out'
 
 
 ###############################################################################
@@ -256,11 +313,11 @@ def main(in_file_list, out_file, num_seconds, dt_mult, test):
 #     np.savetxt(amp_ci_file, amps_ci)
 #     print amps
 	
-    multi_output(out_file, in_file_list, dt, n_bins, exposure,
-        mean_rate_total_ci, mean_rate_total_ref, t, ccf_filtered, ccf_error)
-
+# 	dat_out(out_file, in_file_list, dt, n_bins, exposure,
+#         mean_rate_total_ci, mean_rate_total_ref, t, ccf_filtered, ccf_error)
+    fits_out(out_file, in_file_list, dt, n_bins, exposure, total_segments, 
+		mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error)
 ## End of the function 'main'
-
 
 
 ###############################################################################
