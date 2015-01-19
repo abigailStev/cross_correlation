@@ -34,11 +34,12 @@ if __name__ == "__main__":
 
 	print "\nPlotting the 2D CCF: %s" % args.plot_file
 	print args.tab_file
-	assert args.tab_file[-4:].lower() == "fits", "ERROR: Data file must be in .fits\
-	format."
+	assert args.tab_file[-4:].lower() == "fits", "ERROR: Data file must be in \
+	.fits format."
 	
 	n_bins = get_key_val(args.tab_file, 0, "N_BINS")
-# 	print n_bins
+	means_str = get_key_val(args.tab_file, 0, "RATE_CI")
+	mean_rate_ci = [ float(num.strip()) for num in means_str[1:-1].split(',') ]
 	
 	file_hdu = fits.open(args.tab_file)
 	table = file_hdu[1].data
@@ -49,27 +50,37 @@ if __name__ == "__main__":
 # 	ccf = ccf[:,15:50]
 
 	ccf = np.reshape(table.field('CCF'), (n_bins, 64), order='C')
-	print ccf[0,0:4]  # printing the first time bin, energies 0 - 3 inclusive
+# 	print ccf[0,0:4]  # printing the first time bin, energies 0 - 3 inclusive
 
 	print np.shape(ccf)
-	ccf = ccf[0:50,]
+	t_length = 50
+	ccf = ccf[0:t_length,].T
+# 	print np.shape(ccf)
+# 	this = np.array([mean_rate_ci,]*t_length).T
+# 	print this
+# 	print np.shape(this)
+	ratio = ccf / np.array([mean_rate_ci,]*t_length).T
+# 	print ratio
+# 	print np.shape(ratio)
+	ratio[10,] = 0
 	
 	font_prop = font_manager.FontProperties(size=16)
 
 	fig, ax = plt.subplots(1,1)
-	plt.pcolor(ccf, cmap='hot')
+	plt.pcolor(ratio, cmap='hot')
 	plt.colorbar()
-	ax.set_xlabel('Energy channel', fontproperties=font_prop)
-	ax.set_ylabel('Arbitrary time bins', fontproperties=font_prop)
-	ax.set_xlim(2, 26)
+	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
+	ax.set_ylabel('Energy channel', fontproperties=font_prop)
+	ax.set_ylim(2, 26)
 # 	ax.set_ylim(-0.45, 0.45)
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
 
-	plt.savefig(args.plot_file, dpi=120)
+	plt.savefig(args.plot_file, dpi=150)
 # 	plt.show()
 	plt.close()
 		
+		## plot delta ccf over the mean
 		
 		
 		
