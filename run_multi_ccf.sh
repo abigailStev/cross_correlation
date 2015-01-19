@@ -7,7 +7,7 @@ home_dir=$(ls -d ~)  ## the -d flag is extremely important here
 exe_dir="$home_dir/Dropbox/Research/cross_correlation"
 out_dir="$exe_dir/out_ccf" # for multiple input files with different obsIDs
 day=$(date +%y%m%d)  ## make the date a string and assign it to 'day'
-# day="141029"
+# day="141215"
 
 
 if [ ! -d "$out_dir" ]; then 
@@ -83,6 +83,6 @@ if [ -e "${out_file}.${tab_ext}" ]; then
 else
 	echo "${out_file}.${tab_ext} does not exist. plot_lags.py was not run."
 fi
-if [ -e "${plot_root}_lag-energy.png" ]; then
-	open -a ImageJ "${plot_root}_lag-energy.png"
-fi
+# if [ -e "${plot_root}_lag-energy.png" ]; then
+# 	open -a ImageJ "${plot_root}_lag-energy.png"
+# fi
