@@ -33,7 +33,6 @@ if __name__ == "__main__":
 
 
 	print "\nPlotting the 2D CCF: %s" % args.plot_file
-	print args.tab_file
 	assert args.tab_file[-4:].lower() == "fits", "ERROR: Data file must be in \
 	.fits format."
 	
@@ -51,18 +50,27 @@ if __name__ == "__main__":
 
 	ccf = np.reshape(table.field('CCF'), (n_bins, 64), order='C')
 # 	print ccf[0,0:4]  # printing the first time bin, energies 0 - 3 inclusive
+# 	print np.shape(ccf)
 
-	print np.shape(ccf)
 	t_length = 50
 	ccf = ccf[0:t_length,].T
 # 	print np.shape(ccf)
-# 	this = np.array([mean_rate_ci,]*t_length).T
-# 	print this
-# 	print np.shape(this)
-	ratio = ccf / np.array([mean_rate_ci,]*t_length).T
+	a = np.array([mean_rate_ci,]*t_length).T
+	with np.errstate(all='ignore'):
+		ratio = np.where(a != 0, ccf / a, 0)
 # 	print ratio
 # 	print np.shape(ratio)
-	ratio[10,] = 0
+	
+	print "Minimum value:", np.min(ratio)
+	print "Maximum value:", np.max(ratio)
+	
+	
+	## Saving to a dat file so that we can use fimgcreate
+	out_file = "out_ccf/temp.dat"
+	R = ratio.flatten('C')
+	comment_str = "From %s" % args.tab_file
+	np.savetxt(out_file, R, comments=comment_str)
+	
 	
 	font_prop = font_manager.FontProperties(size=16)
 
@@ -71,8 +79,9 @@ if __name__ == "__main__":
 	plt.colorbar()
 	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
 	ax.set_ylabel('Energy channel', fontproperties=font_prop)
-	ax.set_ylim(2, 26)
+# 	ax.set_ylim(3, 31)
 # 	ax.set_ylim(-0.45, 0.45)
+	ax.set_ylim(0,64)
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
 
