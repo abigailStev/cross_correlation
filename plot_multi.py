@@ -60,19 +60,19 @@ def main(file, plot_file, numsec):
 		table = file_hdu[1].data
 		file_hdu.close()
 		bins = table[table.field('CHANNEL') == 0].field('TIME_BIN')
-		data_0 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_1 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_3 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_6 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_9 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_11 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_14 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_16 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_18 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_19 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_21 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_23 = table[table.field('CHANNEL') == 0].field('CCF')
-		data_25 = table[table.field('CHANNEL') == 0].field('CCF')
+		data_0 = table[table.field('CHANNEL') == 1].field('CCF')
+		data_1 = table[table.field('CHANNEL') == 2].field('CCF') # chan 1, abs 5
+		data_3 = table[table.field('CHANNEL') == 4].field('CCF')
+		data_6 = table[table.field('CHANNEL') == 7].field('CCF') # chan 6, abs 11
+		data_9 = table[table.field('CHANNEL') == 10].field('CCF') 
+		data_11 = table[table.field('CHANNEL') == 12].field('CCF') # chan 11, abs 16
+		data_14 = table[table.field('CHANNEL') == 15].field('CCF') # chan 14, abs 23
+		data_16 = table[table.field('CHANNEL') == 17].field('CCF')
+		data_18 = table[table.field('CHANNEL') == 19].field('CCF') # chan 18, abs 31
+		data_19 = table[table.field('CHANNEL') == 20].field('CCF')
+		data_21 = table[table.field('CHANNEL') == 22].field('CCF') # chan 21, abs 48
+		data_23 = table[table.field('CHANNEL') == 24].field('CCF')
+		data_25 = table[table.field('CHANNEL') == 26].field('CCF')
 		
 	else:
 		raise Exception("ERROR: File type not recognized. Must have extension .dat or .fits.")
