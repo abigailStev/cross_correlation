@@ -360,7 +360,7 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 
 ################################################################################
 def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
-	mean_rate_whole_ci, mean_rate_whole_ref, mean_power_ci, mean_power_ref, \
+	mean_rate_ci, mean_rate_ref, mean_power_ci, mean_power_ref, \
 	noisy):
 	"""
 			UNFILT_cs_to_ccf_w_err
@@ -373,8 +373,8 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 	ccf = fftpack.ifft(cs_avg, axis=0)
 	
 	## Absolute rms norms of poisson noise
-	noise_ci = 2.0 * mean_rate_total_ci
-	noise_ref = 2.0 * mean_rate_total_ref
+	noise_ci = 2.0 * mean_rate_ci
+	noise_ref = 2.0 * mean_rate_ref
 # 	print np.shape(noise_ci)
 # 	print np.shape(noise_ref)
 
@@ -523,6 +523,9 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	cross spectrum per energy channel and keeps running average of the cross 
 	spectra.
 	
+	I take the approach: start time <= segment < end_time, to avoid double-
+	counting and/or skipping events.
+	
 	"""
 	## Check if the FITS file exists
 	try:
@@ -546,7 +549,7 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	
 	start_time = data.field('TIME')[0]
 	final_time = data.field('TIME')[-1]
-	end_time = start_time + (dt * n_bins)
+	seg_end_time = start_time + (dt * n_bins)
 	
 	## Selecting PCU for interest band
 	PCU2_mask = data.field('PCUID') == 2
@@ -555,43 +558,61 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	all_energy_ci = np.asarray(data_pcu2.field('CHANNEL'), dtype=np.float64)
 	
 	## Selecting PCU for reference band
-# 	PCU0_mask = data.field('PCUID') == 0
-# 	data_ref = data[PCU0_mask]
-	data_ref = data[!PCU2_mask]
+	pcus_on, occurrences = np.unique(data.field('PCUID'), return_counts=True)
+	## Getting rid of the PCU 2 element (since we don't want that as the ref)
+	pcu2 = np.where(pcus_on == 2)
+	pcus_on = np.delete(pcus_on, pcu2)
+	occurrences = np.delete(occurrences, pcu2)
+	## Determining the next-most-prevalent pcu
+	most = np.argmax(occurrences)
+	ref_pcu = pcus_on[most]
+	print "Ref PCU =", ref_pcu
+	refpcu_mask = data.field('PCUID') == ref_pcu
+	data_ref = data[refpcu_mask]
 	all_time_ref = np.asarray(data_ref.field('TIME'), dtype=np.float64)
 	all_energy_ref = np.asarray(data_ref.field('CHANNEL'), dtype=np.float64)
 	
-	while end_time < final_time:
-		time_ci = all_time_ci[np.where(all_time_ci < end_time)]
-		energy_ci = all_energy_ci[np.where(all_time_ci < end_time)]
-		for_next_iteration_ci = np.where(all_time_ci >= end_time)
+	## Looping through segments
+	while seg_end_time < final_time:
+		
+		## Get events for channels of interest 
+		time_ci = all_time_ci[np.where(all_time_ci < seg_end_time)]
+		energy_ci = all_energy_ci[np.where(all_time_ci < seg_end_time)]
+		
+		## Chop current segment off the rest of the list
+		for_next_iteration_ci = np.where(all_time_ci >= seg_end_time)
 		all_time_ci = all_time_ci[for_next_iteration_ci]
 		all_energy_ci = all_energy_ci[for_next_iteration_ci]
 		
-		time_ref = all_time_ref[np.where(all_time_ref < end_time)]
-		energy_ref = all_energy_ref[np.where(all_time_ref < end_time)]
-		for_next_iteration_ref = np.where(all_time_ref >= end_time)
+		## Get events for reference band
+		time_ref = all_time_ref[np.where(all_time_ref < seg_end_time)]
+		energy_ref = all_energy_ref[np.where(all_time_ref < seg_end_time)]
+		
+		## Chop current segment off the rest of the list
+		for_next_iteration_ref = np.where(all_time_ref >= seg_end_time)
 		all_time_ref = all_time_ref[for_next_iteration_ref]
 		all_energy_ref = all_energy_ref[for_next_iteration_ref]
 		
+		## At the end of a segment
 		if len(time_ci) > 0 and len(time_ref) > 0:
 			num_segments += 1
 			cs_sum, sum_rate_whole_ci, sum_rate_whole_ref,  sum_power_ci, \
 				sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, \
-				energy_ci, energy_ref, n_bins, dt, start_time, end_time, \
+				energy_ci, energy_ref, n_bins, dt, start_time, seg_end_time, \
 				obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci,\
 				sum_power_ref, cs_sum, num_segments, sum_rate_ci)
+				
 			if num_segments % print_iterator == 0:
 				print "\t", num_segments
 			if test is True and num_segments == 1:  # For testing
 				break
 	
 			start_time += (n_bins * dt)
-			end_time += (n_bins * dt)
+			seg_end_time += (n_bins * dt)
 			
 		elif len(time_ci) == 0 or len(time_ref) == 0:
 			start_time = min(all_time_ci[0], all_time_ref[0])
-			end_time = start_time + (n_bins * dt)
+			seg_end_time = start_time + (n_bins * dt)
 		## End of 'if there are counts in this segment'
 	## End of while-loop
 	
