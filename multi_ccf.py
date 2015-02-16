@@ -10,7 +10,7 @@ import ccf as xcor
 
 __author__ = "Abigail Stevens"
 __author_email__ = "A.L.Stevens@uva.nl"
-__year__ = "2014"
+__year__ = "2014-2015"
 __description__ = "Computes the cross-correlation function of a band of \
 interest with a reference band, over multiple RXTE event-mode data files."
 
@@ -76,8 +76,14 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     
     """
     print "Output sent to: %s" % out_file
-
-    ## Making header
+	
+    chan = np.arange(0,64)
+    energy_channels = np.tile(chan, len(t))
+    ccf_error = np.tile(ccf_error, len(t))
+    time_bins = np.repeat(t, len(chan))
+    assert len(energy_channels) == len(time_bins)
+    
+    ## Making FITS header (extension 0)
     prihdr = fits.Header()
     prihdr.set('TYPE', "Cross-correlation function of multiple data files")
     prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
@@ -93,15 +99,9 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     prihdr.set('FILTER', str(filter))
     prihdu = fits.PrimaryHDU(header=prihdr)
     
-    chan = np.arange(0,64)
-    energy_channels = np.tile(chan, len(t))
-    ccf_error = np.tile(ccf_error, len(t))
-    time_bins = np.repeat(t, len(chan))
-#     print len(energy_channels)
-#     print len(time_bins)
-    assert len(energy_channels) == len(time_bins)
+    print "header made"
     
-    ## Making FITS table
+    ## Making FITS table (extension 1)
     col1 = fits.Column(name='TIME_BIN', format='K', array=time_bins)
     col2 = fits.Column(name='CCF', unit='Counts/second', format='D', \
     	array=ccf.real.flatten('C'))
@@ -112,14 +112,18 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     cols = fits.ColDefs([col1, col2, col3, col4])
     tbhdu = fits.BinTableHDU.from_columns(cols)
     
-    ## If the file already exists, remove it (still working on just updating it)
+    print "table made"
+    
+    ## If the file already exists, remove it
     assert out_file[-4:].lower() == "fits", \
     	'ERROR: Output file must have extension ".fits".'
     if os.path.isfile(out_file):
     	os.remove(out_file)
+    	
     ## Writing to a FITS file
     thdulist = fits.HDUList([prihdu, tbhdu])
     thdulist.writeto(out_file)	
+    
 ## End of function 'fits_out'
 
 
@@ -135,20 +139,27 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     function (ccf) per energy channel.
 	
 	"""
-
+	#####################################################
     ## Idiot checks, to ensure that our assumptions hold
+    #####################################################
+    
     assert num_seconds > 0, "ERROR: num_seconds must be a positive integer."
     assert dt_mult >= 1, "ERROR: dt_mult must be a positive integer."
     
+    ##############################################################
 	## Getting the list of input files and putting them in a list
+	##############################################################
     input_files = [line.strip() for line in open(in_file_list)]
 	
     old_settings = np.seterr(divide='ignore')
-
-    ## Initializations -- 'total' is over all data files,
-    ## 'whole' is over one data file
-#     t_res = 1.0 / 8192.0
-    t_res = float(tools.get_key_val(in_file, 0, 'TIMEDEL'))
+	
+	###########################################################
+    ## Initializations
+    ## 'total' is over all data files (i.e., in multi_ccf.py)
+    ## 'whole' is over one data file (i.e., in ccf.py)
+	###########################################################
+	
+    t_res = float(tools.get_key_val(input_files[0], 0, 'TIMEDEL'))
     dt = dt_mult * t_res
     n_bins = num_seconds * int(1.0 / dt)
     total_segments = 0
@@ -164,17 +175,20 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     total_sum_power_ci = 0
     sum_rate_ci = np.zeros(64)
     
-#     print "dt = %.21f seconds" % dt
-#     print "n_bins = %d" % n_bins
-	
+	###################################################################
 	## Reading in the background count rate from a background spectrum
+	####################################################################
     if bkgd_file:
 		bkgd_rate = xcor.get_background(bkgd_file)
     else:
 		bkgd_rate = np.zeros(64)
 	
+	##################################
     ## Looping through all data files
+    ##################################
+    
     for in_file in input_files:
+    
         cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
             sum_power_ci, sum_power_ref, sum_rate_ci = xcor.read_and_use_segments(in_file, \
             n_bins, dt, test)
@@ -183,20 +197,20 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
         total_cs_sum += cs_sum
         sum_rate_total_ci += sum_rate_whole_ci
         sum_rate_total_ref += sum_rate_whole_ref
-#         print sum_rate_total_ci[19:24]
         total_sum_power_ci += sum_power_ci
         total_sum_power_ref += sum_power_ref
-        # 		print "cs sum shape", np.shape(cs_sum)
-        # 		print "total cs sum shape", np.shape(total_cs_sum)
         sum_rate_whole_ci = None
         sum_rate_whole_ref = None
         cs_sum = None
         num_segments = None
         sum_power_ci = None
         sum_power_ref = None
+        
     ## End of for-loop
-		
+	
+	#########################################
     ## Turning sums over segments into means
+    #########################################
 	mean_ci = sum_rate_ci / float(total_segments)
     mean_rate_total_ci = sum_rate_total_ci / float(total_segments)
     mean_rate_total_ref = sum_rate_total_ref / float(total_segments)
@@ -204,22 +218,30 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     mean_power_ref = total_sum_power_ref / float(total_segments)
     cs_avg = total_cs_sum / float(total_segments)
     
+    ##################################################################
     ## Subtracting the background count rate from the mean count rate
-    mean_rate_whole_ci -= bkgd_rate
+    ##################################################################
+    
+    mean_rate_total_ci -= bkgd_rate
     
     ## Need to use a background from PCU 0 for the reference band...
-    
 #     ref_bkgd_rate = np.mean(bkgd_rate[2:26])
 #     mean_rate_whole_ref -= ref_bkgd_rate    
 #     print np.shape(mean_rate_whole_ci)
 #     print np.shape(mean_rate_whole_ref)
     
+    ######################
     ## Making lag spectra
+    ######################
+    
     xcor.make_lags(out_file, in_file_list, dt, n_bins, num_seconds, \
     	total_segments, mean_rate_total_ci, mean_rate_total_ref, cs_avg, \
     	mean_power_ci, mean_power_ref)
 	
+	##############################################
 	## Computing ccf from cs, and computing error
+	##############################################
+	
     if filter:
     	ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
     		num_seconds, total_segments, mean_rate_total_ci, \
@@ -232,17 +254,15 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     exposure = total_segments * num_seconds  # Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
     print "Total number of segments:", total_segments
-#     print "Total mean rate for ci:", mean_rate_total_ci
-#     print "Mean rate for ci:", np.mean(mean_rate_total_ci) * 64
     print "Mean rate for all of ci:", np.sum(mean_rate_total_ci)
     print "Mean rate for ref:", mean_rate_total_ref
 
     t = np.arange(0, n_bins)  # gives the 'front of the bin'
     
+    ##########
     ## Output
-#     dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, exposure,
-# 		total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end, \
-# 		ccf_error, filter)
+    ##########
+
     fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, exposure, \
     	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end, \
     	ccf_error, filter)
@@ -297,6 +317,8 @@ dest='filter', help='Int flag: 0 if NOT applying a filter in frequency-space, \
     	
     main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds, \
     	args.dt_mult, test, filter)
-
+	
+    print "Multi_ccf.py is done."
+	
 ## End of the program 'multi_ccf.py'
 ###############################################################################
