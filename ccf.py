@@ -62,8 +62,12 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, num_segments,
             out.write("\n%d" % t[j])
             for i in xrange(0, 64):
                 out.write("\t%.6e" % ccf[j][i].real)
-            for i in xrange(0, 64):
-                out.write("\t%.6e" % ccf_error[i].real)
+            if filter:
+				for i in xrange(0, 64):
+					out.write("\t%.6e" % ccf_error[i].real)
+			else:
+				for i in xrange(0, 64):
+					out.write("\t%.6e" % ccf_error[j][i].real)
         ## End of for-loops
     ## End of with-block
 ## End of function 'dat_out'
@@ -83,7 +87,10 @@ def fits_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, \
     ## Getting data into a good output structure
     chan = np.arange(0,64)
     energy_channels = np.tile(chan, len(t))
-    ccf_error = np.tile(ccf_error, len(t))
+    if filter:
+    	ccf_error = np.tile(ccf_error, len(t))
+    else:
+    	ccf_error = ccf_error.real.flatten('C')
     time_bins = np.repeat(t, len(chan))
     assert len(energy_channels) == len(time_bins)
     
