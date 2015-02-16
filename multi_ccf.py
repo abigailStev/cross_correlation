@@ -47,18 +47,22 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 		out.write("\n# Total number of segments = %d " % total_segments)
 		out.write("\n# Mean count rate of ci = %s" % str(list(mean_rate_total_ci)))
 		out.write("\n# Mean count rate of ref band = %.5f" % mean_rate_total_ref)
-        out.write("\n# Filter applied in frequency domain? %s" % str(filter))
-        out.write("\n# ")
-        out.write("\n# Column 1: Time bins")
-        out.write("\n# Column 2-65: CCF per energy channel [count rate]")
-        out.write("\n# Column 66-129: Error on ccf per energy channel [count rate]")
-        out.write("\n# ")
-        for j in xrange(0, n_bins):
-            out.write("\n%d" % t[j])
-            for i in xrange(0, 64):
-            	out.write("\t%.6e" % ccf[j][i].real)
-            for i in xrange(0, 64):
-            	out.write("\t%.6e" % ccf_error[i].real)
+		out.write("\n# Filter applied in frequency domain? %s" % str(filter))
+		out.write("\n# ")
+		out.write("\n# Column 1: Time bins")
+		out.write("\n# Column 2-65: CCF per energy channel [count rate]")
+		out.write("\n# Column 66-129: Error on ccf per energy channel [count rate]")
+		out.write("\n# ")
+		for j in xrange(0, n_bins):
+			out.write("\n%d" % t[j])
+			for i in xrange(0, 64):
+				out.write("\t%.6e" % ccf[j][i].real)
+			if filter:
+				for i in xrange(0, 64):
+					out.write("\t%.6e" % ccf_error[i].real)
+			else:
+				for i in xrange(0, 64):
+					out.write("\t%.6e" % ccf_error[j][i].real)
 
         ## End of for-loops
     ## End of with-block
@@ -79,7 +83,10 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 	
     chan = np.arange(0,64)
     energy_channels = np.tile(chan, len(t))
-    ccf_error = np.tile(ccf_error, len(t))
+    if filter:
+    	ccf_error = np.tile(ccf_error, len(t))
+    else:
+    	ccf_error = ccf_error.real.flatten('C')
     time_bins = np.repeat(t, len(chan))
     assert len(energy_channels) == len(time_bins)
     
@@ -98,9 +105,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     prihdr.set('RATE_REF', mean_rate_total_ref, "counts/second")
     prihdr.set('FILTER', str(filter))
     prihdu = fits.PrimaryHDU(header=prihdr)
-    
-    print "header made"
-    
+        
     ## Making FITS table (extension 1)
     col1 = fits.Column(name='TIME_BIN', format='K', array=time_bins)
     col2 = fits.Column(name='CCF', unit='Counts/second', format='D', \
@@ -111,9 +116,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     	array=energy_channels)
     cols = fits.ColDefs([col1, col2, col3, col4])
     tbhdu = fits.BinTableHDU.from_columns(cols)
-    
-    print "table made"
-    
+        
     ## If the file already exists, remove it
     assert out_file[-4:].lower() == "fits", \
     	'ERROR: Output file must have extension ".fits".'
@@ -251,18 +254,22 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     		num_seconds, total_segments, mean_rate_total_ci, \
     		mean_rate_total_ref, mean_power_ci, mean_power_ref, True)
     	
-    exposure = total_segments * num_seconds  # Exposure time of data used
+    exposure = total_segments * num_seconds  ## Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
     print "Total number of segments:", total_segments
     print "Mean rate for all of ci:", np.sum(mean_rate_total_ci)
     print "Mean rate for ref:", mean_rate_total_ref
 
-    t = np.arange(0, n_bins)  # gives the 'front of the bin'
+    t = np.arange(0, n_bins)  ## gives the 'front of the bin'
     
     ##########
     ## Output
     ##########
-
+    
+    dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, exposure, \
+    	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end, \
+    	ccf_error, filter)
+	
     fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, exposure, \
     	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end, \
     	ccf_error, filter)
