@@ -2,11 +2,12 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
+import matplotlib.font_manager as font_manager
 
 __author__ = "Abigail Stevens"
 __author_email__ = "A.L.Stevens@uva.nl"
-__year__ = "2014"
-__description__ = "Plots multiple CCFs together on one plot."
+__year__ = "2014-2015"
+__description__ = "Plots CCFs of multiple energy channels together on one plot."
 
 """
 		plot_multi.py
@@ -15,30 +16,29 @@ Written in Python 2.7.
 
 """
 
-##########################
+################################################################################
 def main(file, plot_file, numsec):
+	"""
+			main
+	
+	
+	"""
+	
 	# table_1 = np.loadtxt(file_1, comments='#')
 	# table_2 = np.loadtxt(file_2, comments='#')
 	# table_3 = np.loadtxt(file_3, comments='#')
 	# table_4 = np.loadtxt(file_4, comments='#')
 	# table_5 = np.loadtxt(file_5, comments='#')
 	# table_6 = np.loadtxt(file_6, comments='#')
-	# 
-	# data_1 = table_1[:,0]
-	# data_2 = table_2[:,0]
-	# data_3 = table_3[:,0]
-	# data_4 = table_4[:,0]
-	# data_5 = table_5[:,0]
-	# data_6 = table_6[:,0]
+	
+	######################################
+	## Read in data from dat or fits file
+	#######################################
+	
 	if file[-3:].lower() == "dat":
-# 	file="/Users/abigailstevens/Dropbox/Research/power_spectra/out_ccf/140610_t1_4sec.dat"
+
 		table = np.loadtxt(file, comments='#')
-	# 	data_1 = table[:,65] # chan 1, abs 5
-	# 	data_2 = table[:,70] # chan 6, abs 11
-	# 	data_3 = table[:,76] # chan 11, abs 16
-	# 	data_4 = table[:,78] # chan 14, abs 23
-	# 	data_5 = table[:,81] # chan 18, abs 31
-	# 	data_6 = table[:,87] # chan 21, abs 48
+		
 		bins = table[:,0]
 		data_0 = table[:,1]
 		data_1 = table[:,2] # chan 1, abs 5
@@ -55,10 +55,13 @@ def main(file, plot_file, numsec):
 		data_25 = table[:,26]
 		# chan is from 0 to 63 inclusive
 		# abs is from 0 to 254 inclusive
+		
 	elif file[-4:].lower() == "fits":
+	
 		file_hdu = fits.open(file)
 		table = file_hdu[1].data
 		file_hdu.close()
+		
 		bins = table[table.field('CHANNEL') == 0].field('TIME_BIN')
 		data_0 = table[table.field('CHANNEL') == 1].field('CCF')
 		data_1 = table[table.field('CHANNEL') == 2].field('CCF') # chan 1, abs 5
@@ -75,8 +78,14 @@ def main(file, plot_file, numsec):
 		data_25 = table[table.field('CHANNEL') == 26].field('CCF')
 		
 	else:
-		raise Exception("ERROR: File type not recognized. Must have extension .dat or .fits.")
-		
+		raise Exception("ERROR: File type not recognized. Must have extension \
+.dat or .fits.")
+	
+	#############
+	## Plotting!
+	#############
+	
+	font_prop = font_manager.FontProperties(size=16)
 	fig, ax = plt.subplots()
 	ax.plot(bins, data_0, linewidth=2, label="Chan 0")
 	ax.plot(bins, data_1, linewidth=2, label="Chan 1") #label="2.5 keV")
@@ -92,38 +101,50 @@ def main(file, plot_file, numsec):
 	ax.plot(bins, data_23, linewidth=2, ls='-.', label="Chan 23")
 	ax.plot(bins, data_25, linewidth=2, ls='-.', label="Chan 25")
 
-	plt.xlabel('Arbitrary time bins')
-	plt.ylabel('Deviation from mean count rate [photons / s]')
-	# plt.xlim(0,20000)
-	plt.xlim(15,60)
-# 	plt.ylim(-0.0005,0.0005)
-	# plt.ylim(-2.5,3)
-	# plt.xscale('symlog') # this works much better than 'log'
-	# plt.yscale('symlog')
+	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
+	ax.set_ylabel('Deviation from mean count rate [photons / s]', \
+		fontproperties=font_prop)
+# 	ax.set_xlim(0, 20000)
+	ax.set_xlim(0, 2000)
+# 	ax.set_ylim(-0.0005, 0.0005)
+# 	ax.set_ylim(-2.5, 3)
+# 	ax.set_xscale('symlog')  ## this works much better than 'log'
+# 	ax.set_yscale('symlog')
 	title_str = "CCF per energy channel"
-	plt.title(title_str)
+	ax.set_title(title_str, fontproperties=font_prop)
 
-	## The following legend code was found on stack overflow I think, or a pyplot tutorial
+	## The following legend code was found on stack overflow I think
 	legend = ax.legend(loc='upper right')
 	for label in legend.get_texts():
 		label.set_fontsize('small')
 	for label in legend.get_lines():
 		label.set_linewidth(2)  # the legend line width
-
+	
+	fig.set_tight_layout(True)
 	plt.savefig(plot_file, dpi=140)
 # 	plt.show()
 	plt.close()
 
+## End of function 'main'
 
-##########################
+
+################################################################################
 if __name__ == "__main__":
 	
-	parser = argparse.ArgumentParser(description="Plots multiple cross-correlation functions together.")
-	parser.add_argument('ccf_table', \
-		help="Name of file with CCF amplitudes in a table.")
-	parser.add_argument('plot_file', \
-		help="The output file name for the plot.")
-	parser.add_argument('numsec', type=int, help="")
+	parser = argparse.ArgumentParser(usage="python plot_multi.py ccf_table \
+plot_file numsec", description="Plots CCFs of multiple energy channels on one \
+plot.")
+	
+	parser.add_argument('ccf_table', help="Name of file with CCF amplitudes in \
+a table.")
+	
+	parser.add_argument('plot_file', help="The output file name for the plot.")
+	
+	parser.add_argument('numsec', type=int, help="Number of seconds per Fourier\
+ segment.")
+
 	args = parser.parse_args()
 
 	main(args.ccf_table, args.plot_file, args.numsec)
+	
+################################################################################

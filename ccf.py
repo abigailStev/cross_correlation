@@ -11,8 +11,8 @@ import tools  # https://github.com/abigailStev/whizzy_scripts
 __author__ = "Abigail Stevens"
 __author_email__ = "A.L.Stevens@uva.nl"
 __year__ = "2014-2015"
-__description__ = "Computes the cross-correlation function of a band of \
-interest with a reference band from RXTE event-mode data."
+__description__ = "Computes the cross-correlation function of an interest band \
+with a reference band from RXTE event-mode data."
 
 """
         ccf.py
@@ -33,7 +33,7 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, num_segments,
     if out_file[-4:].lower() == "fits":
 		out_file = out_file[:-4]+"dat"
 		
-    print "Output sent to: %s" % out_file
+    print "\nOutput sent to: %s" % out_file
 
     with open(out_file, 'w') as out:
         out.write("#\t\tCross-correlation function")
@@ -65,7 +65,7 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, num_segments,
             if filter:
 				for i in xrange(0, 64):
 					out.write("\t%.6e" % ccf_error[i].real)
-			else:
+            else:
 				for i in xrange(0, 64):
 					out.write("\t%.6e" % ccf_error[j][i].real)
         ## End of for-loops
@@ -94,7 +94,7 @@ def fits_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, \
     time_bins = np.repeat(t, len(chan))
     assert len(energy_channels) == len(time_bins)
     
-    print "Output sent to: %s" % out_file
+    print "\nOutput sent to: %s" % out_file
 
     ## Making FITS header (extension 0)
     prihdr = fits.Header()
@@ -288,7 +288,7 @@ as the original cross-spectrum. Something went wrong."
 
 ################################################################################
 def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
-	mean_rate_total_ci, mean_rate_total_ref, mean_power_ci, mean_power_ref, \
+	countrate_ci, countrate_ref, power_ci, power_ref, \
 	noisy):
 	"""
 			FILT_cs_to_ccf_w_err
@@ -304,22 +304,23 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
     
     ## Absolute rms norms of poisson noise
-	noise_ci = 2.0 * mean_rate_total_ci
-	noise_ref = 2.0 * mean_rate_total_ref
+	noise_ci = 2.0 * countrate_ci
+	noise_ref = 2.0 * countrate_ref
 	
+	## If there's no noise in a (simulated) power spectrum, noise level = 0
 	if not noisy:
 		noise_ci = np.zeros(64)
 		noise_ref = 0
 	
 	noise_ref_array = np.repeat(noise_ref, 64)
-
+	
 	df = 1.0 / float(num_seconds)  # in Hz
 	
     ## Extracting only the signal frequencies of the mean powers
-	signal_ci_pow = np.float64(mean_power_ci[j_min:j_max, :])
-	signal_ref_pow = np.float64(mean_power_ref[j_min:j_max])
+	signal_ci_pow = np.float64(power_ci[j_min:j_max, :])
+	signal_ref_pow = np.float64(power_ref[j_min:j_max])
 	
-    ## Putting powers into absolute rms2 normalization
+    ## Putting powers into absolute rms2 normalization, subtracting noise
 	signal_ci_pow = signal_ci_pow * (2.0 * dt / float(n_bins)) - noise_ci
 	signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
 	
@@ -327,7 +328,7 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	signal_variance = np.sum(signal_ref_pow * df)
 	print "Signal variance:", signal_variance
 	rms_ref = np.sqrt(signal_variance)  
-	print "Frac RMS of reference band:", rms_ref / mean_rate_total_ref  
+	print "Frac RMS of reference band:", rms_ref / countrate_ref  
 	# in frac rms units here -- should be few percent
     
     ## Putting signal_ref_pow in same shape as signal_ci_pow
@@ -367,8 +368,7 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 
 ################################################################################
 def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
-	mean_rate_ci, mean_rate_ref, mean_power_ci, mean_power_ref, \
-	noisy):
+	countrate_ci, countrate_ref, power_ci, power_ref, noisy):
 	"""
 			UNFILT_cs_to_ccf_w_err
 	Takes the iFFT of the cross spectrum to get the cross-correlation function, 
@@ -377,19 +377,53 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 	
 	"""
 	
-	ccf = fftpack.ifft(cs_avg, axis=0)
+	freq = fftpack.fftfreq(n_bins, d=dt)
 	
-	## Absolute rms norms of poisson noise
-	noise_ci = 2.0 * mean_rate_ci
-	noise_ref = 2.0 * mean_rate_ref
-# 	print np.shape(noise_ci)
-# 	print np.shape(noise_ref)
-
+	## Take the IFFT of the cross spectrum to get the CCF
+	ccf_end = fftpack.ifft(cs_avg, axis=0)
+	
+	print "COUNTRATE REF:", countrate_ref
+	
+	## Absolute rms norms of poisson noise	
+	## Was over-estimating the noise from the count rate; using mean power from 
+	## higher frequencies as the noise level
+# 	noise_ref = 2.0 * countrate_ref
+	print "Estimated noise:", 2.0 * countrate_ref
+	temp = power_ref * (2.0 * dt / float(n_bins))
+	noise_ref = np.mean(temp[np.where(freq >= 100)])
+	
+# 	print "NOISE CI", noise_ci
+	print "NOISE REF:", noise_ref
+# 	print "ABS RMS POWER CI", power_ci * (2.0 * dt / float(n_bins))
+	print "ABS RMS POWER REF:", power_ref * (2.0 * dt / float(n_bins))
+# 	print "SHAPE NOISE CI", np.shape(noise_ci)
+# 	print "SHAPE NOISE REF", np.shape(noise_ref)
+	
+	df = 1.0 / float(num_seconds)  # in Hz
+	
+	## Putting powers into absolute rms2 normalization, subtracting noise
+# 	absrms_power_ci = power_ci * (2.0 * dt / float(n_bins)) - noise_ci
+	absrms_power_ref = power_ref * (2.0 * dt / float(n_bins)) - noise_ref
+# 	absrms_power_ci[np.where(absrms_power_ci < 0)] = 0.0
+# 	absrms_power_ref[np.where(absrms_power_ref < 0)] = 0.0
+	print "Mean of whole ps:", np.mean(absrms_power_ref)
+	print "Mean of hf ps:", np.mean(absrms_power_ref[np.where(freq >= 100)])
+	
+	## Getting rms of reference band, to normalize the ccf
+	signal_variance = np.sum(absrms_power_ref * df)
+	print "Signal variance:", signal_variance
+	rms_ref = np.sqrt(signal_variance)  
+	print "Frac RMS of reference band:", rms_ref / countrate_ref  
+	# in frac rms units here -- should be few percent
+	
+	## Dividing ccf by rms of signal in reference band
+	ccf_end *= (2.0 / float(n_bins) / rms_ref)
+	
 	
 	## Need to do error calculation!!
 	
 	
-	return ccf, ccf*0.1
+	return ccf_end, ccf_end*0.10
 	
 ## End of function 'UNFILT_cs_to_ccf_w_err'	
 
@@ -847,6 +881,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, \
     	sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, \
     	dt, test)
+    print "\n"
 	
 	#########################################
 	## Turning sums over segments into means
@@ -900,6 +935,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	##########
     ## Output
     ##########
+    
     fits_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, \
     	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_end, \
     	ccf_error, filter)
@@ -909,12 +945,16 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 
 ################################################################################
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(usage='ccf.py infile outfile [-b \
-BKGD_SPECTRUM] [-n NUM_SECONDS] [-m DT_MULT] [-t {0,1}] [-f {0,1}]', \
-description='Computes the cross-correlation function of a channel of interest \
-with a reference band.', epilog='For optional arguments, default values are \
-given in brackets at end of description.')
+	
+	##############################################
+	## Parsing input arguments and calling 'main'
+	##############################################
+	
+    parser = argparse.ArgumentParser(usage="python ccf.py infile outfile [-b \
+BKGD_SPECTRUM] [-n NUM_SECONDS] [-m DT_MULT] [-t {0,1}] [-f {0,1}]", \
+description="Computes the cross-correlation function of a channel of interest \
+with a reference band.", epilog="For optional arguments, default values are \
+given in brackets at end of description.")
 
     parser.add_argument('infile', help='Name of (ASCII/txt/dat) event list \
 containing both the reference band and the channels of interest. Assumes ref \

@@ -11,8 +11,9 @@ import matplotlib.font_manager as font_manager
 
 __author__ = "Abigail Stevens"
 __author_email__ = "A.L.Stevens@uva.nl"
-__year__ = "2014"
-__description__ = ""
+__year__ = "2014-2015"
+__description__ = "Plots the ccf of multiple energy channels in a 2D colour \
+plot."
 
 """
         plot_2d.py
@@ -21,18 +22,28 @@ Written in Python 2.7.
 
 """
 
-###############################################################################
+################################################################################
 if __name__ == "__main__":
 	
-	parser = argparse.ArgumentParser()
+	###########################
+	## Parsing input arguments
+	###########################
+	
+	parser = argparse.ArgumentParser(usage="python plot_2d.py tab_file [-o \
+plot_file]", description="Plots the ccf of multiple energy channels in a 2D \
+colour plot.", epilog="For optional arguments, default values are given in \
+brackets at end of description.")
+
 	parser.add_argument('tab_file', help="The table file, in .dat or .fits \
-		format.")
-	parser.add_argument('-o', '--outfile', dest='plot_file', default="./ccf", \
-		help="The file name to save the plot to.")
+format.")
+
+	parser.add_argument('-o', '--outfile', dest='plot_file', default="\
+./ccf_2D.png", help="The file name to save the plot to. [./ccf_2D.png]")
+	
 	args = parser.parse_args()
 
 
-	print "\nPlotting the 2D CCF: %s" % args.plot_file
+	print "Plotting the 2D CCF: %s" % args.plot_file
 	assert args.tab_file[-4:].lower() == "fits", "ERROR: Data file must be in \
 	.fits format."
 	
@@ -40,40 +51,44 @@ if __name__ == "__main__":
 	means_str = get_key_val(args.tab_file, 0, "RATE_CI")
 	mean_rate_ci = [ float(num.strip()) for num in means_str[1:-1].split(',') ]
 	
+	#############################
+	## Load data from FITS table
+	#############################
+	
 	file_hdu = fits.open(args.tab_file)
 	table = file_hdu[1].data
 	file_hdu.close()
 
-# 	ccf = np.reshape(table.field('CCF'), (64,n_bins), order='C')
-# 	print np.shape(ccf)
-# 	ccf = ccf[:,15:50]
-
 	ccf = np.reshape(table.field('CCF'), (n_bins, 64), order='C')
-# 	print ccf[0,0:4]  # printing the first time bin, energies 0 - 3 inclusive
-# 	print np.shape(ccf)
 
-	t_length = 50
-	ccf = ccf[0:t_length,].T
-# 	print np.shape(ccf)
+	t_length = 2000  ## Number of time bins to use
+	ccf = ccf[0:t_length,].T  ## Transpose it to get the axes we want
+	
+	###################################################################
+	## Make a ratio of ccf to the mean count rate in the interest band
+	###################################################################
+	
 	a = np.array([mean_rate_ci,]*t_length).T
 	with np.errstate(all='ignore'):
 		ratio = np.where(a != 0, ccf / a, 0)
-# 	print ratio
-# 	print np.shape(ratio)
 	
-	print "Minimum value:", np.min(ratio)
-	print "Maximum value:", np.max(ratio)
+	print "\tMinimum value:", np.min(ratio)
+	print "\tMaximum value:", np.max(ratio)
 	
-	
+	######################################################
 	## Saving to a dat file so that we can use fimgcreate
+	######################################################
+	
 	out_file = "out_ccf/temp.dat"
 	R = ratio.flatten('C')
 	comment_str = "From %s" % args.tab_file
 	np.savetxt(out_file, R, comments=comment_str)
 	
+	#############
+	## Plotting!
+	#############
 	
 	font_prop = font_manager.FontProperties(size=16)
-
 	fig, ax = plt.subplots(1,1)
 	plt.pcolor(ratio, cmap='hot')
 	plt.colorbar()
@@ -84,17 +99,11 @@ if __name__ == "__main__":
 	ax.set_ylim(0,64)
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
-
-	plt.savefig(args.plot_file, dpi=150)
+	fig.set_tight_layout(True)
+	plt.savefig(args.plot_file, dpi=200)
 # 	plt.show()
-	plt.close()
-		
-		## plot delta ccf over the mean
-		
-		
-		
-		
-		
-		
-		
-		
+	plt.close()		
+	
+## End of program 'plot_2d.py'
+
+################################################################################

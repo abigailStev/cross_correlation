@@ -21,7 +21,7 @@ Written in Python 2.7.
 
 """
 
-###############################################################################
+################################################################################
 def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error,\
 	filter):
@@ -34,7 +34,7 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 	if out_file[-4:].lower() == "fits":
 		out_file = out_file[:-4]+"dat"
 		
-	print "Output sent to: %s" % out_file
+	print "\nOutput sent to: %s" % out_file
 	
 	with open(out_file, 'w') as out:
 		out.write("#\t\tCross correlation function of multiple data files")
@@ -45,8 +45,10 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 		out.write("\n# Number of bins per segment = %d" % n_bins)
 		out.write("\n# Total exposure time = %d seconds" % total_exposure)
 		out.write("\n# Total number of segments = %d " % total_segments)
-		out.write("\n# Mean count rate of ci = %s" % str(list(mean_rate_total_ci)))
-		out.write("\n# Mean count rate of ref band = %.5f" % mean_rate_total_ref)
+		out.write("\n# Mean count rate of ci = %s" % \
+			str(list(mean_rate_total_ci)))
+		out.write("\n# Mean count rate of ref band = %.5f" % \
+			mean_rate_total_ref)
 		out.write("\n# Filter applied in frequency domain? %s" % str(filter))
 		out.write("\n# ")
 		out.write("\n# Column 1: Time bins")
@@ -69,7 +71,7 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 ## End of function 'dat_out'
 
 
-###############################################################################
+################################################################################
 def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error,\
 	filter):
@@ -79,7 +81,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     Writes the cross-correlation function to a .fits output file.
     
     """
-    print "Output sent to: %s" % out_file
+    print "\nOutput sent to: %s" % out_file
 	
     chan = np.arange(0,64)
     energy_channels = np.tile(chan, len(t))
@@ -130,7 +132,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 ## End of function 'fits_out'
 
 
-###############################################################################
+################################################################################
 def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     """
 			main
@@ -142,6 +144,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     function (ccf) per energy channel.
 	
 	"""
+	
 	#####################################################
     ## Idiot checks, to ensure that our assumptions hold
     #####################################################
@@ -152,6 +155,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ##############################################################
 	## Getting the list of input files and putting them in a list
 	##############################################################
+	
     input_files = [line.strip() for line in open(in_file_list)]
 	
     old_settings = np.seterr(divide='ignore')
@@ -181,7 +185,9 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	###################################################################
 	## Reading in the background count rate from a background spectrum
 	####################################################################
+   
     if bkgd_file:
+   		print "Using background spectrum: %s" % bkgd_file
 		bkgd_rate = xcor.get_background(bkgd_file)
     else:
 		bkgd_rate = np.zeros(64)
@@ -210,11 +216,13 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
         sum_power_ref = None
         
     ## End of for-loop
+    print "\n"
 	
 	#########################################
     ## Turning sums over segments into means
-    #########################################
-	mean_ci = sum_rate_ci / float(total_segments)
+	#########################################
+	
+    mean_ci = sum_rate_ci / float(total_segments)
     mean_rate_total_ci = sum_rate_total_ci / float(total_segments)
     mean_rate_total_ref = sum_rate_total_ref / float(total_segments)
     mean_power_ci = total_sum_power_ci / float(total_segments)
@@ -227,7 +235,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     
     mean_rate_total_ci -= bkgd_rate
     
-    ## Need to use a background from PCU 0 for the reference band...
+    ## Need to use a background from ref pcu for the reference band...
 #     ref_bkgd_rate = np.mean(bkgd_rate[2:26])
 #     mean_rate_whole_ref -= ref_bkgd_rate    
 #     print np.shape(mean_rate_whole_ci)
@@ -277,11 +285,15 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 ## End of the function 'main'
 
 
-###############################################################################
+################################################################################
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(usage='multi_ccf.py infile outfile [-b \
-BKGD_SPECTRUM] [-n NUM_SECONDS] [-m DT_MULT] [-t {0,1}] [-f {0,1}]', \
+	
+	##############################################
+	## Parsing input arguments and calling 'main'
+	##############################################
+	
+    parser = argparse.ArgumentParser(usage="python multi_ccf.py infile outfile \
+[-b BKGD_SPECTRUM] [-n NUM_SECONDS] [-m DT_MULT] [-t {0,1}] [-f {0,1}]", \
 description='Computes the cross-correlation function of a channel of interest \
 with a reference band, over multiple RXTE eventlists.', epilog='For optional \
 arguments, default values are given in brackets at end of description.')
@@ -294,7 +306,7 @@ Assuming that both PCU0 and PCU2 are in the event list.")
 output file to write the cross-correlation function to.")
         
     parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file', \
-help="Name of the (pha/fits) background spectrum.")
+help="Name of the (pha/fits) background spectrum. [none]")
     	
     parser.add_argument('-n', '--num_seconds', type=tools.type_power_of_two, \
 default=1, dest='num_seconds', help="Number of seconds in each Fourier segment.\
@@ -324,8 +336,6 @@ dest='filter', help='Int flag: 0 if NOT applying a filter in frequency-space, \
     	
     main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds, \
     	args.dt_mult, test, filter)
-	
-    print "Multi_ccf.py is done."
-	
+		
 ## End of the program 'multi_ccf.py'
-###############################################################################
+################################################################################
