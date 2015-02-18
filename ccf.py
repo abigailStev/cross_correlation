@@ -250,20 +250,46 @@ def make_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
 
 
 ################################################################################
-def filter_freq(freq_space_array, dt, n_bins, signal_freq):
+def find_pulse_freq(freq, power_ref):
+	"""
+			find_pulse_freq
+	
+	Determines the frequency of a coherent pulse above 100 Hz (to not confuse
+	with broadband noise).
+	
+	"""
+	
+	## Only searching above 100 Hz for a coherent pulse signal
+	hf = np.where(freq > 100)
+	hf_power = power_ref[hf]
+	hf_freq = freq[hf]
+	
+	## Assuming that the pulse frequency will have the most power
+	pulse_freq = hf_freq[np.argmax(hf_power)]
+
+	return pulse_freq
+## End of function 'find_pulse_freq'
+
+
+################################################################################
+def filter_freq(freq_space_array, dt, n_bins, power_ref):
     """
             filter_freq
 
     Applying a filter to the averaged cross-spectrum per energy channel (in
-    frequency space). Any cross spectrum amplitudes above or below signal_freq
+    frequency space). Any cross spectrum amplitudes above or below pulse_freq
     get zeroed out.
 
     """
+    ## Compute the Fourier frequencies
     freq = fftpack.fftfreq(n_bins, d=dt)
     
+    ## Determine pulse frequency
+    pulse_freq = find_pulse_freq(freq, power_ref)
+    
     ## Get the indices of the beginning and end of the signal
-    min_freq_mask = freq < signal_freq  # we want the last 'True' element
-    max_freq_mask = freq > signal_freq  # we want the first 'True' element
+    min_freq_mask = freq < pulse_freq  # we want the last 'True' element
+    max_freq_mask = freq > pulse_freq  # we want the first 'True' element
     j_min = list(min_freq_mask).index(False)
     j_max = list(max_freq_mask).index(True)
 	
@@ -301,7 +327,7 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	
 	"""
 	## Filter the cross spectrum in frequency
-	filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, 401.0)
+	filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, power_ref)
     
     ## Absolute rms norms of poisson noise
 	noise_ci = 2.0 * countrate_ci
