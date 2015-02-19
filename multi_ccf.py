@@ -24,7 +24,7 @@ Written in Python 2.7.
 ################################################################################
 def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error,\
-	filter):
+	filtering):
 	"""
 			dat_out
 	
@@ -49,7 +49,7 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 			str(list(mean_rate_total_ci)))
 		out.write("\n# Mean count rate of ref band = %.5f" % \
 			mean_rate_total_ref)
-		out.write("\n# Filter applied in frequency domain? %s" % str(filter))
+		out.write("\n# Filter applied in frequency domain? %s" % str(filtering))
 		out.write("\n# ")
 		out.write("\n# Column 1: Time bins")
 		out.write("\n# Column 2-65: CCF per energy channel [count rate]")
@@ -59,7 +59,7 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 			out.write("\n%d" % t[j])
 			for i in xrange(0, 64):
 				out.write("\t%.6e" % ccf[j][i].real)
-			if filter:
+			if filtering:
 				for i in xrange(0, 64):
 					out.write("\t%.6e" % ccf_error[i].real)
 			else:
@@ -74,7 +74,7 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 ################################################################################
 def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error,\
-	filter):
+	filtering):
     """
             fits_out
 
@@ -85,7 +85,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 	
     chan = np.arange(0,64)
     energy_channels = np.tile(chan, len(t))
-    if filter:
+    if filtering:
     	ccf_error = np.tile(ccf_error, len(t))
     else:
     	ccf_error = ccf_error.real.flatten('C')
@@ -105,7 +105,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     	"seconds, of all data")
     prihdr.set('RATE_CI', str(mean_rate_total_ci.tolist()), "counts/second")
     prihdr.set('RATE_REF', mean_rate_total_ref, "counts/second")
-    prihdr.set('FILTER', str(filter))
+    prihdr.set('FILTER', str(filtering))
     prihdu = fits.PrimaryHDU(header=prihdr)
         
     ## Making FITS table (extension 1)
@@ -133,7 +133,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 
 
 ################################################################################
-def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
+def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filtering):
     """
 			main
 		
@@ -157,7 +157,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	##############################################################
 	
     input_files = [line.strip() for line in open(in_file_list)]
-	
+    if not input_files:  ## If data_files is an empty list
+    	raise Exception("ERROR: No files in the eventlist list.")
     old_settings = np.seterr(divide='ignore')
 	
 	###########################################################
@@ -181,6 +182,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     total_sum_power_ref = 0
     total_sum_power_ci = 0
     sum_rate_ci = np.zeros(64)
+    nyquist_freq = 1.0 / (2.0 * dt)
+    
+    print "DT = %.15f" % dt
+    print "N_bins = %d" % n_bins
+    print "Nyquist freq = %f" % nyquist_freq
     
 	###################################################################
 	## Reading in the background count rate from a background spectrum
@@ -229,6 +235,13 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     mean_power_ref = total_sum_power_ref / float(total_segments)
     cs_avg = total_cs_sum / float(total_segments)
     
+    ################################################################
+    ## Printing the cross spectrum to a file, for plotting/checking
+    ################################################################
+    
+    cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
+    np.savetxt('cs_avg.dat', cs_out)
+    
     ##################################################################
     ## Subtracting the background count rate from the mean count rate
     ##################################################################
@@ -253,11 +266,17 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	## Computing ccf from cs, and computing error
 	##############################################
 	
-    if filter:
+	
+    print filtering
+    print type(filtering)
+    
+    if filtering:
+    	print "filtering"
     	ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
     		num_seconds, total_segments, mean_rate_total_ci, \
     		mean_rate_total_ref, mean_power_ci, mean_power_ref, True)
     else:
+    	print "not filtering"
     	ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
     		num_seconds, total_segments, mean_rate_total_ci, \
     		mean_rate_total_ref, mean_power_ci, mean_power_ref, True)
@@ -276,11 +295,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     
     dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, exposure, \
     	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end, \
-    	ccf_error, filter)
+    	ccf_error, filtering)
 	
     fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, exposure, \
     	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end, \
-    	ccf_error, filter)
+    	ccf_error, filtering)
 		
 ## End of the function 'main'
 
@@ -322,7 +341,7 @@ one segment for testing. [0]")
     	
     parser.add_argument('-f', '--filter', type=int, default=0, choices={0,1},
 dest='filter', help='Int flag: 0 if NOT applying a filter in frequency-space, \
-1 if applying filter (around a pulsation). [0]')
+1 if applying filter (around a coherent pulsation). [0]')
         
     args = parser.parse_args()
 
@@ -330,12 +349,15 @@ dest='filter', help='Int flag: 0 if NOT applying a filter in frequency-space, \
     if args.test == 1:
         test = True
 	
-	filter = False
+    filtering = False
     if args.filter == 1:
-    	filter = True
+    	filtering = True
+    
+    print filtering
+    print type(filtering)
     	
     main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds, \
-    	args.dt_mult, test, filter)
+    	args.dt_mult, test, filtering)
 		
 ## End of the program 'multi_ccf.py'
 ################################################################################
