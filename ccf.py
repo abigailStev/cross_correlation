@@ -84,18 +84,19 @@ def fits_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, \
     
     """
     
+    detchans=64
     ## Getting data into a good output structure
-    chan = np.arange(0,64)
+    chan = np.arange(0, detchans)
     energy_channels = np.tile(chan, len(t))
     if filter:
     	ccf_error = np.tile(ccf_error, len(t))
     else:
     	ccf_error = ccf_error.real.flatten('C')
-    time_bins = np.repeat(t, len(chan))
+    time_bins = np.repeat(t, detchans)
     assert len(energy_channels) == len(time_bins)
     
     print "\nOutput sent to: %s" % out_file
-
+	
     ## Making FITS header (extension 0)
     prihdr = fits.Header()
     prihdr.set('TYPE', "Cross-correlation function")
@@ -107,6 +108,7 @@ def fits_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, \
     prihdr.set('SEGMENTS', num_segments, "segments in the whole light curve")
     prihdr.set('EXPOSURE', num_segments * n_bins * dt, \
     	"seconds, of light curve")
+    prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
     prihdr.set('RATE_CI', str(mean_rate_whole_ci.tolist()), "counts/second")
     prihdr.set('RATE_REF', mean_rate_whole_ref, "counts/second")
     prihdr.set('FILTER', str(filter))
@@ -179,6 +181,7 @@ def make_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
 	writes the lag information to a .fits output file.
 	
 	"""
+	detchans=64
 	freq = fftpack.fftfreq(n_bins, d=dt)
 	max_index = np.argmax(freq)+1  # because in python, the scipy fft makes the 
 								   # nyquist frequency negative, and we want it 
@@ -195,11 +198,11 @@ def make_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
 	power_ref = power_ref[1:max_index + 1]
 	phase = np.arctan2(cs_avg.real, cs_avg.imag)
 	err_phase = get_phase_err(cs_avg, power_ci, \
-		np.repeat(power_ref[:, np.newaxis], 64, axis=1), 1, num_segments)
+		np.repeat(power_ref[:, np.newaxis], detchans, axis=1), 1, num_segments)
 	tlag = phase_to_tlags(phase, freq)
 	err_tlag = phase_to_tlags(err_phase, freq)
     
-	chan = np.arange(0,64)
+	chan = np.arange(0,detchans)
 	energy_channels = np.tile(chan, len(freq))
 	bins = np.repeat(freq, len(chan))    
     
@@ -216,6 +219,7 @@ def make_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
 	prihdr.set('SEGMENTS', num_segments, "segments in the whole light curve")
 	prihdr.set('EXPOSURE', num_segments * n_bins * dt, \
 		"seconds, of light curve")
+	prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
 	prihdr.set('RATE_CI', str(mean_rate_whole_ci.tolist()), "counts/second")
 	prihdr.set('RATE_REF', mean_rate_whole_ref, "counts/second")
 	prihdr.set('FILTER', str(filter))
@@ -352,9 +356,9 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	
 	## Getting rms of reference band, to normalize the ccf
 	signal_variance = np.sum(signal_ref_pow * df)
-	print "Signal variance:", signal_variance
+	print "FSignal variance:", signal_variance
 	rms_ref = np.sqrt(signal_variance)  
-	print "Frac RMS of reference band:", rms_ref / countrate_ref  
+	print "FFrac RMS of reference band:", rms_ref / countrate_ref  
 	# in frac rms units here -- should be few percent
     
     ## Putting signal_ref_pow in same shape as signal_ci_pow
@@ -415,8 +419,9 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 	## higher frequencies as the noise level
 # 	noise_ref = 2.0 * countrate_ref
 	print "Estimated noise:", 2.0 * countrate_ref
+	noise_ref = 2.0 * countrate_ref - 0.016*(2.0 * countrate_ref)
 	temp = power_ref * (2.0 * dt / float(n_bins))
-	noise_ref = np.mean(temp[np.where(freq >= 100)])
+# 	noise_ref = np.mean(temp[np.where(freq >= 100)])
 	
 # 	print "NOISE CI", noise_ci
 	print "NOISE REF:", noise_ref
@@ -433,7 +438,7 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 # 	absrms_power_ci[np.where(absrms_power_ci < 0)] = 0.0
 # 	absrms_power_ref[np.where(absrms_power_ref < 0)] = 0.0
 	print "Mean of whole ps:", np.mean(absrms_power_ref)
-	print "Mean of hf ps:", np.mean(absrms_power_ref[np.where(freq >= 100)])
+# 	print "Mean of hf ps:", np.mean(absrms_power_ref[np.where(freq >= 100)])
 	
 	## Getting rms of reference band, to normalize the ccf
 	signal_variance = np.sum(absrms_power_ref * df)
@@ -594,14 +599,15 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	counting and/or skipping events.
 	
 	"""
-	## Check if the FITS file exists
+	
+	## Check if the FITS file exists; if so, load the data
 	try:
 		fits_hdu = fits.open(in_file)
 	except IOError:
 		print "\tERROR: File does not exist: %s" % in_file
 		sys.exit()
 	
-	header = fits_hdu[0].header	 # Header info is in ext 0, data is in ext 1
+	header = fits_hdu[0].header	 ## Header info is in ext 0, data is in ext 1
 	data = fits_hdu[1].data
 	fits_hdu.close()
 	
@@ -626,15 +632,18 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	
 	## Selecting PCU for reference band
 	pcus_on, occurrences = np.unique(data.field('PCUID'), return_counts=True)
+	
 	## Getting rid of the PCU 2 element (since we don't want that as the ref)
 	pcu2 = np.where(pcus_on == 2)
 	pcus_on = np.delete(pcus_on, pcu2)
 	occurrences = np.delete(occurrences, pcu2)
+	
 	## Determining the next-most-prevalent pcu
-	most = np.argmax(occurrences)
-	ref_pcu = pcus_on[most]
-	print "Ref PCU =", ref_pcu
-	refpcu_mask = data.field('PCUID') == ref_pcu
+	# most = np.argmax(occurrences)
+# 	ref_pcu = pcus_on[most]
+# 	print "Ref PCU =", ref_pcu
+# 	refpcu_mask = data.field('PCUID') == ref_pcu
+	refpcu_mask = data.field('PCUID') != 2
 	data_ref = data[refpcu_mask]
 	all_time_ref = np.asarray(data_ref.field('TIME'), dtype=np.float64)
 	all_energy_ref = np.asarray(data_ref.field('CHANNEL'), dtype=np.float64)
@@ -890,6 +899,13 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     mean_rate_whole_ref = 0
     ccf_end = np.zeros((n_bins, 64))
     cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
+    nyquist_freq = 1.0 / (2.0 * dt)
+    
+    print "DT = %f" % dt
+    print "N_bins = %d" % n_bins
+    print "Nyquist freq =", nyquist_freq
+    print "Filtering?", filter
+
     
     ###################################################################
     ## Reading in the background count rate from a background spectrum
@@ -919,6 +935,13 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     mean_power_ref = sum_power_ref / float(num_segments)
     cs_avg = cs_sum / float(num_segments)
     
+    ################################################################
+    ## Printing the cross spectrum to a file, for plotting/checking
+    ################################################################
+    
+    cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
+    np.savetxt('cs_avg.dat', cs_out)
+    
     ##################################################################
     ## Subtracting the background count rate from the mean count rate
     ##################################################################
@@ -944,7 +967,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	##############################################
 	
     if filter:
-		ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
+    	ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
 			num_seconds, num_segments, mean_rate_whole_ci, mean_rate_whole_ref,\
 			mean_power_ci, mean_power_ref, True)
     else:
@@ -1017,7 +1040,7 @@ dest='filter', help='Int flag: 0 if NOT applying a filter in frequency-space, \
     filter = False
     if args.filter == 1:
     	filter = True
-
+    	
     main(args.infile, args.outfile, args.bkgd_file, args.num_seconds, \
     	args.dt_mult, test, filter)
 

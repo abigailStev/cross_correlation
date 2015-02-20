@@ -91,7 +91,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     	ccf_error = ccf_error.real.flatten('C')
     time_bins = np.repeat(t, len(chan))
     assert len(energy_channels) == len(time_bins)
-    
+    detchans=64
     ## Making FITS header (extension 0)
     prihdr = fits.Header()
     prihdr.set('TYPE', "Cross-correlation function of multiple data files")
@@ -103,6 +103,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     prihdr.set('SEGMENTS', total_segments, "segments, of all data")
     prihdr.set('EXPOSURE', total_exposure, \
     	"seconds, of all data")
+    prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
     prihdr.set('RATE_CI', str(mean_rate_total_ci.tolist()), "counts/second")
     prihdr.set('RATE_REF', mean_rate_total_ref, "counts/second")
     prihdr.set('FILTER', str(filtering))
@@ -184,9 +185,10 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filterin
     sum_rate_ci = np.zeros(64)
     nyquist_freq = 1.0 / (2.0 * dt)
     
-    print "DT = %.15f" % dt
+    print "\nDT = %.15f" % dt
     print "N_bins = %d" % n_bins
     print "Nyquist freq = %f" % nyquist_freq
+    print "Filtering?", filtering
     
 	###################################################################
 	## Reading in the background count rate from a background spectrum
@@ -197,6 +199,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filterin
 		bkgd_rate = xcor.get_background(bkgd_file)
     else:
 		bkgd_rate = np.zeros(64)
+    print "\n"
 	
 	##################################
     ## Looping through all data files
@@ -352,9 +355,6 @@ dest='filter', help='Int flag: 0 if NOT applying a filter in frequency-space, \
     filtering = False
     if args.filter == 1:
     	filtering = True
-    
-    print filtering
-    print type(filtering)
     	
     main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds, \
     	args.dt_mult, test, filtering)
