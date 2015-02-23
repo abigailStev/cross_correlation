@@ -268,18 +268,12 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filterin
 	##############################################
 	## Computing ccf from cs, and computing error
 	##############################################
-	
-	
-    print filtering
-    print type(filtering)
     
     if filtering:
-    	print "filtering"
     	ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
     		num_seconds, total_segments, mean_rate_total_ci, \
     		mean_rate_total_ref, mean_power_ci, mean_power_ref, True)
     else:
-    	print "not filtering"
     	ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
     		num_seconds, total_segments, mean_rate_total_ci, \
     		mean_rate_total_ref, mean_power_ci, mean_power_ref, True)
