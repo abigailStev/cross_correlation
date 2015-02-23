@@ -47,21 +47,26 @@ format.")
 	assert args.tab_file[-4:].lower() == "fits", "ERROR: Data file must be in \
 	.fits format."
 	
-	n_bins = get_key_val(args.tab_file, 0, "N_BINS")
-	means_str = get_key_val(args.tab_file, 0, "RATE_CI")
-	mean_rate_ci = [ float(num.strip()) for num in means_str[1:-1].split(',') ]
-	
+
 	#############################
 	## Load data from FITS table
 	#############################
+	try:
+		file_hdu = fits.open(args.tab_file)
+	except IOError:
+		print "\tERROR: File does not exist: %s" % args.tab_file
+		sys.exit()
 	
-	file_hdu = fits.open(args.tab_file)
+	n_bins = int(file_hdu[0].header["N_BINS"])
+	means_str = file_hdu[0].header["RATE_CI"]
+	detchans = int(file_hdu[0].header["DETCHANS"])	
 	table = file_hdu[1].data
 	file_hdu.close()
+	
+	mean_rate_ci = [ float(num.strip()) for num in means_str[1:-1].split(',') ]
+	ccf = np.reshape(table.field('CCF'), (n_bins, detchans), order='C')
 
-	ccf = np.reshape(table.field('CCF'), (n_bins, 64), order='C')
-
-	t_length = 2000  ## Number of time bins to use
+	t_length = 70  ## Number of time bins to use
 	ccf = ccf[0:t_length,].T  ## Transpose it to get the axes we want
 	
 	###################################################################
@@ -79,6 +84,9 @@ format.")
 	## Saving to a dat file so that we can use fimgcreate
 	######################################################
 	
+# 	ratio[np.where(np.abs(ratio) > 0.3)] = 0
+	print np.shape(ratio)
+	ratio[32:,] = 0
 	out_file = "out_ccf/temp.dat"
 	R = ratio.flatten('C')
 	comment_str = "From %s" % args.tab_file
@@ -90,17 +98,16 @@ format.")
 	
 	font_prop = font_manager.FontProperties(size=16)
 	fig, ax = plt.subplots(1,1)
-	plt.pcolor(ratio, cmap='hot')
+	plt.pcolor(ratio, cmap='hot')  ## in future, can use vmin and vmax to set limits
 	plt.colorbar()
 	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
 	ax.set_ylabel('Energy channel', fontproperties=font_prop)
-# 	ax.set_ylim(3, 31)
-# 	ax.set_ylim(-0.45, 0.45)
-	ax.set_ylim(0,64)
+	ax.set_ylim(3, 31)
+# 	ax.set_ylim(0,detchans)
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
 	fig.set_tight_layout(True)
-	plt.savefig(args.plot_file, dpi=200)
+	plt.savefig(args.plot_file, dpi=150)
 # 	plt.show()
 	plt.close()		
 	
