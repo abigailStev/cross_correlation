@@ -33,16 +33,14 @@ def make_plot(x_bins, ccf_amps, ccf_err, prefix, plot_file, chan):
 	font_prop = font_manager.FontProperties(size=16)
 
 	fig, ax = plt.subplots(1,1)
-	ax.plot(x_bins, ccf_amps, lw=2, c='black')
+	ax.plot(x_bins, ccf_amps, lw=1.5, c='black')
 # 	ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=2, c='black', elinewidth=2, capsize=2)
 	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
 	ax.set_ylabel('Deviation from mean count rate [photons / s]', fontproperties=font_prop)
-	ax.set_xlim(0, 2500)
+	ax.set_xlim(0, )
 # 	ax.set_ylim(-0.45, 0.45)
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
-# 	title = prefix + ", Energy channel " + str(chan)
-# 	ax.set_title("Periodic signal at ~7 keV", fontproperties=font_prop)
 	ax.set_title(prefix + ", Energy channel " + str(chan), fontproperties=font_prop)
 
 	## The following legend code was found on stack overflow
@@ -110,8 +108,13 @@ help="The identifying prefix of the data (object nickname or proposal ID). [x]")
 			make_plot(time_bins, ccf[:, i], ccf_err[:, i], args.prefix, plot_file, c)
 			
 	elif args.tab_file[-5:].lower() == ".fits":
-	
-		file_hdu = fits.open(args.tab_file)
+		
+		try:
+			file_hdu = fits.open(args.tab_file)
+		except IOError:
+			print "\tERROR: File does not exist: %s" % args.tab_file
+			exit()
+			
 		table = file_hdu[1].data
 		file_hdu.close()
 		
