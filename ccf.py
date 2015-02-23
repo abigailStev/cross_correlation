@@ -356,10 +356,10 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	
 	## Getting rms of reference band, to normalize the ccf
 	ref_variance = np.sum(signal_ref_pow * df)
-	print "FSignal variance:", ref_variance
+	print "Reference band variance:", ref_variance
 	rms_ref = np.sqrt(ref_variance)  
-	print "FFrac RMS of reference band:", rms_ref / countrate_ref  
-	# in frac rms units here -- should be few percent
+	print "Frac RMS of reference band:", rms_ref / countrate_ref  
+	## in frac rms units here -- should be few percent
     
     ## Broadcasting signal_ref_pow into same shape as signal_ci_pow
 	signal_ref_pow = np.resize(signal_ref_pow, np.shape(signal_ci_pow))
@@ -445,16 +445,14 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 	
 	## Broadcasting acf_ref into same shape as acf_ci
 	acf_ref = np.resize(acf_ref, np.shape(acf_ci))
-	print np.shape(acf_ref)
 	assert np.shape(acf_ref) == np.shape(acf_ci), "ERROR: Array broadcasting failed."
 	
 	## Bartlett formula for computing variance on unfilfered CCF
 	var_ccf = (acf_ci * acf_ref) / num_segments
 	
-	print np.shape(var_ccf)
-	print type(var_ccf[0][0])
-	print var_ccf
-	print ccf_end
+	print "Datatype of var_ccf:", type(var_ccf[0][0])
+	print "Variance of ccf computed with Bartlett formula:", var_ccf[0:5,0]
+	print "CCF:", ccf_end[0:5,0]
 	
 	## Getting rms of reference band, to normalize the ccf
 	rms_variance = np.sum(absrms_power_ref * df)
@@ -465,12 +463,13 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 	
 	## Dividing ccf by rms of signal in reference band
 	ccf_end *= (2.0 / float(n_bins) / rms_ref)
+	var_ccf *= (2.0 / float(n_bins))
 	
 	
-	## Need to do error calculation!!
+	print "Normed ccf:", ccf_end[0:5,0]
+	print "Normed var_ccf:", var_ccf[0:5,0]	
 	
-	
-	return ccf_end, ccf_end*0.10
+	return ccf_end, var_ccf
 	
 ## End of function 'UNFILT_cs_to_ccf_w_err'	
 
@@ -530,8 +529,8 @@ def make_cs(rate_ci, rate_ref, n_bins, dt):
     power_ci = np.absolute(fft_data_ci) ** 2
     power_ref = np.absolute(fft_data_ref) ** 2
 	
-	## Broadcasting fft of ref into same shape as fft of ci
-	fft_data_ref = np.resize(fft_data_ref, np.shape(fft_data_ci))
+    ## Broadcasting fft of ref into same shape as fft of ci
+    fft_data_ref = np.resize(fft_data_ref, np.shape(fft_data_ci))
 	
 	## Computing the cross spectrum from the fourier transform
     cs_segment = np.multiply(fft_data_ci, np.conj(fft_data_ref))
@@ -646,18 +645,18 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	all_time_ci = np.asarray(data_pcu2.field('TIME'), dtype=np.float64)
 	all_energy_ci = np.asarray(data_pcu2.field('CHANNEL'), dtype=np.float64)
 	
-	## Selecting PCU for reference band
-	pcus_on, occurrences = np.unique(data.field('PCUID'), return_counts=True)
-	
-	## Getting rid of the PCU 2 element (since we don't want that as the ref)
-	pcu2 = np.where(pcus_on == 2)
-	pcus_on = np.delete(pcus_on, pcu2)
-	occurrences = np.delete(occurrences, pcu2)
-	
 	## Determining the next-most-prevalent pcu
-	# most = np.argmax(occurrences)
-# 	ref_pcu = pcus_on[most]
+# 	pcus_on, occurrences = np.unique(data.field('PCUID'), return_counts=True)
+# 	## Getting rid of the PCU 2 element (since we don't want that as the ref)
+# 	pcu2 = np.where(pcus_on == 2)
+# 	pcus_on = np.delete(pcus_on, pcu2)
+# 	occurrences = np.delete(occurrences, pcu2)
+# 	## Next-most pcu is:
+# 	most_pcu = np.argmax(occurrences)
+# 	ref_pcu = pcus_on[most_pcu]
 # 	print "Ref PCU =", ref_pcu
+	
+	## Selecting PCU for reference band
 # 	refpcu_mask = data.field('PCUID') == ref_pcu
 	refpcu_mask = data.field('PCUID') != 2
 	data_ref = data[refpcu_mask]
@@ -706,6 +705,7 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 			start_time = min(all_time_ci[0], all_time_ref[0])
 			seg_end_time = start_time + (n_bins * dt)
 		## End of 'if there are counts in this segment'
+
 	## End of while-loop
 	
 	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
@@ -939,7 +939,6 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, \
     	sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, \
     	dt, test)
-    print "\n"
 	
 	#########################################
 	## Turning sums over segments into means
