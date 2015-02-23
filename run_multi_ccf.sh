@@ -5,14 +5,19 @@
 ## Bash script to run multi_CCF.py, plot_CCF.py, plot_multi.py, plot_2d.py, and 
 ## plot_lags.py
 ##
+## Example call: ./run_multi_ccf.sh ./eventlists.lst J1808 4 16 0 150131
+##
+## Change the directory names and specifiers before the double '#' row to best
+## suit your setup.
+##
+## Notes: HEASOFT 6.11.*, bash 3.*, and Python 2.7.* (with supporting libraries) 
+## 		  must be installed in order to run this script. 
+##
 ## Written by Abigail Stevens, A.L.Stevens@uva.nl, 2014-2015
 ##
 ################################################################################
 
-##########################################
 ## Checking the number of input arguments
-##########################################
-
 if (( $# != 6 )); then
     echo -e "\tUsage: ./run_multi_ccf.sh <file list> <prefix> <dt multiple> <num seconds> <testing> <date>\n"
     exit
@@ -25,15 +30,12 @@ numsec=$4
 testing=$5
 day=$6
 
-######################################
-## If heainit isn't running, start it
-######################################
+################################################################################
 
+## If heainit isn't running, start it
 if (( $(echo $DYLD_LIBRARY_PATH | grep heasoft | wc -l) < 1 )); then
 	. $HEADAS/headas-init.sh
 fi
-
-################################################################################
 
 home_dir=$(ls -d ~)
 
@@ -94,12 +96,12 @@ fi
 if [ -e "${out_file}.${tab_ext}" ]; then
 	python "$exe_dir"/plot_CCF.py "${out_file}.${tab_ext}" -o "${plot_root}" \
 		-p "$prefix"
-	if [ -e "${plot_root}_chan_06.${plot_ext}" ]; then open -a ImageJ "${plot_root}_chan_06.${plot_ext}"; fi
+# 	if [ -e "${plot_root}_chan_06.${plot_ext}" ]; then open -a ImageJ "${plot_root}_chan_06.${plot_ext}"; fi
 	
 	ccfs_plot="$exe_dir/ccf_plot.${plot_ext}"
 	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" \
 		"$numsec"
-	if [ -e "$ccfs_plot" ]; then open -a ImageJ "$ccfs_plot"; fi
+# 	if [ -e "$ccfs_plot" ]; then open -a ImageJ "$ccfs_plot"; fi
 fi
 
 #######################
@@ -109,24 +111,24 @@ fi
 plot_file="${plot_root}_2Dccf.${plot_ext}"
 if [ -e "${out_file}.${tab_ext}" ]; then
 	python "$exe_dir"/plot_2d.py "${out_file}.${tab_ext}" -o "${plot_file}"
-	if [ -e "${plot_file}" ]; then open -a ImageJ "${plot_file}"; fi
+# 	if [ -e "${plot_file}" ]; then open -a ImageJ "${plot_file}"; fi
 fi
 	
 plot_file="${plot_root}_2Dccf.fits"
 detchans=$(python -c "from tools import get_key_val; print get_key_val('${out_file}.fits', 0, 'DETCHANS')")
 echo "$detchans"
 
-if [ -e "$out_dir/temp.dat" ]; then
-	fimgcreate bitpix=-32 \
-		naxes="70,${detchans}" \
-		datafile="$out_dir/temp.dat" \
-		outfile="${plot_root}_2Dccf.fits" \
-		nskip=1 \
-		history=true \
-		clobber=yes
-else
-	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
-fi
+# if [ -e "$out_dir/temp.dat" ]; then
+# 	fimgcreate bitpix=-32 \
+# 		naxes="70,${detchans}" \
+# 		datafile="$out_dir/temp.dat" \
+# 		outfile="${plot_root}_2Dccf.fits" \
+# 		nskip=1 \
+# 		history=true \
+# 		clobber=yes
+# else
+# 	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
+# fi
 
 if [ -e "${plot_root}_2Dccf.fits" ]; then
 	echo "FITS 2D ccf ratio image: ${plot_root}_2Dccf.fits"
@@ -148,13 +150,13 @@ elif (( $testing == 1 )); then
 	plot_root="$lag_out_dir/test_${prefix}_${day}_t${dt}_${numsec}sec"
 fi
 
-if [ -e "${out_file}.${tab_ext}" ]; then
-	python "$lag_exe_dir"/plot_lags.py "${out_file}.${tab_ext}" \
-		-o "${plot_root}" -l "$lag_lf" -u "$lag_uf"
-# 	if [ -e "${plot_root}_lag-energy.png" ]; then open -a ImageJ "${plot_root}_lag-energy.png"; fi
-else
-	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
-fi
+# if [ -e "${out_file}.${tab_ext}" ]; then
+# 	python "$lag_exe_dir"/plot_lags.py "${out_file}.${tab_ext}" \
+# 		-o "${plot_root}" -l "$lag_lf" -u "$lag_uf"
+# # 	if [ -e "${plot_root}_lag-energy.png" ]; then open -a ImageJ "${plot_root}_lag-energy.png"; fi
+# else
+# 	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
+# fi
 
 ################################################################################
 ## All done!
