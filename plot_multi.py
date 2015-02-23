@@ -58,7 +58,11 @@ def main(file, plot_file, numsec):
 		
 	elif file[-4:].lower() == "fits":
 	
-		file_hdu = fits.open(file)
+		try:
+			file_hdu = fits.open(file)
+		except IOError:
+			print "\tERROR: File does not exist: %s" % file
+			exit()
 		table = file_hdu[1].data
 		file_hdu.close()
 		
@@ -105,7 +109,7 @@ def main(file, plot_file, numsec):
 	ax.set_ylabel('Deviation from mean count rate [photons / s]', \
 		fontproperties=font_prop)
 # 	ax.set_xlim(0, 20000)
-	ax.set_xlim(0, 2000)
+	ax.set_xlim(0, 200)
 # 	ax.set_ylim(-0.0005, 0.0005)
 # 	ax.set_ylim(-2.5, 3)
 # 	ax.set_xscale('symlog')  ## this works much better than 'log'
