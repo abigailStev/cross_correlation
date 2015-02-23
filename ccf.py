@@ -355,20 +355,17 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	signal_ref_pow = signal_ref_pow * (2.0 * dt / float(n_bins)) - noise_ref
 	
 	## Getting rms of reference band, to normalize the ccf
-	signal_variance = np.sum(signal_ref_pow * df)
-	print "FSignal variance:", signal_variance
-	rms_ref = np.sqrt(signal_variance)  
+	ref_variance = np.sum(signal_ref_pow * df)
+	print "FSignal variance:", ref_variance
+	rms_ref = np.sqrt(ref_variance)  
 	print "FFrac RMS of reference band:", rms_ref / countrate_ref  
 	# in frac rms units here -- should be few percent
     
-    ## Putting signal_ref_pow in same shape as signal_ci_pow
-	signal_ref_pow_stacked = signal_ref_pow
-	for i in xrange(63):
-		signal_ref_pow_stacked = np.column_stack(
-			(signal_ref_pow, signal_ref_pow_stacked))
-	assert np.shape(signal_ref_pow_stacked) == np.shape(signal_ci_pow)
+    ## Broadcasting signal_ref_pow into same shape as signal_ci_pow
+	signal_ref_pow = np.resize(signal_ref_pow, np.shape(signal_ci_pow))
+	assert np.shape(signal_ref_pow) == np.shape(signal_ci_pow)
 
-	temp = (noise_ci * signal_ref_pow_stacked) + \
+	temp = (noise_ci * signal_ref_pow) + \
 		(noise_ref * signal_ci_pow) + \
 		(noise_ci * noise_ref)
 	cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(total_segments))
@@ -419,6 +416,7 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 	## higher frequencies as the noise level
 # 	noise_ref = 2.0 * countrate_ref
 	print "Estimated noise:", 2.0 * countrate_ref
+	noise_ci = 2.0 * countrate_ci - 0.016*(2.0 * countrate_ci)
 	noise_ref = 2.0 * countrate_ref - 0.016*(2.0 * countrate_ref)
 	temp = power_ref * (2.0 * dt / float(n_bins))
 # 	noise_ref = np.mean(temp[np.where(freq >= 100)])
@@ -433,17 +431,35 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 	df = 1.0 / float(num_seconds)  # in Hz
 	
 	## Putting powers into absolute rms2 normalization, subtracting noise
-# 	absrms_power_ci = power_ci * (2.0 * dt / float(n_bins)) - noise_ci
+	absrms_power_ci = power_ci * (2.0 * dt / float(n_bins)) - noise_ci
 	absrms_power_ref = power_ref * (2.0 * dt / float(n_bins)) - noise_ref
 # 	absrms_power_ci[np.where(absrms_power_ci < 0)] = 0.0
 # 	absrms_power_ref[np.where(absrms_power_ref < 0)] = 0.0
 	print "Mean of whole ps:", np.mean(absrms_power_ref)
 # 	print "Mean of hf ps:", np.mean(absrms_power_ref[np.where(freq >= 100)])
 	
+	
+	## Computing the autocorrelation functions from the power spectra
+	acf_ci = fftpack.ifft(absrms_power_ci)
+	acf_ref = fftpack.ifft(absrms_power_ref)
+	
+	## Broadcasting acf_ref into same shape as acf_ci
+	acf_ref = np.resize(acf_ref, np.shape(acf_ci))
+	print np.shape(acf_ref)
+	assert np.shape(acf_ref) == np.shape(acf_ci), "ERROR: Array broadcasting failed."
+	
+	## Bartlett formula for computing variance on unfilfered CCF
+	var_ccf = (acf_ci * acf_ref) / num_segments
+	
+	print np.shape(var_ccf)
+	print type(var_ccf[0][0])
+	print var_ccf
+	print ccf_end
+	
 	## Getting rms of reference band, to normalize the ccf
-	signal_variance = np.sum(absrms_power_ref * df)
-	print "Signal variance:", signal_variance
-	rms_ref = np.sqrt(signal_variance)  
+	rms_variance = np.sum(absrms_power_ref * df)
+	print "RMS variance:", rms_variance
+	rms_ref = np.sqrt(rms_variance)  
 	print "Frac RMS of reference band:", rms_ref / countrate_ref  
 	# in frac rms units here -- should be few percent
 	
@@ -513,12 +529,12 @@ def make_cs(rate_ci, rate_ref, n_bins, dt):
 	## Computing the power from the fourier transform
     power_ci = np.absolute(fft_data_ci) ** 2
     power_ref = np.absolute(fft_data_ref) ** 2
-
-    fft_ref = np.repeat(fft_data_ref[:, np.newaxis], 64, axis=1)
-    assert np.shape(fft_ref) == np.shape(fft_data_ci)
+	
+	## Broadcasting fft of ref into same shape as fft of ci
+	fft_data_ref = np.resize(fft_data_ref, np.shape(fft_data_ci))
 	
 	## Computing the cross spectrum from the fourier transform
-    cs_segment = np.multiply(fft_data_ci, np.conj(fft_ref))
+    cs_segment = np.multiply(fft_data_ci, np.conj(fft_data_ref))
     
     return cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
         power_ref
