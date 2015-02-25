@@ -18,8 +18,9 @@
 ################################################################################
 
 ## Checking the number of input arguments
-if (( $# != 6 )); then
-    echo -e "\tUsage: ./run_multi_ccf.sh <file list> <prefix> <dt multiple> <num seconds> <testing> <date>\n"
+if (( $# != 7 )); then
+    echo -e "\tUsage: ./run_multi_ccf.sh <file list> <prefix> <dt multiple> \
+<num seconds> <testing> <date> <filtering>\n"
     exit
 fi
 
@@ -29,6 +30,7 @@ dt=$3
 numsec=$4
 testing=$5
 day=$6
+filtering=$7 ## 0 = no, 1 = yes; 0 is for QPOs, 1 is for coherent pulses
 
 ################################################################################
 
@@ -47,7 +49,6 @@ lag_out_dir="$lag_exe_dir/out_lags"
 if [ ! -d "$out_dir" ]; then mkdir -p "$out_dir"; fi
 if [ ! -d "$lag_out_dir" ]; then mkdir -p "$lag_out_dir"; fi
 
-filtering=0  ## 0 = no, 1 = yes; 0 is for QPOs, 1 is for coherent pulses
 bkgd_spec="$home_dir/Reduced_data/$prefix/evt_bkgd_rebinned.pha"
 
 lag_lf=4  ## Lower frequency bound for lag spectra, in Hz
