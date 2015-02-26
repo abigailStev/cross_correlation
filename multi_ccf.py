@@ -22,7 +22,7 @@ Written in Python 2.7.
 """
 
 ################################################################################
-def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
+def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure, \
 	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error,\
 	filtering):
 	"""
@@ -43,7 +43,8 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 		out.write("\n# Background spectrum: %s" % bkgd_file)
 		out.write("\n# Time bin size = %.21f seconds" % dt)
 		out.write("\n# Number of bins per segment = %d" % n_bins)
-		out.write("\n# Total exposure time = %d seconds" % total_exposure)
+		out.write("\n# DETCHANS = %d" % detchans)
+		out.write("\n# Total exposure time = %d seconds" % exposure)
 		out.write("\n# Total number of segments = %d " % total_segments)
 		out.write("\n# Mean count rate of ci = %s" % \
 			str(list(mean_rate_total_ci)))
@@ -72,7 +73,7 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 
 
 ################################################################################
-def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
+def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,\
 	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error,\
 	filtering):
     """
@@ -83,7 +84,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     """
     print "\nOutput sent to: %s" % out_file
 	
-    chan = np.arange(0,64)
+    chan = np.arange(0, detchans)
     energy_channels = np.tile(chan, len(t))
     if filtering:
     	ccf_error = np.tile(ccf_error, len(t))
@@ -91,7 +92,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     	ccf_error = ccf_error.real.flatten('C')
     time_bins = np.repeat(t, len(chan))
     assert len(energy_channels) == len(time_bins)
-    detchans=64
+
     ## Making FITS header (extension 0)
     prihdr = fits.Header()
     prihdr.set('TYPE', "Cross-correlation function of multiple data files")
@@ -101,8 +102,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
     prihdr.set('DT', dt, "seconds")
     prihdr.set('N_BINS', n_bins, "time bins per segment")
     prihdr.set('SEGMENTS', total_segments, "segments, of all data")
-    prihdr.set('EXPOSURE', total_exposure, \
-    	"seconds, of all data")
+    prihdr.set('EXPOSURE', exposure, "seconds, of all data")
     prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
     prihdr.set('RATE_CI', str(mean_rate_total_ci.tolist()), "counts/second")
     prihdr.set('RATE_REF', mean_rate_total_ref, "counts/second")
@@ -134,7 +134,8 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, total_exposure, \
 
 
 ################################################################################
-def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filtering):
+def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, \
+	filtering):
     """
 			main
 		
@@ -171,19 +172,15 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filterin
     t_res = float(tools.get_key_val(input_files[0], 0, 'TIMEDEL'))
     dt = dt_mult * t_res
     n_bins = num_seconds * int(1.0 / dt)
-    total_segments = 0
-    sum_rate_total_ci = np.zeros(64, dtype=np.float64)
-    sum_rate_total_ref = 0
-    mean_rate_total_ci = np.zeros(64, dtype=np.float64)
-    mean_rate_total_ref = 0
-    ccf = np.zeros((n_bins, 64))
-    ccf_end = np.zeros((n_bins, 64))
-    total_cs_sum = np.zeros((n_bins, 64), dtype=np.complex128)
-    cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
-    total_sum_power_ref = 0
-    total_sum_power_ci = 0
-    sum_rate_ci = np.zeros(64)
+    detchans = float(tools.get_key_val(input_files[0], 0, 'DETCHANS'))
     nyquist_freq = 1.0 / (2.0 * dt)
+    
+    total_segments = 0
+    total_cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
+    sum_rate_total_ci = np.zeros(detchans)
+    sum_rate_total_ref = 0
+    total_sum_power_ci = np.zeros((n_bins, detchans), dtype=np.float64)
+    total_sum_power_ref = np.zeros(n_bins, dtype=np.float64)
     
     print "\nDT = %.15f" % dt
     print "N_bins = %d" % n_bins
@@ -198,8 +195,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filterin
    		print "Using background spectrum: %s" % bkgd_file
 		bkgd_rate = xcor.get_background(bkgd_file)
     else:
-		bkgd_rate = np.zeros(64)
-    print "\n"
+		bkgd_rate = np.zeros(detchans)
+    print " "
 	
 	##################################
     ## Looping through all data files
@@ -208,8 +205,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filterin
     for in_file in input_files:
     
         cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-            sum_power_ci, sum_power_ref, sum_rate_ci = xcor.read_and_use_segments(in_file, \
-            n_bins, dt, test)
+            sum_power_ci, sum_power_ref, sum_rate_ci = \
+            xcor.read_and_use_segments(in_file, n_bins, detchans, dt, test)
             
         total_segments += num_segments
         total_cs_sum += cs_sum
@@ -225,7 +222,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filterin
         sum_power_ref = None
         
     ## End of for-loop
-    print "\n"
+    print " "
 	
 	#########################################
     ## Turning sums over segments into means
@@ -261,7 +258,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filterin
     ## Making lag spectra
     ######################
     
-    xcor.make_lags(out_file, in_file_list, dt, n_bins, num_seconds, \
+    xcor.make_lags(out_file, in_file_list, dt, n_bins, detchans, num_seconds, \
     	total_segments, mean_rate_total_ci, mean_rate_total_ref, cs_avg, \
     	mean_power_ci, mean_power_ref)
 	
@@ -271,11 +268,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filterin
     
     if filtering:
     	ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
-    		num_seconds, total_segments, mean_rate_total_ci, \
+    		detchans, num_seconds, total_segments, mean_rate_total_ci, \
     		mean_rate_total_ref, mean_power_ci, mean_power_ref, True)
     else:
     	ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
-    		num_seconds, total_segments, mean_rate_total_ci, \
+    		detchans, num_seconds, total_segments, mean_rate_total_ci, \
     		mean_rate_total_ref, mean_power_ci, mean_power_ref, True)
     	
     exposure = total_segments * num_seconds  ## Exposure time of data used
@@ -290,11 +287,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, filterin
     ## Output
     ##########
     
-    dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, exposure, \
-    	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end, \
-    	ccf_error, filtering)
-	
-    fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, exposure, \
+#     dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure, \
+#     	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end, \
+#     	ccf_error, filtering)
+
+    fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,\
     	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end, \
     	ccf_error, filtering)
 		
