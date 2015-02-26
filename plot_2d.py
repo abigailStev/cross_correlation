@@ -6,7 +6,6 @@ from datetime import datetime
 import os
 from astropy.io import fits
 import matplotlib.pyplot as plt
-from tools import get_key_val
 import matplotlib.font_manager as font_manager
 
 __author__ = "Abigail Stevens"
@@ -30,15 +29,19 @@ if __name__ == "__main__":
 	###########################
 	
 	parser = argparse.ArgumentParser(usage="python plot_2d.py tab_file [-o \
-plot_file]", description="Plots the ccf of multiple energy channels in a 2D \
-colour plot.", epilog="For optional arguments, default values are given in \
-brackets at end of description.")
+plot_file] [-p prefix]", description="Plots the ccf of multiple energy channels\
+ in a 2D colour plot.", epilog="For optional arguments, default values are \
+given in brackets at end of description.")
 
 	parser.add_argument('tab_file', help="The table file, in .dat or .fits \
 format.")
 
 	parser.add_argument('-o', '--outfile', dest='plot_file', default="\
 ./ccf_2D.png", help="The file name to save the plot to. [./ccf_2D.png]")
+	
+	parser.add_argument('-p', '--prefix', dest='prefix', default="--", \
+help="The identifying prefix of the data (object nickname or proposal ID). \
+[--]")
 	
 	args = parser.parse_args()
 
@@ -106,6 +109,8 @@ format.")
 # 	ax.set_ylim(0,detchans)
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
+	ax.set_title(args.prefix)
+
 	fig.set_tight_layout(True)
 	plt.savefig(args.plot_file, dpi=150)
 # 	plt.show()

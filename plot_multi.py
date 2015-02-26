@@ -17,7 +17,7 @@ Written in Python 2.7.
 """
 
 ################################################################################
-def main(file, plot_file, numsec):
+def main(file, plot_file, prefix):
 	"""
 			main
 	
@@ -106,7 +106,7 @@ def main(file, plot_file, numsec):
 	ax.plot(bins, data_25, linewidth=2, ls='-.', label="Chan 25")
 
 	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
-	ax.set_ylabel('Deviation from mean count rate [photons / s]', \
+	ax.set_ylabel('Deviation from mean (photons / s)', \
 		fontproperties=font_prop)
 # 	ax.set_xlim(0, 20000)
 	ax.set_xlim(0, 200)
@@ -114,8 +114,7 @@ def main(file, plot_file, numsec):
 # 	ax.set_ylim(-2.5, 3)
 # 	ax.set_xscale('symlog')  ## this works much better than 'log'
 # 	ax.set_yscale('symlog')
-	title_str = "CCF per energy channel"
-	ax.set_title(title_str, fontproperties=font_prop)
+	ax.set_title("%s, CCF per energy channel" % prefix, fontproperties=font_prop)
 
 	## The following legend code was found on stack overflow I think
 	legend = ax.legend(loc='upper right')
@@ -135,8 +134,7 @@ def main(file, plot_file, numsec):
 ################################################################################
 if __name__ == "__main__":
 	
-	parser = argparse.ArgumentParser(usage="python plot_multi.py ccf_table \
-plot_file numsec", description="Plots CCFs of multiple energy channels on one \
+	parser = argparse.ArgumentParser(usage="python plot_multi.py ccf_table plot_file [-p prefix]", description="Plots CCFs of multiple energy channels on one \
 plot.")
 	
 	parser.add_argument('ccf_table', help="Name of file with CCF amplitudes in \
@@ -144,11 +142,10 @@ a table.")
 	
 	parser.add_argument('plot_file', help="The output file name for the plot.")
 	
-	parser.add_argument('numsec', type=int, help="Number of seconds per Fourier\
- segment.")
+	parser.add_argument('-p', '--prefix', dest='prefix', default="--", help="The identifying prefix of the data (object nickname or proposal ID). [--]")
 
 	args = parser.parse_args()
 
-	main(args.ccf_table, args.plot_file, args.numsec)
+	main(args.ccf_table, args.plot_file, args.prefix)
 	
 ################################################################################
