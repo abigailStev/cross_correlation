@@ -291,12 +291,17 @@ def filter_freq(freq_space_array, dt, n_bins, power_ref):
     ## Determine pulse frequency
     pulse_freq = find_pulse_freq(freq, power_ref)
     
+    print "Pulse frequency:", pulse_freq
+    print "Index of pulse freq:", np.where(freq == pulse_freq)
+    
     ## Get the indices of the beginning and end of the signal
     min_freq_mask = freq < pulse_freq  # we want the last 'True' element
     max_freq_mask = freq > pulse_freq  # we want the first 'True' element
     j_min = list(min_freq_mask).index(False)
     j_max = list(max_freq_mask).index(True)
 	
+    print "j min =", j_min
+    print "j max =", j_max
 	## Make zeroed arrays to replace with
     zero_front = np.zeros((j_min, 64), dtype=np.complex128)
     zero_end = np.zeros((len(freq_space_array) - j_max, 64), \
@@ -309,7 +314,7 @@ def filter_freq(freq_space_array, dt, n_bins, power_ref):
     ## Check that the original array is the same shape as the filtered one
     assert np.shape(freq_space_array) == np.shape(filt_freq_space_array), \
     	"ERROR: Frequency-filtered cross spectrum does not have the same size \
-as the original cross-spectrum. Something went wrong."
+as the original cross spectrum. Something went wrong."
     
     return filt_freq_space_array, j_min, j_max
 
@@ -318,8 +323,7 @@ as the original cross-spectrum. Something went wrong."
 
 ################################################################################
 def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
-	countrate_ci, countrate_ref, power_ci, power_ref, \
-	noisy):
+	countrate_ci, countrate_ref, power_ci, power_ref, noisy):
 	"""
 			FILT_cs_to_ccf_w_err
 	
@@ -362,7 +366,7 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	## in frac rms units here -- should be few percent
     
     ## Broadcasting signal_ref_pow into same shape as signal_ci_pow
-	signal_ref_pow = np.resize(signal_ref_pow, np.shape(signal_ci_pow))
+	signal_ref_pow = np.resize(np.repeat(signal_ref_pow, 64), np.shape(signal_ci_pow))
 	assert np.shape(signal_ref_pow) == np.shape(signal_ci_pow)
 
 	temp = (noise_ci * signal_ref_pow) + \
@@ -445,7 +449,8 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 	
 	## Broadcasting acf_ref into same shape as acf_ci
 	acf_ref = np.resize(acf_ref, np.shape(acf_ci))
-	assert np.shape(acf_ref) == np.shape(acf_ci), "ERROR: Array broadcasting failed."
+	assert np.shape(acf_ref) == np.shape(acf_ci), "ERROR: Array broadcasting \
+failed."
 	
 	## Bartlett formula for computing variance on unfilfered CCF
 	var_ccf = (acf_ci * acf_ref) / num_segments
@@ -505,7 +510,7 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
 
 
 ################################################################################
-def make_cs(rate_ci, rate_ref, n_bins, dt):
+def make_cs(rate_ci, rate_ref, n_bins):
     """
             make_cs
 
@@ -525,20 +530,87 @@ def make_cs(rate_ci, rate_ref, n_bins, dt):
     fft_data_ci = fftpack.fft(rate_sub_mean_ci, axis=0)
     fft_data_ref = fftpack.fft(rate_sub_mean_ref)
 	
+    print "\tCI SEG:", fft_data_ci[1,1]
+    print "\tREG SEG:", fft_data_ref[1]
+	
 	## Computing the power from the fourier transform
     power_ci = np.absolute(fft_data_ci) ** 2
     power_ref = np.absolute(fft_data_ref) ** 2
 	
     ## Broadcasting fft of ref into same shape as fft of ci
-    fft_data_ref = np.resize(fft_data_ref, np.shape(fft_data_ci))
+    print "Shape data ref:", np.shape(fft_data_ref)
+    fft_data_ref = np.resize(np.repeat(fft_data_ref, 64), np.shape(fft_data_ci))
 	
 	## Computing the cross spectrum from the fourier transform
     cs_segment = np.multiply(fft_data_ci, np.conj(fft_data_ref))
+    
+    print "\tCS SEG:", cs_segment[1,1]
     
     return cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
         power_ref
 
 ## End of function 'make_cs'
+
+
+################################################################################
+def make_cs_alltogether(rate_ci, rate_ref, n_bins, num_segments):
+    """
+            make_cs_alltogether
+
+
+    """
+    ## Computing the mean count rate of the segments
+    mean_rate_ci = np.mean(rate_ci, axis=0)
+    mean_rate_ref = np.mean(rate_ref, axis=0)
+    print "Shape mean ci:", np.shape(mean_rate_ci)
+    print "Shape mean ref:", np.shape(mean_rate_ref)
+#     
+    ## Subtracting the mean off each value of 'rate'
+    rate_sub_mean_ci = np.subtract(rate_ci, mean_rate_ci)
+    rate_sub_mean_ref = np.subtract(rate_ref, mean_rate_ref)
+
+    ## Taking the FFT of the time-domain photon count rate
+    ## Using the SciPy FFT algorithm, as it's faster than NumPy for large lists
+    fft_data_ci = fftpack.fft(rate_sub_mean_ci, axis=0)
+    fft_data_ref = fftpack.fft(rate_sub_mean_ref, axis=0)
+    
+    print "\tCI STACK:", fft_data_ci[1,1,:]
+    print "\tREF STACK:", fft_data_ref[1,1,:]
+    
+    
+#     print " "
+#     print "Shape fft data ci:", np.shape(fft_data_ci)
+#     print "Shape fft data ref:", np.shape(fft_data_ref)
+
+    ## Broadcasting fft of ref into same shape as fft of ci
+#     print "fft_data_ref[0,0:3,0] =",fft_data_ref[1,1:4,1]
+#     print "fft_data_ref[0,0,0:3] =", fft_data_ref[1,1,1:3]
+#     print "fft_data_ref[0:3,0,0] =", fft_data_ref[1:3,1,1]
+    	
+	
+	## Computing the power from the fourier transform
+    power_ci_segments = np.absolute(fft_data_ci) ** 2
+    power_ref_segments = np.absolute(fft_data_ref) ** 2
+    power_ci = np.mean(power_ci_segments, axis=-1)
+    power_ref = np.mean(power_ref_segments, axis=-1)
+    power_ref = np.mean(power_ref, axis=-1)
+    print "Shape power ci:", np.shape(power_ci)
+    print "Shape power ref:", np.shape(power_ref)
+	
+
+	## Computing the cross spectrum from the fourier transform
+    cs_segments = np.multiply(fft_data_ci, np.conj(fft_data_ref))
+    print "\tCS STACK:", cs_segments[1,1,:]
+    
+    print "Shape cs segments:", np.shape(cs_segments)
+    cs_avg = np.mean(cs_segments, axis=-1)
+    print "Shape cs avg:", np.shape(cs_avg)
+    mean_rate_whole_ci = np.mean(mean_rate_ci, axis=-1)
+    mean_rate_whole_ref = np.mean(mean_rate_ref)
+
+    return cs_avg, power_ci, power_ref, mean_rate_whole_ci, mean_rate_whole_ref
+
+## End of function 'make_cs_alltogether'
 
 
 ################################################################################
@@ -572,8 +644,8 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, \
 	
 	## Make the cross spectrum
 	cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
-		power_ref = make_cs(rate_ci_2d, rate_ref, n_bins, dt)
-	
+		power_ref = make_cs(rate_ci_2d, rate_ref, n_bins)
+		
 	## Sums across segments
 	sum_rate_whole_ci += mean_rate_segment_ci
 	sum_rate_whole_ref += mean_rate_segment_ref
@@ -588,14 +660,14 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, \
 	mean_rate_segment_ref = None
 	power_ci = None
 	power_ref = None
-	rate_ref = None
-	rate_ci_2d = None
+# 	rate_ref = None
+# 	rate_ci_2d = None
 	rate_ref_2d = None
 	rate_ci_1d = None
-	rate_ref_1d = None
+# 	rate_ref_1d = None
 		
 	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
-		sum_power_ci, sum_power_ref, sum_rate_ci
+		sum_power_ci, sum_power_ref, sum_rate_ci, rate_ci_2d, rate_ref
 		
 ## End of function 'each_segment'
 
@@ -663,6 +735,10 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	all_time_ref = np.asarray(data_ref.field('TIME'), dtype=np.float64)
 	all_energy_ref = np.asarray(data_ref.field('CHANNEL'), dtype=np.float64)
 	
+	rate_ci_stack = np.zeros((n_bins, 64))
+	rate_ref_stack = np.zeros((n_bins, 64))
+	
+	
 	## Looping through segments
 	while seg_end_time < final_time:
 		
@@ -688,14 +764,27 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 		if len(time_ci) > 0 and len(time_ref) > 0:
 			num_segments += 1
 			cs_sum, sum_rate_whole_ci, sum_rate_whole_ref,  sum_power_ci, \
-				sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, \
+				sum_power_ref, sum_rate_ci, rateci2d, rateref = each_segment(time_ci, time_ref, \
 				energy_ci, energy_ref, n_bins, dt, start_time, seg_end_time, \
 				obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci,\
 				sum_power_ref, cs_sum, num_segments, sum_rate_ci)
-				
+			
+			
+			
+			rate_ci_stack = np.dstack((rate_ci_stack, rateci2d))
+# 			print "Shape rate ci:", np.shape(rate_ci_stack)
+# 			print "Shape rate ref:", np.shape(rateref)
+# 			print "rateref[0:3] =", rateref[0:3]
+			rateref = np.resize(np.repeat(rateref, 64), (n_bins,64))
+# 			print "rateref[0:3,0] =", rateref[0:3,0]
+# 			print "rateref[0,0:3] =", rateref[0,0:3]
+			rate_ref_stack = np.dstack((rate_ref_stack, rateref))
+			print np.shape(rate_ref_stack)
+
+
 			if num_segments % print_iterator == 0:
 				print "\t", num_segments
-			if test is True and num_segments == 1:  # For testing
+			if test is True and num_segments == 3:  # For testing
 				break
 	
 			start_time += (n_bins * dt)
@@ -708,9 +797,19 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 
 	## End of while-loop
 	
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-		sum_power_ci, sum_power_ref, sum_rate_ci
+	rate_ci_stack = rate_ci_stack[:,:,1:]
+	print "Shape rate ci stack:", np.shape(rate_ci_stack)
+	rate_ref_stack = rate_ref_stack[:,:,1:]
+	print "Shape rate ref stack:", np.shape(rate_ref_stack)
+	
+# 	return rate_ci_stack, rate_ref_stack, num_segments
 
+	
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+		sum_power_ci, sum_power_ref, sum_rate_ci, rate_ci_stack, rate_ref_stack
+
+
+    
 ## End of function 'fits_in'
 
 
@@ -844,8 +943,11 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 	if (in_file[-5:].lower() == ".fits"):
 		obs_epoch = tools.obs_epoch_rxte(in_file)
 		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-			sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file, \
+			sum_power_ci, sum_power_ref, sum_rate_ci, rate_ci_stack, rate_ref_stack = fits_in(in_file, \
 			n_bins, dt, print_iterator, test, obs_epoch)
+			
+# 		rate_ci_stack, rate_ref_stack, num_segments = fits_in(in_file, \
+# 			n_bins, dt, print_iterator, test, obs_epoch)
 		
 	elif (in_file[-4:].lower() == ".dat"):
 		fits_file = in_file[0:-4] + ".fits"
@@ -857,7 +959,8 @@ def read_and_use_segments(in_file, n_bins, dt, test):
 		raise Exception("ERROR: Input file type not recognized. Must be .dat or .fits.")
 	
 	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-		sum_power_ci, sum_power_ref, sum_rate_ci
+		sum_power_ci, sum_power_ref, sum_rate_ci, rate_ci_stack, rate_ref_stack
+# 	return rate_ci_stack, rate_ref_stack, num_segments
         
 ## End of function 'read_and_use_segments'
 
@@ -917,7 +1020,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
     nyquist_freq = 1.0 / (2.0 * dt)
     
-    print "DT = %f" % dt
+    print "\nDT = %f" % dt
     print "N_bins = %d" % n_bins
     print "Nyquist freq =", nyquist_freq
     print "Filtering?", filter
@@ -931,15 +1034,17 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 		bkgd_rate = get_background(bkgd_file)
     else:
 		bkgd_rate = np.zeros(64)	
+    print " "
 	
 	#################################################
 	## Reading in data, computing the cross spectrum
 	#################################################
 	
     cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, \
-    	sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, \
+    	sum_power_ref, sum_rate_ci, rate_ci_stack, rate_ref_stack = read_and_use_segments(in_file, n_bins, \
     	dt, test)
-	
+#     rate_ci_stack, rate_ref_stack, num_segments = read_and_use_segments(in_file, n_bins, dt, test)
+    	
 	#########################################
 	## Turning sums over segments into means
 	#########################################
@@ -949,6 +1054,18 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     mean_power_ci = sum_power_ci / float(num_segments)
     mean_power_ref = sum_power_ref / float(num_segments)
     cs_avg = cs_sum / float(num_segments)
+    
+    
+    cs_stacked_avg, power_ci, power_ref, rate_whole_ci, rate_whole_ref = \
+		make_cs_alltogether(rate_ci_stack, rate_ref_stack, n_bins, num_segments)
+    
+    
+    print np.allclose(cs_stacked_avg, cs_avg)
+    print np.allclose(power_ci, mean_power_ci)
+    print np.allclose(power_ref, mean_power_ref)
+    print np.allclose(rate_whole_ci, mean_rate_whole_ci)
+    print np.allclose(rate_whole_ref, mean_rate_whole_ref)
+    
     
     ################################################################
     ## Printing the cross spectrum to a file, for plotting/checking
