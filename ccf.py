@@ -23,8 +23,9 @@ Written in Python 2.7.
 """
 
 ################################################################################
-def dat_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, num_segments,
-        mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error, filter):
+def dat_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds, \
+	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error, \
+	filter):
     """
             dat_out
 
@@ -43,6 +44,7 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, num_segments,
         out.write("\n# Background spectrum: %s" % bkgd_file)
         out.write("\n# Time bin size = %.21f seconds" % dt)
         out.write("\n# Number of bins per segment = %d" % n_bins)
+        out.write("\n# DETCHANS = %d" % detchans)
         out.write("\n# Number of seconds per segment = %d" % num_seconds)
         out.write("\n# Number of segments per light curve = %d" % num_segments)
         out.write("\n# Exposure time = %d seconds" \
@@ -75,7 +77,7 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, num_segments,
 
 
 ################################################################################
-def fits_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, \
+def fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds, \
 	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error, \
 	filter):
     """
@@ -85,7 +87,6 @@ def fits_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, \
     
     """
     
-    detchans=64
     ## Getting data into a good output structure
     chan = np.arange(0, detchans)
     energy_channels = np.tile(chan, len(t))
@@ -157,14 +158,14 @@ def get_phase_err(cs_avg, power_ci, power_ref, n, M):
 
 
 ################################################################################
-def phase_to_tlags(phase, freq):
+def phase_to_tlags(phase, freq, detchans):
 	"""
 			phase_to_tlags
 	
 	Converts a complex phase (in radians) to a time lag (in seconds).
 	
 	"""
-	f = np.repeat(freq[:, np.newaxis], 64, axis=1)
+	f = np.repeat(freq[:, np.newaxis], detchans, axis=1)
 	with np.errstate(all='ignore'):
 		tlags =  np.where(f != 0, phase / (2.0 * np.pi * f), 0)
 		
@@ -173,8 +174,9 @@ def phase_to_tlags(phase, freq):
 
 
 ################################################################################
-def make_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
-	mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, power_ci, power_ref):
+def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, \
+	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, power_ci, \
+	power_ref):
 	"""
 			make_lags
 			
@@ -182,7 +184,7 @@ def make_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
 	writes the lag information to a .fits output file.
 	
 	"""
-	detchans=64
+	
 	freq = fftpack.fftfreq(n_bins, d=dt)
 	max_index = np.argmax(freq)+1  # because in python, the scipy fft makes the 
 								   # nyquist frequency negative, and we want it 
@@ -200,8 +202,8 @@ def make_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
 	phase = np.arctan2(cs_avg.real, cs_avg.imag)
 	err_phase = get_phase_err(cs_avg, power_ci, \
 		np.repeat(power_ref[:, np.newaxis], detchans, axis=1), 1, num_segments)
-	tlag = phase_to_tlags(phase, freq)
-	err_tlag = phase_to_tlags(err_phase, freq)
+	tlag = phase_to_tlags(phase, freq, detchans)
+	err_tlag = phase_to_tlags(err_phase, freq, detchans)
     
 	chan = np.arange(0,detchans)
 	energy_channels = np.tile(chan, len(freq))
@@ -277,7 +279,7 @@ def find_pulse_freq(freq, power_ref):
 
 
 ################################################################################
-def filter_freq(freq_space_array, dt, n_bins, power_ref):
+def filter_freq(freq_space_array, dt, n_bins, detchans, power_ref):
     """
             filter_freq
 
@@ -304,8 +306,8 @@ def filter_freq(freq_space_array, dt, n_bins, power_ref):
     print "j min =", j_min
     print "j max =", j_max
 	## Make zeroed arrays to replace with
-    zero_front = np.zeros((j_min, 64), dtype=np.complex128)
-    zero_end = np.zeros((len(freq_space_array) - j_max, 64), \
+    zero_front = np.zeros((j_min, detchans), dtype=np.complex128)
+    zero_end = np.zeros((len(freq_space_array) - j_max, detchans), \
     	dtype=np.complex128)
 	
 	## Concatenate the arrays together
@@ -323,8 +325,8 @@ as the original cross spectrum. Something went wrong."
 	
 
 ################################################################################
-def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
-	countrate_ci, countrate_ref, power_ci, power_ref, noisy):
+def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds, \
+	total_segments, countrate_ci, countrate_ref, power_ci, power_ref, noisy):
 	"""
 			FILT_cs_to_ccf_w_err
 	
@@ -336,7 +338,8 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	
 	"""
 	## Filter the cross spectrum in frequency
-	filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, power_ref)
+	filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, dt, n_bins, detchans, \
+		power_ref)
     
     ## Absolute rms norms of poisson noise
 	noise_ci = 2.0 * countrate_ci
@@ -344,10 +347,10 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	
 	## If there's no noise in a (simulated) power spectrum, noise level = 0
 	if not noisy:
-		noise_ci = np.zeros(64)
+		noise_ci = np.zeros(detchans)
 		noise_ref = 0
 	
-	noise_ref_array = np.repeat(noise_ref, 64)
+	noise_ref_array = np.repeat(noise_ref, detchans)
 	
 	df = 1.0 / float(num_seconds)  # in Hz
 	
@@ -367,7 +370,8 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	## in frac rms units here -- should be few percent
     
     ## Broadcasting signal_ref_pow into same shape as signal_ci_pow
-	signal_ref_pow = np.resize(np.repeat(signal_ref_pow, 64), np.shape(signal_ci_pow))
+	signal_ref_pow = np.resize(np.repeat(signal_ref_pow, detchans), \
+		np.shape(signal_ci_pow))
 	assert np.shape(signal_ref_pow) == np.shape(signal_ci_pow)
 
 	temp = (noise_ci * signal_ref_pow) + \
@@ -379,7 +383,7 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 	cs_signal_amp = np.sum(temp1, axis=0)
 
 	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
-	error_ratio = np.zeros(64, dtype=np.float64)
+	error_ratio = np.zeros(detchans, dtype=np.float64)
 	with np.errstate(all='ignore'):
 		error_ratio = np.where(cs_signal_amp != 0, cs_noise_amp / cs_signal_amp, 0)
 	
@@ -399,8 +403,8 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, total_segments, \
 
 
 ################################################################################
-def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
-	countrate_ci, countrate_ref, power_ci, power_ref, noisy):
+def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds, \
+	num_segments, countrate_ci, countrate_ref, power_ci, power_ref, noisy):
 	"""
 			UNFILT_cs_to_ccf_w_err
 	Takes the iFFT of the cross spectrum to get the cross-correlation function, 
@@ -411,11 +415,12 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 	
 	freq = fftpack.fftfreq(n_bins, d=dt)
 	
+	######################################################
 	## Take the IFFT of the cross spectrum to get the CCF
+	######################################################
+	
 	ccf_end = fftpack.ifft(cs_avg, axis=0)
-	
-	print "COUNTRATE REF:", countrate_ref
-	
+		
 	## Absolute rms norms of poisson noise	
 	## Was over-estimating the noise from the count rate; using mean power from 
 	## higher frequencies as the noise level
@@ -424,12 +429,13 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 	noise_ci = 2.0 * countrate_ci - 0.016*(2.0 * countrate_ci)
 	noise_ref = 2.0 * countrate_ref - 0.016*(2.0 * countrate_ref)
 	temp = power_ref * (2.0 * dt / float(n_bins))
-# 	noise_ref = np.mean(temp[np.where(freq >= 100)])
+	if np.max(freq) > 100:
+		noise_ref = np.mean(temp[np.where(freq >= 100)])
 	
 # 	print "NOISE CI", noise_ci
 	print "NOISE REF:", noise_ref
 # 	print "ABS RMS POWER CI", power_ci * (2.0 * dt / float(n_bins))
-	print "ABS RMS POWER REF:", power_ref * (2.0 * dt / float(n_bins))
+# 	print "ABS RMS POWER REF:", power_ref * (2.0 * dt / float(n_bins))
 # 	print "SHAPE NOISE CI", np.shape(noise_ci)
 # 	print "SHAPE NOISE REF", np.shape(noise_ref)
 	
@@ -441,7 +447,8 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, num_seconds, num_segments, \
 # 	absrms_power_ci[np.where(absrms_power_ci < 0)] = 0.0
 # 	absrms_power_ref[np.where(absrms_power_ref < 0)] = 0.0
 	print "Mean of whole ps:", np.mean(absrms_power_ref)
-# 	print "Mean of hf ps:", np.mean(absrms_power_ref[np.where(freq >= 100)])
+	if np.max(freq) > 100:
+		print "Mean of hf ps:", np.mean(absrms_power_ref[np.where(freq >= 100)])
 	
 	
 	## Computing the autocorrelation functions from the power spectra
@@ -456,9 +463,9 @@ failed."
 	## Bartlett formula for computing variance on unfilfered CCF
 	var_ccf = (acf_ci * acf_ref) / num_segments
 	
-	print "Datatype of var_ccf:", type(var_ccf[0][0])
-	print "Variance of ccf computed with Bartlett formula:", var_ccf[0:5,0]
-	print "CCF:", ccf_end[0:5,0]
+# 	print "Datatype of var_ccf:", type(var_ccf[0][0])
+# 	print "Variance of ccf computed with Bartlett formula:", var_ccf[0:5,0]
+# 	print "CCF:", ccf_end[0:5,0]
 	
 	## Getting rms of reference band, to normalize the ccf
 	rms_variance = np.sum(absrms_power_ref * df)
@@ -471,9 +478,11 @@ failed."
 	ccf_end *= (2.0 / float(n_bins) / rms_ref)
 	var_ccf *= (2.0 / float(n_bins))
 	
+# 	
+# 	print "Normed ccf:", ccf_end[0:5,0]
+# 	print "Normed var_ccf:", var_ccf[0:5,0]	
 	
-	print "Normed ccf:", ccf_end[0:5,0]
-	print "Normed var_ccf:", var_ccf[0:5,0]	
+	var_ccf = ccf_end * 0.1
 	
 	return ccf_end, var_ccf
 	
@@ -484,7 +493,9 @@ failed."
 def stack_reference_band(rate_ref_2d, obs_epoch):
     """
             stack_reference_band
-
+	
+	WARNING: Only tested with RXTE event-mode detector channels, 0-63 incl.
+	
     Stacks the photons in the reference band from 3-20 keV to make one 'band'.
     Assumes that we are in epoch 5 or 3.
     Should I be using chan.txt to assist with this?
@@ -511,7 +522,7 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
 
 
 ################################################################################
-def make_cs(rate_ci, rate_ref, n_bins):
+def make_cs(rate_ci, rate_ref, n_bins, detchans):
     """
             make_cs
 
@@ -527,7 +538,7 @@ def make_cs(rate_ci, rate_ref, n_bins):
     rate_sub_mean_ref = np.subtract(rate_ref, mean_rate_segment_ref)
 
     ## Taking the FFT of the time-domain photon count rate
-    ## Using the SciPy FFT algorithm, as it's faster than NumPy for large lists
+    ## SciPy is faster than NumPy or pyFFTW for my array sizes
     fft_data_ci = fftpack.fft(rate_sub_mean_ci, axis=0)
     fft_data_ref = fftpack.fft(rate_sub_mean_ref)
 	
@@ -536,62 +547,22 @@ def make_cs(rate_ci, rate_ref, n_bins):
     power_ref = np.absolute(fft_data_ref) ** 2
 	
     ## Broadcasting fft of ref into same shape as fft of ci
-    fft_data_ref = np.resize(np.repeat(fft_data_ref, 64), np.shape(fft_data_ci))
+    fft_data_ref = np.resize(np.repeat(fft_data_ref, detchans), (n_bins, \
+    	detchans))
 	
 	## Computing the cross spectrum from the fourier transform
     cs_segment = np.multiply(fft_data_ci, np.conj(fft_data_ref))
     
-    
-    return cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, power_ref
+    return cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
+    	power_ref
 
 ## End of function 'make_cs'
 
 
 ################################################################################
-def make_cs_alltogether(rate_ci, rate_ref, n_bins, num_segments):
-    """
-            make_cs_alltogether
-
-
-    """
-    ## Computing the mean count rate of the segments
-    mean_rate_ci = np.mean(rate_ci, axis=0)
-    mean_rate_ref = np.mean(rate_ref, axis=0)
-     
-    ## Subtracting the mean off each value of 'rate'
-    rate_sub_mean_ci = np.subtract(rate_ci, mean_rate_ci)
-    rate_sub_mean_ref = np.subtract(rate_ref, mean_rate_ref)
-
-    ## Taking the FFT of the time-domain photon count rate
-    ## Using the SciPy FFT algorithm, as it's faster than NumPy for large lists
-    fft_data_ci = fftpack.fft(rate_sub_mean_ci, axis=0)
-    fft_data_ref = fftpack.fft(rate_sub_mean_ref, axis=0)
-    	
-	## Computing the power from the fourier transform
-    power_ci_segments = np.absolute(fft_data_ci) ** 2
-    power_ref_segments = np.absolute(fft_data_ref) ** 2
-    power_ci = np.mean(power_ci_segments, axis=-1)
-    power_ref = np.mean(power_ref_segments, axis=-1)
-    power_ref = np.mean(power_ref, axis=-1)
-
-	## Computing the cross spectrum from the fourier transform
-    cs_segments = np.multiply(fft_data_ci, np.conj(fft_data_ref))
-    
-    cs_avg = np.mean(cs_segments, axis=-1)
-    mean_rate_whole_ci = np.mean(mean_rate_ci, axis=-1)
-    mean_rate_whole_ref = np.mean(mean_rate_ref)
-
-    return cs_avg, power_ci, power_ref, mean_rate_whole_ci, mean_rate_whole_ref
-
-## End of function 'make_cs_alltogether'
-
-
-################################################################################
-# def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, \
-# 	start_time, end_time, obs_epoch):
-def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, \
-	start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, \
-	sum_power_ci, sum_power_ref, cs_sum, num_segments, sum_rate_ci):
+def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, detchans, \
+	dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref,\
+	sum_power_ci, sum_power_ref, cs_sum, sum_rate_ci):
 	"""
 			each_segment
 	
@@ -607,27 +578,32 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, \
 	mean_rate_segment_ref = np.zeros(64, dtype=np.float64)
 	cs_segment = np.zeros((n_bins, 64), dtype=np.complex128)
 	
-	## Populate the light curves for interest band and reference band
-	rate_ci_2d, rate_ci_1d = tools.make_lightcurve( \
-		np.asarray(time_ci), np.asarray(energy_ci), n_bins, dt, start_time)
-	rate_ref_2d, rate_ref_1d = tools.make_lightcurve( \
-		np.asarray(time_ref), np.asarray(energy_ref), n_bins, dt, \
-		start_time)
+	##############################################################
+	## Populate the light curves for interest and reference bands
+	##############################################################
+	
+	rate_ci_2d = tools.make_2Dlightcurve(np.asarray(time_ci), \
+		np.asarray(energy_ci), n_bins, detchans, dt, start_time)
+	rate_ref_2d = tools.make_2Dlightcurve( np.asarray(time_ref), \
+		np.asarray(energy_ref), n_bins, detchans, dt, start_time)
 	
 	## Stack the reference band
 	rate_ref = stack_reference_band(rate_ref_2d, obs_epoch)
 	
+	###########################
 	## Make the cross spectrum
+	###########################
+	
 	cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
-		power_ref = make_cs(rate_ci_2d, rate_ref, n_bins)
+		power_ref = make_cs(rate_ci_2d, rate_ref, n_bins, detchans)
 		
-	## Sums across segments
+	## Sums across segments -- arrays, so it adds by index
 	sum_rate_whole_ci += mean_rate_segment_ci
 	sum_rate_whole_ref += mean_rate_segment_ref
 	sum_power_ci += power_ci
 	sum_power_ref += power_ref
-	cs_sum += cs_segment  # This adds by index
-	sum_rate_ci += np.mean(rate_ci_1d)
+	cs_sum += cs_segment
+	sum_rate_ci += np.mean(rate_ci_2d)
 	
 	## Clearing variables from memory for the next iteration
 	cs_segment = None
@@ -635,22 +611,18 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, dt, \
 	mean_rate_segment_ref = None
 	power_ci = None
 	power_ref = None
-# 	rate_ref = None
-# 	rate_ci_2d = None
+	rate_ref = None
+	rate_ci_2d = None
 	rate_ref_2d = None
-	rate_ci_1d = None
-	rate_ref_1d = None
 		
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
-		sum_power_ci, sum_power_ref, sum_rate_ci
-
-# 	return rate_ci_2d, rate_ref
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, \
+		sum_power_ref, sum_rate_ci
 	
 ## End of function 'each_segment'
 
 
 ################################################################################
-def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
+def fits_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 	"""
 			fits_in
 	
@@ -664,7 +636,10 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	
 	"""
 	
+	#######################################################
 	## Check if the FITS file exists; if so, load the data
+	#######################################################
+	
 	try:
 		fits_hdu = fits.open(in_file)
 	except IOError:
@@ -675,12 +650,15 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	data = fits_hdu[1].data
 	fits_hdu.close()
 	
+	###################
 	## Initializations
+	###################
+	
 	num_segments = 0
-	sum_rate_whole_ci = np.zeros(64, dtype=np.float64)
+	sum_rate_whole_ci = np.zeros(detchans, dtype=np.float64)
 	sum_rate_whole_ref = 0
-	cs_sum = np.zeros((n_bins, 64), dtype=np.complex128)
-	sum_power_ci = np.zeros((n_bins, 64), dtype=np.float64)
+	cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
+	sum_power_ci = np.zeros((n_bins, detchans), dtype=np.float64)
 	sum_power_ref = np.zeros(n_bins, dtype=np.float64)
 	sum_rate_ci = 0
 	
@@ -688,7 +666,10 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 	final_time = data.field('TIME')[-1]
 	seg_end_time = start_time + (dt * n_bins)
 	
+	###################################
 	## Selecting PCU for interest band
+	###################################
+	
 	PCU2_mask = data.field('PCUID') == 2
 	data_pcu2 = data[PCU2_mask]
 	all_time_ci = np.asarray(data_pcu2.field('TIME'), dtype=np.float64)
@@ -705,17 +686,20 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 # 	ref_pcu = pcus_on[most_pcu]
 # 	print "Ref PCU =", ref_pcu
 	
+	####################################
 	## Selecting PCU for reference band
+	####################################
+	
 # 	refpcu_mask = data.field('PCUID') == ref_pcu
 	refpcu_mask = data.field('PCUID') != 2
 	data_ref = data[refpcu_mask]
 	all_time_ref = np.asarray(data_ref.field('TIME'), dtype=np.float64)
 	all_energy_ref = np.asarray(data_ref.field('CHANNEL'), dtype=np.float64)
 	
-	rate_ci_stack = np.zeros((n_bins, 64))
-	rate_ref_stack = np.zeros((n_bins, 64))
-		
+	############################
 	## Looping through segments
+	############################
+	
 	while seg_end_time < final_time:
 		
 		## Get events for channels of interest 
@@ -736,208 +720,223 @@ def fits_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
 		all_time_ref = all_time_ref[for_next_iteration_ref]
 		all_energy_ref = all_energy_ref[for_next_iteration_ref]
 		
+		###########################
 		## At the end of a segment
+		###########################
+		
 		if len(time_ci) > 0 and len(time_ref) > 0:
+			
 			num_segments += 1
 			
 			cs_sum, sum_rate_whole_ci, sum_rate_whole_ref,  sum_power_ci, \
 				sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, \
-				energy_ci, energy_ref, n_bins, dt, start_time, seg_end_time, \
-				obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci,\
-				sum_power_ref, cs_sum, num_segments, sum_rate_ci)
-			
-# 			rateci2d, rateref = each_segment(time_ci, time_ref, \
-# 				energy_ci, energy_ref, n_bins, dt, start_time, seg_end_time, \
-# 				obs_epoch)
-# 			
-			
-# 			rate_ci_stack = np.dstack((rate_ci_stack, rateci2d))
-# 			rateref = np.resize(np.repeat(rateref, 64), (n_bins,64))
-# 			rate_ref_stack = np.dstack((rate_ref_stack, rateref))
+				energy_ci, energy_ref, n_bins, detchans, dt, start_time, \
+				seg_end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref,\
+				sum_power_ci, sum_power_ref, cs_sum, sum_rate_ci)
 
 			if num_segments % print_iterator == 0:
 				print "\t", num_segments
-			if test is True and num_segments == 20:  # For testing
+			if test is True and num_segments == 1:  # For testing
 				break
 	
 			start_time += (n_bins * dt)
 			seg_end_time += (n_bins * dt)
-			
-		elif len(time_ci) == 0 or len(time_ref) == 0:
+		
+		## This next bit deals with gappy data
+		elif len(time_ci) == 0 and len(time_ref) == 0:
+		
 			start_time = min(all_time_ci[0], all_time_ref[0])
 			seg_end_time = start_time + (n_bins * dt)
+		
+		else:
+		 	start_time += (n_bins * dt)
+			seg_end_time += (n_bins * dt)
+			
 		## End of 'if there are counts in this segment'
 
 	## End of while-loop
 	
-# 	rate_ci_stack = rate_ci_stack[:,:,1:]
-# 	rate_ref_stack = rate_ref_stack[:,:,1:]
-# 	
-# 	return rate_ci_stack, rate_ref_stack, num_segments
-
-	
 	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
-
-
     
 ## End of function 'fits_in'
 
 
 ################################################################################
-def dat_in(in_file, n_bins, dt, print_iterator, test, obs_epoch):
+def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
     """
             dat_in
 
     Reading in the eventlist to make the cross spectrum. Reads in a clock- 	
     corrected GTI'd event list, populates the light curves, computes cross 
-    spectrum per energy channel and keeps running average of the cross spectra.
+    spectrum per energy channel and keeps running average of the cross spectrum,
+    mean count rate for interest band and reference band, and power spectra for
+    the interest and reference bands.
     
     """
+    ###################
     ## Initializations
-#     num_segments = 0
-#     sum_rate_whole_ci = np.zeros(64, dtype=np.float64)
-#     sum_rate_whole_ref = 0
-#     cs_sum = np.zeros((n_bins, 64), dtype=np.complex128)
-#     time_ci = np.asarray([])
-#     energy_ci = np.asarray([])
-#     time_ref = np.asarray([])
-#     energy_ref = np.asarray([])
-#     start_time = -99
-#     final_time = -99
-#     sum_power_ci = np.zeros((n_bins, 64), dtype=np.float64)
-#     sum_power_ref = np.zeros(n_bins, dtype=np.float64)
-#     sum_rate_ci = 0
-# 
-#     ## Reading only the first line of data to get the start time of the file
-#     try:
-# 		with open(in_file, 'r') as fo:
-# 			for line in fo:
-# 				if line[0].strip() != "#":
-# 					line = line.strip().split()
-# 					start_time = np.float64(line[0])
-# 					break
-#     except IOError:
-#     	print "\tERROR: File does not exist: %s" % in_file
-# 		
-#     end_time = start_time + (dt * n_bins)
-# #     print "Start time is %.21f" % start_time
-# # 	print "End time of first seg is %.21f" % end_time
-# 
-#     with open(in_file, 'r') as f:
-#         for line, next_line in tools.pairwise(f):
-#             if line[0].strip() != "#":  # If the line is not a comment
-#                 line = line.strip().split()
-#                 next_line = next_line.strip().split()
-#                 current_time = np.float64(line[0])
-# #                 print "%.21f" % current_time
-#                 current_chan = np.int8(line[1])
-#                 current_pcu = np.int8(line[2])
-#                 next_time = np.float64(next_line[0])
-# 
-#                 if current_pcu == 2:  ## If pcu = 2
-#                     time_ci = np.append(time_ci, current_time)
-#                     energy_ci = np.append(energy_ci, current_chan)
-#                 elif current_pcu == 0:  ## pcu = 0
-#                     time_ref = np.append(time_ref, current_time)
-#                     energy_ref = np.append(energy_ref, current_chan)
-#                 else:
-# #                 	raise Exception("ERROR: PCU is not 0 or 2. Exiting.")
-# 					pass
-#                 next_time = float(next_line[0])
-#                 next_end_time = end_time + (dt * n_bins)
-# 
-#                 if next_time >= end_time:  # Triggered at end of a segment
-#                 	if len(time_ci) > 0:
-#                 		num_segments += 1
-#                 		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
-#                 			sum_power_ci, sum_power_ref, sum_rate_ci = \
-#                 			each_segment(time_ci, time_ref, energy_ci, \
-#                 			energy_ref, n_bins, dt, start_time, end_time, \
-#                 			obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, \
-#                 			sum_power_ci, sum_power_ref, cs_sum, num_segments, \
-#                 			sum_rate_ci)
-#                 		if num_segments % print_iterator == 0:
-#                 			print "\t", num_segments
-#                 		if test is True and num_segments == 1:  # For testing
-#                 			break
-#                 		time_ci = []
-#                 		energy_ci = []
-#                 		time_ref = []
-#                 		energy_ref = []
-#                 	## End of 'if there are counts in this segment'
-#                 	start_time += (n_bins * dt)
-#                 	end_time += (n_bins * dt)
-#                 	
-#                 	## This next bit helps it handle gappy data; keep in mind 
-#                 	## that end_time has already been incremented here
-#                 	if next_time >= end_time:
-#                 		start_time = next_time
-#                 		end_time = start_time + (n_bins * dt)
-# 			
-# 				## End of 'if it`s at the end of a segment'
-# 			## End of 'if the line is not a comment'
-# 		## End of for-loop
-# 	## End of with-block
-# 		
-#     return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-#         sum_power_ci, sum_power_ref, sum_rate_ci
+    ###################
+    
+    num_segments = 0
+    sum_rate_whole_ci = np.zeros(detchans, dtype=np.float64)
+    sum_rate_whole_ref = 0
+    cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
+    time_ci = np.asarray([])
+    energy_ci = np.asarray([])
+    time_ref = np.asarray([])
+    energy_ref = np.asarray([])
+    start_time = -99
+    sum_power_ci = np.zeros((n_bins, detchans), dtype=np.float64)
+    sum_power_ref = np.zeros(n_bins, dtype=np.float64)
+    sum_rate_ci = 0
+
+    ## Reading only the first line of data to get the start time of the file
+    try:
+		with open(in_file, 'r') as fo:
+			for line in fo:
+				if line[0].strip() != "#":
+					line = line.strip().split()
+					start_time = np.float64(line[0])
+					break
+    except IOError:
+    	print "\tERROR: File does not exist: %s" % in_file
+		
+    end_time = start_time + (dt * n_bins)
+	
+	############################
+	## Looping through segments
+	############################
+	
+    with open(in_file, 'r') as f:
+        for line, next_line in tools.pairwise(f):
+            if line[0].strip() != "#":  # If the line is not a comment
+            
+                line = line.strip().split()
+                next_line = next_line.strip().split()
+                current_time = np.float64(line[0])
+                current_chan = np.uint16(line[1])
+                current_pcu = np.uint8(line[2])
+                next_time = np.float64(next_line[0])
+                
+				########################################
+				## Selecting band for data based on PCU
+				########################################
+				
+                if current_pcu == 2:  ## If pcu = 2
+                    time_ci = np.append(time_ci, current_time)
+                    energy_ci = np.append(energy_ci, current_chan)
+                else:
+                    time_ref = np.append(time_ref, current_time)
+                    energy_ref = np.append(energy_ref, current_chan)
+
+                next_time = float(next_line[0])
+                next_end_time = end_time + (dt * n_bins)
+				
+				###########################
+				## At the end of a segment
+				###########################
+		
+                if next_time >= end_time:
+                	if len(time_ci) > 0 and len(time_ref) > 0:
+                	
+                		num_segments += 1
+                		
+                		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
+                			sum_power_ci, sum_power_ref, sum_rate_ci = \
+                			each_segment(time_ci, time_ref, energy_ci, \
+                			energy_ref, n_bins, detchans, dt, start_time, \
+                			end_time, obs_epoch, sum_rate_whole_ci, \
+                			sum_rate_whole_ref, sum_power_ci, sum_power_ref, \
+                			cs_sum, sum_rate_ci)
+                			
+                		if num_segments % print_iterator == 0:
+                			print "\t", num_segments
+                		if test is True and num_segments == 1:  # For testing
+                			break
+                		time_ci = []
+                		energy_ci = []
+                		time_ref = []
+                		energy_ref = []
+                		
+                		start_time += (n_bins * dt)
+                		end_time += (n_bins * dt)
+                	
+                	## This next bit helps it handle gappy data
+                	elif len(time_ci) == 0 and len(time_ref) == 0:
+                		start_time = next_time
+                		end_time = start_time + (n_bins * dt)
+                	
+                	else:
+                		start_time += (n_bins * dt)
+                		end_time += (n_bins * dt)
+                	## End of 'if there are counts in this segment'
+				## End of 'if it`s at the end of a segment'
+				
+			## End of 'if the line is not a comment'
+		## End of for-loop
+	## End of with-block
+		
+    return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+        sum_power_ci, sum_power_ref, sum_rate_ci
         
 ## End of function 'dat_in'
     
     
 ################################################################################
-def read_and_use_segments(in_file, n_bins, dt, test):
-	"""
+def read_and_use_segments(in_file, n_bins, detchans, dt, test):
+    """
 			read_and_use_segments
 	
 	Reads in segments of a light curve from a .dat or .fits file. Split into 
 	'fits_in' and 'dat_in' for easier readability.
 		
-	"""
-  	assert tools.power_of_two(n_bins), "ERROR: n_bins must be a power of 2."
-  	
-  	print "Input file: %s" % in_file
-  	
-  	if n_bins == 32768:
-  		print_iterator = int(10)
-  	elif n_bins < 32768:
-  		print_iterator = int(10)
-  	else:
-  		print_iterator = int(1)
-  	
-	print "Segments computed:"
-
-	## Data from dat and fits need to be populated as a light curve before a 
-	## power spectrum can be taken, whereas data from lc was made in seextrct 
-	## and so it's already populated as a light curve
-	if (in_file[-5:].lower() == ".fits"):
+    """
 	
-		obs_epoch = tools.obs_epoch_rxte(in_file)
-		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
-			sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file, \
-			n_bins, dt, print_iterator, test, obs_epoch)
-			
-# 		rate_ci_stack, rate_ref_stack, num_segments = fits_in(in_file, \
-# 			n_bins, dt, print_iterator, test, obs_epoch)
+    assert tools.power_of_two(n_bins), "ERROR: n_bins must be a power of 2."
+  	
+    print "Input file: %s" % in_file
+  	
+  	## Determining print iterator for segments
+    if n_bins == 32768:
+    	print_iterator = int(10)
+    elif n_bins < 32768:
+        print_iterator = int(10)
+    else:
+    	print_iterator = int(1)
+  	
+    print "Segments computed:"
+	
+	#######################################################
+	## Data is read in differently from fits and dat files
+	#######################################################
+	
+    if (in_file[-5:].lower() == ".fits"):
+	
+        obs_epoch = tools.obs_epoch_rxte(in_file)
 		
-	elif (in_file[-4:].lower() == ".dat"):
+        cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+			sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file, \
+			n_bins, detchans, dt, print_iterator, test, obs_epoch)
+		
+    elif (in_file[-4:].lower() == ".dat"):
 	
-		fits_file = in_file[0:-4] + ".fits"
-  		obs_epoch = tools.obs_epoch_rxte(fits_file)
-		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+        fits_file = in_file[0:-4] + ".fits"  ## Still need a fits file to get the observation time
+        obs_epoch = tools.obs_epoch_rxte(fits_file)
+  		
+        cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
 			sum_power_ci, sum_power_ref, sum_rate_ci = dat_in(in_file, \
-			n_bins, dt, print_iterator, test, obs_epoch)
+			n_bins, detchans, dt, print_iterator, test, obs_epoch)
 			
-	else:
+    else:
+	    raise Exception("ERROR: Input file type not recognized. Must be .dat or\
+.fits.")
 	
-		raise Exception("ERROR: Input file type not recognized. Must be .dat or .fits.")
-	
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+    return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
-# 	return rate_ci_stack, rate_ref_stack, num_segments
         
 ## End of function 'read_and_use_segments'
+
 
 ################################################################################
 def get_background(bkgd_file):
@@ -947,7 +946,13 @@ def get_background(bkgd_file):
 	Get the background count rate from a background spectrum file.
 	
 	"""
-	fits_hdu = fits.open(bkgd_file)
+	
+	try:
+		fits_hdu = fits.open(bkgd_file)
+	except IOError:
+		print "\tERROR: File does not exist: %s" % bkgd_file
+		sys.exit()
+		
 	header = fits_hdu[1].header
 	data = fits_hdu[1].data
 	fits_hdu.close()
@@ -989,37 +994,32 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     t_res = float(tools.get_key_val(in_file, 0, 'TIMEDEL'))
     dt = dt_mult * t_res
     n_bins = num_seconds * int(1.0 / dt)
-    mean_rate_whole_ci = np.zeros(64)
-    mean_rate_whole_ref = 0
-    ccf_end = np.zeros((n_bins, 64))
-    cs_avg = np.zeros((n_bins, 64), dtype=np.complex128)
     nyquist_freq = 1.0 / (2.0 * dt)
+    detchans = float(tools.get_key_val(in_file, 0, 'DETCHANS'))
     
     print "\nDT = %f" % dt
     print "N_bins = %d" % n_bins
     print "Nyquist freq =", nyquist_freq
     print "Filtering?", filter
-
-    
-    ###################################################################
+	
+	###################################################################
     ## Reading in the background count rate from a background spectrum
     ###################################################################
     
     if bkgd_file:
 		bkgd_rate = get_background(bkgd_file)
     else:
-		bkgd_rate = np.zeros(64)	
+		bkgd_rate = np.zeros(detchans)	
     print " "
-	
+    
 	#################################################
 	## Reading in data, computing the cross spectrum
 	#################################################
 	
     cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, \
     	sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, \
-    	dt, test)
-#     rate_ci_stack, rate_ref_stack, num_segments = read_and_use_segments(in_file, n_bins, dt, test)
-    	
+    	detchans, dt, test)
+        
 	#########################################
 	## Turning sums over segments into means
 	#########################################
@@ -1029,16 +1029,13 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     mean_power_ci = sum_power_ci / float(num_segments)
     mean_power_ref = sum_power_ref / float(num_segments)
     cs_avg = cs_sum / float(num_segments)
-    
-#     cs_stacked_avg, power_ci, power_ref, rate_whole_ci, rate_whole_ref = \
-# 		make_cs_alltogether(rate_ci_stack, rate_ref_stack, n_bins, num_segments)
         
     ################################################################
     ## Printing the cross spectrum to a file, for plotting/checking
     ################################################################
     
     cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
-#     np.savetxt('cs_avg.dat', cs_out)
+    np.savetxt('cs_avg.dat', cs_out)
     
     ##################################################################
     ## Subtracting the background count rate from the mean count rate
@@ -1046,46 +1043,44 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     
     mean_rate_whole_ci -= bkgd_rate
     
-    ## Need to use a background from PCU 0 for the reference band...
-#     ref_bkgd_rate = np.mean(bkgd_rate[2:26])
-#     mean_rate_whole_ref -= ref_bkgd_rate    
-#     print np.shape(mean_rate_whole_ci)
-#     print np.shape(mean_rate_whole_ref)
+    ## Need to use a background from ref. PCU for the reference band...
+    ref_bkgd_rate = np.mean(bkgd_rate[2:26])
+    mean_rate_whole_ref -= ref_bkgd_rate    
     
     ######################
     ## Making lag spectra
     ######################
     
-#     make_lags(out_file, in_file, dt, n_bins, num_seconds, num_segments, \
-# 		mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, mean_power_ci, \
-# 		mean_power_ref)
-# 	
-# 	##############################################
-# 	## Computing ccf from cs, and computing error
-# 	##############################################
-# 	
-#     if filter:
-#     	ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
-# 			num_seconds, num_segments, mean_rate_whole_ci, mean_rate_whole_ref,\
-# 			mean_power_ci, mean_power_ref, True)
-#     else:
-#     	ccf_end, ccf_error = UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
-#     		num_seconds, num_segments, mean_rate_whole_ci, mean_rate_whole_ref,\
-#     		mean_power_ci, mean_power_ref, True)
-# 	
+    make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, \
+    	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, \
+    	mean_power_ci, mean_power_ref)
+	
+	##############################################
+	## Computing ccf from cs, and computing error
+	##############################################
+	
+    if filter:
+    	ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
+    		detchans, num_seconds, num_segments, mean_rate_whole_ci, \
+    		mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
+    else:
+    	ccf_end, ccf_error = UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
+    		detchans, num_seconds, num_segments, mean_rate_whole_ci, \
+    		mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
+	
     print "Number of segments:", num_segments
     print "Sum of mean rate for ci:", np.sum(mean_rate_whole_ci)
     print "Mean rate for ref:", np.mean(mean_rate_whole_ref)
-# 	
-#     t = np.arange(0, n_bins)
+	
+    t = np.arange(0, n_bins)
 	
 	##########
     ## Output
     ##########
     
-#     fits_out(out_file, in_file, bkgd_file, dt, n_bins, num_seconds, \
-#     	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_end, \
-#     	ccf_error, filter)
+    fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds, \
+    	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_end, \
+    	ccf_error, filter)
 	
 ## End of function 'main'
 
@@ -1138,7 +1133,6 @@ dest='filter', help='Int flag: 0 if NOT applying a filter in frequency-space, \
     filter = False
     if args.filter == 1:
     	filter = True
-    
     
     main(args.infile, args.outfile, args.bkgd_file, args.num_seconds, args.dt_mult, test, filter)
 
