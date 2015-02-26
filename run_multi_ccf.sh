@@ -76,19 +76,16 @@ cp "$file_list" "$saved_file_list"
 ## Running multi_ccf.py
 ########################
 
-if [ -e "$saved_file_list" ] && [ -e "$bkgd_spec" ]; then
-
-	python "$exe_dir"/multi_CCF.py "$saved_file_list" "${out_file}.${tab_ext}" \
-		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtering"
-		
-elif [ -e "$saved_file_list" ]; then
-
-	python "$exe_dir"/multi_CCF.py "$saved_file_list" "${out_file}.${tab_ext}" \
-		-n "$numsec" -m "$dt" -t "$testing" -f "$filtering"
-
-else 
-	echo -e "\tERROR: multi_ccf.py was not run. List of eventlists and/or background energy spectrum doesn't exist."
-fi
+# if [ -e "$saved_file_list" ] && [ -e "$bkgd_spec" ]; then
+# 	python "$exe_dir"/multi_CCF.py "$saved_file_list" "${out_file}.${tab_ext}" \
+# 		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtering"	
+# elif [ -e "$saved_file_list" ]; then
+# 	python "$exe_dir"/multi_CCF.py "$saved_file_list" "${out_file}.${tab_ext}" \
+# 		-n "$numsec" -m "$dt" -t "$testing" -f "$filtering"
+# else 
+# 	echo -e "\tERROR: multi_ccf.py was not run. List of eventlists and/or \
+# background energy spectrum doesn't exist."
+# fi
 
 ####################
 ## Plotting the ccf
@@ -97,12 +94,12 @@ fi
 if [ -e "${out_file}.${tab_ext}" ]; then
 	python "$exe_dir"/plot_CCF.py "${out_file}.${tab_ext}" -o "${plot_root}" \
 		-p "$prefix"
-# 	if [ -e "${plot_root}_chan_06.${plot_ext}" ]; then open -a ImageJ "${plot_root}_chan_06.${plot_ext}"; fi
+	if [ -e "${plot_root}_chan_06.${plot_ext}" ]; then open -a ImageJ "${plot_root}_chan_06.${plot_ext}"; fi
 	
 	ccfs_plot="$exe_dir/ccf_plot.${plot_ext}"
 	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" \
-		"$numsec"
-# 	if [ -e "$ccfs_plot" ]; then open -a ImageJ "$ccfs_plot"; fi
+		-p "$prefix"
+	if [ -e "$ccfs_plot" ]; then open -a ImageJ "$ccfs_plot"; fi
 fi
 
 #######################
@@ -111,25 +108,25 @@ fi
 
 plot_file="${plot_root}_2Dccf.${plot_ext}"
 if [ -e "${out_file}.${tab_ext}" ]; then
-	python "$exe_dir"/plot_2d.py "${out_file}.${tab_ext}" -o "${plot_file}"
-# 	if [ -e "${plot_file}" ]; then open -a ImageJ "${plot_file}"; fi
+	python "$exe_dir"/plot_2d.py "${out_file}.${tab_ext}" -o "${plot_file}" \
+		-p "$prefix"
+	if [ -e "${plot_file}" ]; then open -a ImageJ "${plot_file}"; fi
 fi
 	
 plot_file="${plot_root}_2Dccf.fits"
-detchans=$(python -c "from tools import get_key_val; print get_key_val('${out_file}.fits', 0, 'DETCHANS')")
-echo "$detchans"
+detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fits', 0, 'DETCHANS'))")
 
-# if [ -e "$out_dir/temp.dat" ]; then
-# 	fimgcreate bitpix=-32 \
-# 		naxes="70,${detchans}" \
-# 		datafile="$out_dir/temp.dat" \
-# 		outfile="${plot_root}_2Dccf.fits" \
-# 		nskip=1 \
-# 		history=true \
-# 		clobber=yes
-# else
-# 	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
-# fi
+if [ -e "$out_dir/temp.dat" ]; then
+	fimgcreate bitpix=-32 \
+		naxes="70,${detchans}" \
+		datafile="$out_dir/temp.dat" \
+		outfile="${plot_root}_2Dccf.fits" \
+		nskip=1 \
+		history=true \
+		clobber=yes
+else
+	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
+fi
 
 if [ -e "${plot_root}_2Dccf.fits" ]; then
 	echo "FITS 2D ccf ratio image: ${plot_root}_2Dccf.fits"

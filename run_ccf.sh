@@ -30,8 +30,8 @@ fi
 
 ################################################################################
 
-home_dir=$(ls -d ~)  # the -d flag is extremely important here
-day=$(date +%y%m%d)  # make the date a string and assign it to 'day'
+home_dir=$(ls -d ~) 
+day=$(date +%y%m%d)
 exe_dir="$home_dir/Dropbox/Research/cross_correlation"
 out_dir="$exe_dir/out_ccf"
 # prefix="P70080"
@@ -69,19 +69,14 @@ fi
 ##################
 
 if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
-
 	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${tab_ext}" \
 		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtering"
-
 elif [ -e "$in_file" ]; then
-
 	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${tab_ext}" \
 		-n "$numsec" -m "$dt" -t "$testing" -f "$filtering"
-
 else
-
-	echo -e "\tERROR: ccf.py was not run. Eventlist and/or background energy spectrum doesn't exist."
-
+	echo -e "\tERROR: ccf.py was not run. Eventlist and/or background energy \
+spectrum doesn't exist."
 fi
 
 
@@ -96,12 +91,12 @@ if [ -e "${out_file}.${tab_ext}" ]; then
 	
 	if [ -e "${plot_root}_chan_06.png" ]; then open -a ImageJ "${plot_root}_chan_06.png"; fi
 
-# 	ccfs_plot="$exe_dir/${day}_ccfs.png"
+	ccfs_plot="$exe_dir/${day}_ccfs.png"
 
-# 	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" \
-# 		"${numsec}"
+	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" \
+		-p "${prefix}"
 
-# 	if [ -e "$ccfs_plot" ]; then open -a ImageJ "$ccfs_plot"; fi
+	if [ -e "$ccfs_plot" ]; then open -a ImageJ "$ccfs_plot"; fi
 
 fi
 
@@ -110,12 +105,13 @@ fi
 ## Plotting the 2D ccf with colours
 ####################################
 
-# plot_file="${plot_root}_2Dccf.png"
-# if [ -e "${out_file}.${tab_ext}" ]; then
-# 	python "$exe_dir"/plot_2d.py "${out_file}.${tab_ext}" -o "${plot_file}"
-# 	if [ -e "${plot_file}" ]; then open -a ImageJ "${plot_file}"; fi
-# fi
-# 
+plot_file="${plot_root}_2Dccf.png"
+if [ -e "${out_file}.${tab_ext}" ]; then
+	python "$exe_dir"/plot_2d.py "${out_file}.${tab_ext}" -o "${plot_file}" \
+		-p "${prefix}"
+	if [ -e "${plot_file}" ]; then open -a ImageJ "${plot_file}"; fi
+fi
+
 # plot_file="${plot_root}_2Dccf.fits"
 # 
 # if [ -e "$out_dir/temp.dat" ]; then
