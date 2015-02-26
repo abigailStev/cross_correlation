@@ -36,8 +36,8 @@ def make_plot(x_bins, ccf_amps, ccf_err, prefix, plot_file, chan):
 	ax.plot(x_bins, ccf_amps, lw=1.5, c='black')
 # 	ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=2, c='black', elinewidth=2, capsize=2)
 	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
-	ax.set_ylabel('Deviation from mean count rate [photons / s]', fontproperties=font_prop)
-	ax.set_xlim(0, )
+	ax.set_ylabel('Deviation from mean (photons / s)', fontproperties=font_prop)
+	ax.set_xlim(0, 40)
 # 	ax.set_ylim(-0.45, 0.45)
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
@@ -79,8 +79,9 @@ format.")
 help="The root of the filename to save the plot to. Energy channel will be \
 appended to name before saving. [./ccf]")
 
-	parser.add_argument('-p', '--prefix', dest='prefix', default="x", \
-help="The identifying prefix of the data (object nickname or proposal ID). [x]")
+	parser.add_argument('-p', '--prefix', dest='prefix', default="--", \
+help="The identifying prefix of the data (object nickname or proposal ID). \
+[--]")
 
 	args = parser.parse_args()
 
