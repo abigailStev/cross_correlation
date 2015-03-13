@@ -108,8 +108,8 @@ def main(file, plot_file, prefix):
 	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
 	ax.set_ylabel('Deviation from mean (photons / s)', \
 		fontproperties=font_prop)
-# 	ax.set_xlim(0, 20000)
-	ax.set_xlim(0, 200)
+	ax.set_xlim(0, 4000)
+# 	ax.set_xlim(0, 200)
 # 	ax.set_ylim(-0.0005, 0.0005)
 # 	ax.set_ylim(-2.5, 3)
 # 	ax.set_xscale('symlog')  ## this works much better than 'log'
