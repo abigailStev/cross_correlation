@@ -7,9 +7,10 @@ import os
 from astropy.io import fits
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
+import tools
 
 __author__ = "Abigail Stevens"
-__author_email__ = "A.L.Stevens@uva.nl"
+__author_email__ = "A.L.Stevens at uva.nl"
 __year__ = "2014-2015"
 __description__ = "Plots the ccf of multiple energy channels in a 2D colour \
 plot."
@@ -43,6 +44,10 @@ format.")
 help="The identifying prefix of the data (object nickname or proposal ID). \
 [--]")
 	
+	parser.add_argument('-l', '--length', dest='t_length', \
+type=tools.type_positive_int, default=100, help="Number of time bins to use \
+along the x-axis. [100]")
+	
 	args = parser.parse_args()
 
 
@@ -68,27 +73,26 @@ help="The identifying prefix of the data (object nickname or proposal ID). \
 	
 	mean_rate_ci = [ float(num.strip()) for num in means_str[1:-1].split(',') ]
 	ccf = np.reshape(table.field('CCF'), (n_bins, detchans), order='C')
-
-	t_length = 70  ## Number of time bins to use
-	ccf = ccf[0:t_length,].T  ## Transpose it to get the axes we want
+	
+	ccf = ccf[0:args.t_length,].T  ## Transpose it to get the axes we want
 	
 	###################################################################
 	## Make a ratio of ccf to the mean count rate in the interest band
 	###################################################################
 	
-	a = np.array([mean_rate_ci,]*t_length).T
+	a = np.array([mean_rate_ci,]*args.t_length).T
 	with np.errstate(all='ignore'):
 		ratio = np.where(a != 0, ccf / a, 0)
 	
-	print "\tMinimum value:", np.min(ratio)
-	print "\tMaximum value:", np.max(ratio)
+# 	print "\tMinimum value:", np.min(ratio)
+# 	print "\tMaximum value:", np.max(ratio)
 	
 	######################################################
 	## Saving to a dat file so that we can use fimgcreate
 	######################################################
 	
 # 	ratio[np.where(np.abs(ratio) > 0.3)] = 0
-	print np.shape(ratio)
+# 	print np.shape(ratio)
 	ratio[32:,] = 0
 	out_file = "out_ccf/temp.dat"
 	R = ratio.flatten('C')
