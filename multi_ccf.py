@@ -9,7 +9,7 @@ import tools  # https://github.com/abigailStev/whizzy_scripts
 import ccf as xcor
 
 __author__ = "Abigail Stevens"
-__author_email__ = "A.L.Stevens@uva.nl"
+__author_email__ = "A.L.Stevens at uva.nl"
 __year__ = "2014-2015"
 __description__ = "Computes the cross-correlation function of a band of \
 interest with a reference band, over multiple RXTE event-mode data files."
@@ -170,6 +170,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, \
 	###########################################################
 	
     t_res = float(tools.get_key_val(input_files[0], 0, 'TIMEDEL'))
+    print t_res
+    print dt_mult
     dt = dt_mult * t_res
     n_bins = num_seconds * int(1.0 / dt)
     detchans = float(tools.get_key_val(input_files[0], 0, 'DETCHANS'))
@@ -207,7 +209,9 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test, \
         cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
             sum_power_ci, sum_power_ref, sum_rate_ci = \
             xcor.read_and_use_segments(in_file, n_bins, detchans, dt, test)
-            
+        
+        print "Segments for this file: %d\n" % num_segments
+        
         total_segments += num_segments
         total_cs_sum += cs_sum
         sum_rate_total_ci += sum_rate_whole_ci
