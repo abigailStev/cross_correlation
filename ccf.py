@@ -10,7 +10,7 @@ import tools  # https://github.com/abigailStev/whizzy_scripts
 import timeit
 
 __author__ = "Abigail Stevens"
-__author_email__ = "A.L.Stevens@uva.nl"
+__author_email__ = "A.L.Stevens at uva.nl"
 __year__ = "2014-2015"
 __description__ = "Computes the cross-correlation function of an interest band \
 with a reference band from RXTE event-mode data."
@@ -144,7 +144,8 @@ def get_phase_err(cs_avg, power_ci, power_ref, n, M):
 	"""
 			get_phase_err
 	
-	Computes the error on the complex phase (in radians).
+	Computes the error on the complex phase (in radians). Power should not be 
+	noise-subtracted.
 	
 	"""
 	with np.errstate(all='ignore'):
@@ -199,7 +200,7 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, \
 	cs_avg = cs_avg[1:max_index + 1]
 	power_ci = power_ci[1:max_index + 1]
 	power_ref = power_ref[1:max_index + 1]
-	phase = np.arctan2(cs_avg.real, cs_avg.imag)
+	phase = np.arctan2(cs_avg.imag, cs_avg.real)
 	err_phase = get_phase_err(cs_avg, power_ci, \
 		np.repeat(power_ref[:, np.newaxis], detchans, axis=1), 1, num_segments)
 	tlag = phase_to_tlags(phase, freq, detchans)
@@ -482,7 +483,7 @@ failed."
 # 	print "Normed ccf:", ccf_end[0:5,0]
 # 	print "Normed var_ccf:", var_ccf[0:5,0]	
 	
-	var_ccf = ccf_end * 0.1
+	var_ccf = ccf_end * 0.0
 	
 	return ccf_end, var_ccf
 	
