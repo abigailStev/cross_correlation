@@ -22,7 +22,7 @@ Written in Python 2.7.
 
 ################################################################################
 def dat_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
-	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error,
+	num_seg, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error,
 	filter):
 	"""
 			dat_out
@@ -44,9 +44,9 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 		out.write("\n# Number of bins per segment = %d" % n_bins)
 		out.write("\n# DETCHANS = %d" % detchans)
 		out.write("\n# Number of seconds per segment = %d" % num_seconds)
-		out.write("\n# Number of segments per light curve = %d" % num_segments)
+		out.write("\n# Number of segments per light curve = %d" % num_seg)
 		out.write("\n# Exposure time = %d seconds" \
-				  % (num_segments * num_seconds))
+				  % (num_seg * num_seconds))
 		out.write("\n# Mean count rate of ci = %s" \
 			% str(list(mean_rate_whole_ci)))
 		out.write("\n# Mean count rate of ref band = %.8f" \
@@ -76,7 +76,7 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 
 ################################################################################
 def fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
-	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error,
+	num_seg, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error,
 	filter):
 	"""
 			fits_out
@@ -105,9 +105,9 @@ def fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 	prihdr.set('BKGD', bkgd_file)
 	prihdr.set('DT', dt, "seconds")
 	prihdr.set('N_BINS', n_bins, "time bins per segment")
-	prihdr.set('SEGMENTS', num_segments, "segments in the whole light curve")
+	prihdr.set('SEGMENTS', num_seg, "segments in the whole light curve")
 	prihdr.set('SEC_SEG', num_seconds, "seconds per segment")
-	prihdr.set('EXPOSURE', num_segments * num_seconds,
+	prihdr.set('EXPOSURE', num_seg * num_seconds,
 		"seconds, of light curve")
 	prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
 	prihdr.set('RATE_CI', str(mean_rate_whole_ci.tolist()), "counts/second")
@@ -175,7 +175,7 @@ def phase_to_tlags(phase, freq, detchans):
 
 ################################################################################
 def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
-	num_segments, mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, power_ci,
+	num_seg, mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, power_ci,
 	power_ref):
 	"""
 			make_lags
@@ -198,7 +198,7 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	power_ref = power_ref[1:max_index + 1]
 	phase = np.arctan2(cs_avg.imag, cs_avg.real)
 	err_phase = get_phase_err(cs_avg, power_ci,
-		np.repeat(power_ref[:, np.newaxis], detchans, axis=1), 1, num_segments)
+		np.repeat(power_ref[:, np.newaxis], detchans, axis=1), 1, num_seg)
 	tlag = phase_to_tlags(phase, freq, detchans)
 	err_tlag = phase_to_tlags(err_phase, freq, detchans)
 
@@ -216,8 +216,8 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	prihdr.set('EVTLIST', in_file)
 	prihdr.set('DT', dt, "seconds")
 	prihdr.set('N_BINS', n_bins, "time bins per segment")
-	prihdr.set('SEGMENTS', num_segments, "segments in the whole light curve")
-	prihdr.set('EXPOSURE', num_segments * n_bins * dt,
+	prihdr.set('SEGMENTS', num_seg, "segments in the whole light curve")
+	prihdr.set('EXPOSURE', num_seg * n_bins * dt,
 		"seconds, of light curve")
 	prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
 	prihdr.set('RATE_CI', str(mean_rate_whole_ci.tolist()), "counts/second")
@@ -401,7 +401,7 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 
 ################################################################################
 def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
-	num_segments, countrate_ci, countrate_ref, power_ci, power_ref, noisy):
+	num_seg, countrate_ci, countrate_ref, power_ci, power_ref, noisy):
 	"""
 			UNFILT_cs_to_ccf_w_err
 	Takes the iFFT of the cross spectrum to get the cross-correlation function, 
@@ -410,8 +410,12 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 	
 	"""
 	
-	freq = fftpack.fftfreq(n_bins, d=dt)
-	
+	if len(power_ref) == n_bins:
+		freq = fftpack.fftfreq(n_bins, d=dt)
+		nyq_ind = np.argmax(freq)+1
+		power_ref = power_ref[0:nyq_ind+1]
+		power_ci = power_ci[0:nyq_ind+1,]
+
 	######################################################
 	## Take the IFFT of the cross spectrum to get the CCF
 	######################################################
@@ -445,21 +449,21 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 # 	absrms_power_ci[np.where(absrms_power_ci < 0)] = 0.0
 # 	absrms_power_ref[np.where(absrms_power_ref < 0)] = 0.0
 
-	print "Mean of whole ps:", np.mean(absrms_power_ref)
-	if np.max(freq) > 100:
-		print "Mean of hf ps:", np.mean(absrms_power_ref[np.where(freq >= 100)])
+# 	print "Mean of whole ps:", np.mean(absrms_power_ref)
+# 	if np.max(freq) > 100:
+# 		print "Mean of hf ps:", np.mean(absrms_power_ref[np.where(freq >= 100)])
 	
 	## Getting rms of reference band, to normalize the ccf and acf
 	absrms_var_ref = np.sum(absrms_power_ref * df)
-	print "Ref band variance:", absrms_var_ref, "(abs rms)"
 	absrms_rms_ref = np.sqrt(absrms_var_ref)  
-	print "Ref band rms:", absrms_rms_ref, "(abs rms)"
+# 	print "Ref band rms:", absrms_rms_ref, "(abs rms)"
+	print "Ref band var:", absrms_var_ref / (countrate_ref ** 2), "(frac rms)"
 	print "Ref band rms:", absrms_rms_ref / countrate_ref, "(frac rms)"
 	
 	## Computing the autocorrelation functions from the power spectra
 	acf_ci = fftpack.ifft(power_ci).real
 	acf_ref = fftpack.ifft(power_ref).real
-	print "ACF REF:", acf_ref[0:4]
+# 	print "ACF REF:", acf_ref[0:4]
 	acf_ci *= (2.0 / float(n_bins) / absrms_rms_ref)
 	acf_ref *= (2.0 / float(n_bins) / absrms_rms_ref)
 	
@@ -478,7 +482,8 @@ failed."
 	
 	print "CCF:", ccf_end[2:5, 6]
 	print "Err:", rms_ccf[2:5, 6]
-	
+	print "Countrate ci chan 6:", countrate_ci[6]
+	print "Countrate ref:", countrate_ref
 # 	var_ccf = ccf_end * 0.0
 	
 	return ccf_end, rms_ccf
@@ -527,12 +532,12 @@ def make_cs(rate_ci, rate_ref, n_bins, detchans):
 
 	"""
 	## Computing the mean count rate of the segment
-	mean_rate_segment_ci = np.mean(rate_ci, axis=0)
-	mean_rate_segment_ref = np.mean(rate_ref)
+	mean_rate_seg_ci = np.mean(rate_ci, axis=0)
+	mean_rate_seg_ref = np.mean(rate_ref)
 
 	## Subtracting the mean off each value of 'rate'
-	rate_sub_mean_ci = np.subtract(rate_ci, mean_rate_segment_ci)
-	rate_sub_mean_ref = np.subtract(rate_ref, mean_rate_segment_ref)
+	rate_sub_mean_ci = np.subtract(rate_ci, mean_rate_seg_ci)
+	rate_sub_mean_ref = np.subtract(rate_ref, mean_rate_seg_ref)
 
 	## Taking the FFT of the time-domain photon count rate
 	## SciPy is faster than NumPy or pyFFTW for my array sizes
@@ -548,13 +553,41 @@ def make_cs(rate_ci, rate_ref, n_bins, detchans):
 		detchans))
 	
 	## Computing the cross spectrum from the fourier transform
-	cs_segment = np.multiply(fft_data_ci, np.conj(fft_data_ref))
+	cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
 
-	return cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
+	return cs_seg, mean_rate_seg_ci, mean_rate_seg_ref, power_ci, \
 		power_ref
 
 ## End of function 'make_cs'
 
+
+################################################################################
+def print_seg_ccf(n_bins, dt, rate_ref, power_ref, cs_seg):
+
+	## Temporary, for getting covariance of CCF segments
+	df = 1.0 / float(n_bins * dt)  # in Hz
+	absrms_noise_ref = 2.0 * rate_ref - 0.016*(2.0 * rate_ref)
+	absrms_power_ref = power_ref * (2.0 * dt / float(n_bins)) - absrms_noise_ref
+	absrms_var_ref = np.sum(absrms_power_ref * df)
+# 	print "Ref band var:", absrms_var_ref, "(abs rms)"
+	
+	ccf = fftpack.ifft(cs_seg, axis=0).real
+# 	print ccf[0:4,15]
+	
+	out_file="./testing_ccf_covariance.dat"
+	if absrms_var_ref > 0:
+	
+		absrms_rms_ref = np.sqrt(absrms_var_ref)  
+# 		print "Ref band rms:", absrms_rms_ref, "(abs rms)"
+# 		print "Ref band rms:", absrms_rms_ref / rate_ref, "(frac rms)"
+		ccf *= (2.0 / float(n_bins) / absrms_rms_ref)
+	
+		with open(out_file, 'a') as out:
+			for element in ccf[0:100,15]:
+				out.write("%.6e\t" % element)
+			out.write("\n")
+	return
+			
 
 ################################################################################
 def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, detchans,
@@ -571,9 +604,9 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, detchans,
 	assert len(time_ref) == len(energy_ref)
 	
 	## Initializations
-	mean_rate_segment_ci = np.zeros(64, dtype=np.float64)
-	mean_rate_segment_ref = np.zeros(64, dtype=np.float64)
-	cs_segment = np.zeros((n_bins, 64), dtype=np.complex128)
+	mean_rate_seg_ci = np.zeros(64, dtype=np.float64)
+	mean_rate_seg_ref = np.zeros(64, dtype=np.float64)
+	cs_seg = np.zeros((n_bins, 64), dtype=np.complex128)
 	
 	##############################################################
 	## Populate the light curves for interest and reference bands
@@ -591,21 +624,25 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, detchans,
 	## Make the cross spectrum
 	###########################
 	
-	cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
+	cs_seg, mean_rate_seg_ci, mean_rate_seg_ref, power_ci, \
 		power_ref = make_cs(rate_ci_2d, rate_ref, n_bins, detchans)
-		
+	
+	## Temporary, for getting covariance of CCF segments
+# 	print_seg_ccf(n_bins, dt, mean_rate_seg_ref, power_ref, cs_seg)
+	
+	
 	## Sums across segments -- arrays, so it adds by index
-	sum_rate_whole_ci += mean_rate_segment_ci
-	sum_rate_whole_ref += mean_rate_segment_ref
+	sum_rate_whole_ci += mean_rate_seg_ci
+	sum_rate_whole_ref += mean_rate_seg_ref
 	sum_power_ci += power_ci
 	sum_power_ref += power_ref
-	cs_sum += cs_segment
+	cs_sum += cs_seg
 	sum_rate_ci += np.mean(rate_ci_2d)
 	
 	## Clearing variables from memory for the next iteration
-	cs_segment = None
-	mean_rate_segment_ci = None
-	mean_rate_segment_ref = None
+	cs_seg = None
+	mean_rate_seg_ci = None
+	mean_rate_seg_ref = None
 	power_ci = None
 	power_ref = None
 	rate_ref = None
@@ -651,7 +688,7 @@ def fits_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 	## Initializations
 	###################
 	
-	num_segments = 0
+	num_seg = 0
 	sum_rate_whole_ci = np.zeros(detchans, dtype=np.float64)
 	sum_rate_whole_ref = 0
 	cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
@@ -724,7 +761,7 @@ def fits_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 		
 		if len(time_ci) > 0 and len(time_ref) > 0:
 			
-			num_segments += 1
+			num_seg += 1
 			
 			cs_sum, sum_rate_whole_ci, sum_rate_whole_ref,  sum_power_ci, \
 				sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, 
@@ -732,9 +769,9 @@ def fits_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 				seg_end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, 
 				sum_power_ci, sum_power_ref, cs_sum, sum_rate_ci)
 
-			if num_segments % print_iterator == 0:
-				print "\t", num_segments
-			if test is True and num_segments == 1:  # For testing
+			if num_seg % print_iterator == 0:
+				print "\t", num_seg
+			if test is True and num_seg == 1:  # For testing
 				break
 	
 			start_time += (n_bins * dt)
@@ -754,7 +791,7 @@ def fits_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 
 	## End of while-loop
 	
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
 ## End of function 'fits_in'
@@ -776,7 +813,7 @@ def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 	## Initializations
 	###################
 
-	num_segments = 0
+	num_seg = 0
 	sum_rate_whole_ci = np.zeros(detchans, dtype=np.float64)
 	sum_rate_whole_ref = 0
 	cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
@@ -838,7 +875,7 @@ def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 				if next_time >= end_time:
 					if len(time_ci) > 0 and len(time_ref) > 0:
 
-						num_segments += 1
+						num_seg += 1
 
 						cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
 							sum_power_ci, sum_power_ref, sum_rate_ci = \
@@ -848,9 +885,9 @@ def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 							sum_rate_whole_ref, sum_power_ci, sum_power_ref,
 							cs_sum, sum_rate_ci)
 
-						if num_segments % print_iterator == 0:
-							print "\t", num_segments
-						if test is True and num_segments == 1:  # For testing
+						if num_seg % print_iterator == 0:
+							print "\t", num_seg
+						if test is True and num_seg == 1:  # For testing
 							break
 						time_ci = []
 						energy_ci = []
@@ -875,7 +912,7 @@ def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 		## End of for-loop
 	## End of with-block
 		
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
 ## End of function 'dat_in'
@@ -913,7 +950,7 @@ def read_and_use_segments(in_file, n_bins, detchans, dt, test):
 	
 		obs_epoch = tools.obs_epoch_rxte(in_file)
 		
-		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, \
 			sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file,
 			n_bins, detchans, dt, print_iterator, test, obs_epoch)
 		
@@ -922,7 +959,7 @@ def read_and_use_segments(in_file, n_bins, detchans, dt, test):
 		fits_file = in_file[0:-4] + ".fits"  ## Still need a fits file to get the observation time
 		obs_epoch = tools.obs_epoch_rxte(fits_file)
 
-		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, \
 			sum_power_ci, sum_power_ref, sum_rate_ci = dat_in(in_file,
 			n_bins, detchans, dt, print_iterator, test, obs_epoch)
 			
@@ -930,7 +967,7 @@ def read_and_use_segments(in_file, n_bins, detchans, dt, test):
 		raise Exception("ERROR: Input file type not recognized. Must be .dat or\
 .fits.")
 	
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
 ## End of function 'read_and_use_segments'
@@ -1014,7 +1051,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	## Reading in data, computing the cross spectrum
 	#################################################
 	
-	cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, sum_power_ci, \
+	cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, sum_power_ci, \
 		sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, 
 		detchans, dt, test)
 
@@ -1022,11 +1059,11 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	## Turning sums over segments into means
 	#########################################
 
-	mean_rate_whole_ci = sum_rate_whole_ci / float(num_segments)
-	mean_rate_whole_ref = sum_rate_whole_ref / float(num_segments)
-	mean_power_ci = sum_power_ci / float(num_segments)
-	mean_power_ref = sum_power_ref / float(num_segments)
-	cs_avg = cs_sum / float(num_segments)
+	mean_rate_whole_ci = sum_rate_whole_ci / float(num_seg)
+	mean_rate_whole_ref = sum_rate_whole_ref / float(num_seg)
+	mean_power_ci = sum_power_ci / float(num_seg)
+	mean_power_ref = sum_power_ref / float(num_seg)
+	cs_avg = cs_sum / float(num_seg)
 
 	################################################################
 	## Printing the cross spectrum to a file, for plotting/checking
@@ -1050,7 +1087,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	######################
 
 	make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
-		num_segments, mean_rate_whole_ci, mean_rate_whole_ref, cs_avg,
+		num_seg, mean_rate_whole_ci, mean_rate_whole_ref, cs_avg,
 		mean_power_ci, mean_power_ref)
 	
 	##############################################
@@ -1059,14 +1096,14 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	
 	if filter:
 		ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins,
-			detchans, num_seconds, num_segments, mean_rate_whole_ci,
+			detchans, num_seconds, num_seg, mean_rate_whole_ci,
 			mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
 	else:
 		ccf_end, ccf_error = UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins,
-			detchans, num_seconds, num_segments, mean_rate_whole_ci,
+			detchans, num_seconds, num_seg, mean_rate_whole_ci,
 			mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
 	
-	print "Number of segments:", num_segments
+	print "Number of segments:", num_seg
 	print "Sum of mean rate for ci:", np.sum(mean_rate_whole_ci)
 	print "Mean rate for ref:", np.mean(mean_rate_whole_ref)
 	
@@ -1077,7 +1114,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	##########
 
 	fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
-		num_segments, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_end,
+		num_seg, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_end,
 		ccf_error, filter)
 	
 ## End of function 'main'
