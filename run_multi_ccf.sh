@@ -36,13 +36,13 @@ filtering=$7 ## 0 = no, 1 = yes; 0 is for QPOs, 1 is for coherent pulses
 
 ## If heainit isn't running, start it
 if (( $(echo $DYLD_LIBRARY_PATH | grep heasoft | wc -l) < 1 )); then
-	. $HEADAS/headas-init.sh
+	. ${HEADAS}/headas-init.sh
 fi
 
 home_dir=$(ls -d ~)
 
 exe_dir="$home_dir/Dropbox/Research/cross_correlation"
-out_dir="$exe_dir/out_ccf" # for multiple input files with different obsIDs
+out_dir="$exe_dir/out_ccf"
 lag_exe_dir="$home_dir/Dropbox/Research/lags"
 lag_out_dir="$lag_exe_dir/out_lags"
 
@@ -54,7 +54,7 @@ if [ ! -d "$lag_out_dir" ]; then mkdir -p "$lag_out_dir"; fi
 lag_lf=4  ## Lower frequency bound for lag spectra, in Hz
 lag_uf=7  ## Upper frequency bound for lag spectra, in Hz
 
-tlen=70  ## Number of time bins to plot along the 2D CCF x-axis
+tlen=100  ## Number of time bins to plot along the 2D CCF x-axis
 
 tab_ext="fits"
 plot_ext="png"
@@ -89,20 +89,20 @@ else
 background energy spectrum doesn't exist."
 fi
 
-####################
-## Plotting the ccf
-####################
+################################
+## Plotting the individual ccfs
+################################
 
-if [ -e "${out_file}.${tab_ext}" ]; then
-	python "$exe_dir"/plot_CCF.py "${out_file}.${tab_ext}" -o "${plot_root}" \
-		-p "$prefix"
-# 	if [ -e "${plot_root}_chan_06.${plot_ext}" ]; then open "${plot_root}_chan_06.${plot_ext}"; fi
-	
-	ccfs_plot="$exe_dir/ccf_plot.${plot_ext}"
-	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" \
-		-p "$prefix"
-# 	if [ -e "$ccfs_plot" ]; then open "$ccfs_plot"; fi
-fi
+# if [ -e "${out_file}.${tab_ext}" ]; then
+# 	python "$exe_dir"/plot_CCF.py "${out_file}.${tab_ext}" -o "${plot_root}" \
+# 		-p "$prefix"
+# # 	if [ -e "${plot_root}_chan_06.${plot_ext}" ]; then open "${plot_root}_chan_06.${plot_ext}"; fi
+# 	
+# 	ccfs_plot="$exe_dir/ccf_plot.${plot_ext}"
+# 	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" \
+# 		-p "$prefix"
+# # 	if [ -e "$ccfs_plot" ]; then open "$ccfs_plot"; fi
+# fi
 
 #######################
 ## Plotting the 2D ccf
@@ -114,48 +114,48 @@ if [ -e "${out_file}.${tab_ext}" ]; then
 		-p "$prefix" -l "$tlen"
 	if [ -e "${plot_file}" ]; then open "${plot_file}"; fi
 fi
-	
-plot_file="${plot_root}_2Dccf.fits"
-detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fits', 0, 'DETCHANS'))")
-
-if [ -e "$out_dir/temp.dat" ]; then
-	fimgcreate bitpix=-32 \
-		naxes="${tlen},${detchans}" \
-		datafile="$out_dir/temp.dat" \
-		outfile="${plot_root}_2Dccf.fits" \
-		nskip=1 \
-		history=true \
-		clobber=yes
-else
-	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
-fi
-
-if [ -e "${plot_root}_2Dccf.fits" ]; then
-	echo "FITS 2D ccf ratio image: ${plot_root}_2Dccf.fits"
-else
-	echo -e "\tERROR: FIMGCREATE was not successful."
-fi
+# 	
+# plot_file="${plot_root}_2Dccf.fits"
+# detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fits', 0, 'DETCHANS'))")
+# 
+# if [ -e "$out_dir/temp.dat" ]; then
+# 	fimgcreate bitpix=-32 \
+# 		naxes="${tlen},${detchans}" \
+# 		datafile="$exe_dir/temp.dat" \
+# 		outfile="${plot_root}_2Dccf.fits" \
+# 		nskip=1 \
+# 		history=true \
+# 		clobber=yes
+# else
+# 	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
+# fi
+# 
+# if [ -e "${plot_root}_2Dccf.fits" ]; then
+# 	echo "FITS 2D ccf ratio image: ${plot_root}_2Dccf.fits"
+# else
+# 	echo -e "\tERROR: FIMGCREATE was not successful."
+# fi
 
 #####################
 ## Plotting the lags
 #####################
 
-cd "$lag_exe_dir"
-
-if (( $testing == 0 )); then
-	out_file="$lag_out_dir/${prefix}_${day}_t${dt}_${numsec}sec"
-	plot_root="$lag_out_dir/${prefix}_${day}_t${dt}_${numsec}sec"
-elif (( $testing == 1 )); then
-	out_file="$lag_out_dir/test_${prefix}_${day}_t${dt}_${numsec}sec"
-	plot_root="$lag_out_dir/test_${prefix}_${day}_t${dt}_${numsec}sec"
-fi
-
-if [ -e "${out_file}.${tab_ext}" ]; then
-	python "$lag_exe_dir"/plot_lags.py "${out_file}.${tab_ext}" \
-		-o "${plot_root}" -p "$prefix" -l "$lag_lf" -u "$lag_uf"
-else
-	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
-fi
+# cd "$lag_exe_dir"
+# 
+# if (( $testing == 0 )); then
+# 	out_file="$lag_out_dir/${prefix}_${day}_t${dt}_${numsec}sec"
+# 	plot_root="$lag_out_dir/${prefix}_${day}_t${dt}_${numsec}sec"
+# elif (( $testing == 1 )); then
+# 	out_file="$lag_out_dir/test_${prefix}_${day}_t${dt}_${numsec}sec"
+# 	plot_root="$lag_out_dir/test_${prefix}_${day}_t${dt}_${numsec}sec"
+# fi
+# 
+# if [ -e "${out_file}.${tab_ext}" ]; then
+# 	python "$lag_exe_dir"/plot_lags.py "${out_file}.${tab_ext}" \
+# 		-o "${plot_root}" -p "$prefix" -l "$lag_lf" -u "$lag_uf"
+# else
+# 	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
+# fi
 
 ################################################################################
 ## All done!
