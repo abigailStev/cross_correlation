@@ -22,7 +22,7 @@ Written in Python 2.7.
 
 ################################################################################
 def dat_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
-	num_seg, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error,
+	num_seg, mean_rate_ci_whole, mean_rate_ref_whole, t, ccf, ccf_error,
 	filter):
 	"""
 			dat_out
@@ -48,9 +48,9 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 		out.write("\n# Exposure time = %d seconds" \
 				  % (num_seg * num_seconds))
 		out.write("\n# Mean count rate of ci = %s" \
-			% str(list(mean_rate_whole_ci)))
+			% str(list(mean_rate_ci_whole)))
 		out.write("\n# Mean count rate of ref band = %.8f" \
-				  % np.mean(mean_rate_whole_ref))
+				  % np.mean(mean_rate_ref_whole))
 		out.write("\n# Filter applied in frequency domain? %s" % str(filter))
 		out.write("\n# ")
 		out.write("\n# Column 1: Time bins")
@@ -76,7 +76,7 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 
 ################################################################################
 def fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
-	num_seg, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf, ccf_error,
+	num_seg, mean_rate_ci_whole, mean_rate_ref_whole, t, ccf, ccf_error,
 	filter):
 	"""
 			fits_out
@@ -110,8 +110,8 @@ def fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 	prihdr.set('EXPOSURE', num_seg * num_seconds,
 		"seconds, of light curve")
 	prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
-	prihdr.set('RATE_CI', str(mean_rate_whole_ci.tolist()), "counts/second")
-	prihdr.set('RATE_REF', mean_rate_whole_ref, "counts/second")
+	prihdr.set('RATE_CI', str(mean_rate_ci_whole.tolist()), "counts/second")
+	prihdr.set('RATE_REF', mean_rate_ref_whole, "counts/second")
 	prihdr.set('FILTER', str(filter))
 	prihdu = fits.PrimaryHDU(header=prihdr)
 
@@ -175,7 +175,7 @@ def phase_to_tlags(phase, freq, detchans):
 
 ################################################################################
 def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
-	num_seg, mean_rate_whole_ci, mean_rate_whole_ref, cs_avg, power_ci,
+	num_seg, mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, power_ci,
 	power_ref):
 	"""
 			make_lags
@@ -220,8 +220,8 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	prihdr.set('EXPOSURE', num_seg * n_bins * dt,
 		"seconds, of light curve")
 	prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
-	prihdr.set('RATE_CI', str(mean_rate_whole_ci.tolist()), "counts/second")
-	prihdr.set('RATE_REF', mean_rate_whole_ref, "counts/second")
+	prihdr.set('RATE_CI', str(mean_rate_ci_whole.tolist()), "counts/second")
+	prihdr.set('RATE_REF', mean_rate_ref_whole, "counts/second")
 	prihdr.set('FILTER', str(filter))
 	prihdu = fits.PrimaryHDU(header=prihdr)
 
@@ -400,6 +400,24 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 
 
 ################################################################################
+def standard_ccf_err(n_bins, detchans, num_seg, ccf):
+	"""
+			standard_ccf_err
+	"""
+	standard_err = np.zeros((200, detchans))
+	for i in range(detchans):
+		in_file = "./out_ccf/GX339-BQPO_ccf_segs_" + str(i) + ".dat"
+		table_i = np.loadtxt(in_file)
+		mean_ccf_i = np.mean(table_i, axis=0)
+		ccf_resid_i = table_i - mean_ccf_i
+		sample_var_i = np.sum(ccf_resid_i**2, axis=0) / float(num_seg-1)
+		standard_err_i = np.sqrt(sample_var_i/float(num_seg))
+		standard_err[:,i] = standard_err_i
+
+	return standard_err
+
+
+################################################################################
 def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 	num_seg, countrate_ci, countrate_ref, power_ci, power_ref, noisy):
 	"""
@@ -415,28 +433,27 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 		nyq_ind = np.argmax(freq)+1
 		power_ref = power_ref[0:nyq_ind+1]
 		power_ci = power_ci[0:nyq_ind+1,]
-
+	
+	print "CI count rate:", countrate_ci
+	print "Ref count rate:", countrate_ref
+	
+# 	print num_seconds * num_seg
+# 	counts_ci = countrate_ci * (num_seconds * num_seg)
+# 	np.savetxt('GX339-BQPO_channel_counts.txt', counts_ci)
+	
 	######################################################
 	## Take the IFFT of the cross spectrum to get the CCF
 	######################################################
 	
-	ccf_end = fftpack.ifft(cs_avg, axis=0).real
+	ccf = fftpack.ifft(cs_avg, axis=0).real
 		
-	## Absolute rms norms of poisson noise	
+	## Absolute rms norms of Poisson noise	
 	## Was over-estimating the noise from the count rate; using mean power from 
 	## higher frequencies as the noise level
 	
 	if noisy: 
-		absrms_noise_ci = 2.0 * countrate_ci
-		absrms_noise_ref = 2.0 * countrate_ref
-# 		print "Estimated noise:", 2.0 * countrate_ref
-# 		noise_ci = 2.0 * countrate_ci - 0.016*(2.0 * countrate_ci)
-# 		noise_ref = 2.0 * countrate_ref - 0.016*(2.0 * countrate_ref)
-# 		temp = power_ref * (2.0 * dt / float(n_bins))
-# 		if np.max(freq) > 100:
-# 			noise_ref = np.mean(temp[np.where(freq >= 100)])
-# # 		print "NOISE CI", noise_ci
-# 		print "NOISE REF:", noise_ref	
+		absrms_noise_ci = 2.0 * countrate_ci * 0.985
+		absrms_noise_ref = 2.0 * countrate_ref * 0.985
 	else:
 		absrms_noise_ci = 0.0
 		absrms_noise_ref = 0.0
@@ -446,47 +463,48 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 	## Putting powers into absolute rms2 normalization, subtracting noise
 	absrms_power_ci = power_ci * (2.0 * dt / float(n_bins)) - absrms_noise_ci
 	absrms_power_ref = power_ref * (2.0 * dt / float(n_bins)) - absrms_noise_ref
-# 	absrms_power_ci[np.where(absrms_power_ci < 0)] = 0.0
-# 	absrms_power_ref[np.where(absrms_power_ref < 0)] = 0.0
 
-# 	print "Mean of whole ps:", np.mean(absrms_power_ref)
-# 	if np.max(freq) > 100:
-# 		print "Mean of hf ps:", np.mean(absrms_power_ref[np.where(freq >= 100)])
-	
-	## Getting rms of reference band, to normalize the ccf and acf
+# 	## Getting rms of reference band, to normalize the ccf and acf
 	absrms_var_ref = np.sum(absrms_power_ref * df)
 	absrms_rms_ref = np.sqrt(absrms_var_ref)  
+# 	print "Ref band var:", absrms_var_ref, "(abs rms)"
 # 	print "Ref band rms:", absrms_rms_ref, "(abs rms)"
-	print "Ref band var:", absrms_var_ref / (countrate_ref ** 2), "(frac rms)"
-	print "Ref band rms:", absrms_rms_ref / countrate_ref, "(frac rms)"
-	
-	## Computing the autocorrelation functions from the power spectra
-	acf_ci = fftpack.ifft(power_ci).real
-	acf_ref = fftpack.ifft(power_ref).real
-# 	print "ACF REF:", acf_ref[0:4]
-	acf_ci *= (2.0 / float(n_bins) / absrms_rms_ref)
-	acf_ref *= (2.0 / float(n_bins) / absrms_rms_ref)
-	
-	## Broadcasting acf_ref into same shape as acf_ci
-	acf_ref = np.resize(np.repeat(acf_ref, detchans), np.shape(acf_ci))
-	assert np.shape(acf_ref) == np.shape(acf_ci), "ERROR: Array broadcasting \
-failed."
-	
-	## Bartlett formula for computing variance on unfilfered CCF
-	## Box & Jenkens 1976 eqn 11.1.9; Smith & Vaughan 2007 eqn 3
-	var_ccf = np.abs((acf_ci * acf_ref) / n_bins)
-	rms_ccf = np.sqrt(var_ccf)
+# 	print "Ref band var:", absrms_var_ref / (countrate_ref ** 2), "(frac rms)"
+# 	print "Ref band rms:", absrms_rms_ref / countrate_ref, "(frac rms)"
+# 	
+# 	## Computing the autocorrelation functions from the power spectra
+# 	acf_ci = fftpack.ifft(power_ci).real
+# 	acf_ref = fftpack.ifft(power_ref).real
+# 	acf_ci *= (2.0 / float(n_bins) / absrms_rms_ref)
+# 	acf_ref *= (2.0 / float(n_bins) / absrms_rms_ref)
+# 	
+# 	## Broadcasting acf_ref into same shape as acf_ci
+# 	acf_ref = np.resize(np.repeat(acf_ref, detchans), np.shape(acf_ci))
+# 	assert np.shape(acf_ref) == np.shape(acf_ci), "ERROR: Array broadcasting \
+# failed."
+# 	
+# 	## Bartlett formula for computing variance on unfilfered CCF
+# 	## Box & Jenkens 1976 eqn 11.1.9; Smith & Vaughan 2007 eqn 3
+# 	var_ccf = np.abs((acf_ci * acf_ref) / n_bins)
+# 	rms_ccf = np.sqrt(var_ccf)
 	
 	## Dividing ccf by rms of signal in reference band
-	ccf_end *= (2.0 / float(n_bins) / absrms_rms_ref)
+	ccf *= (2.0 / float(n_bins) / absrms_rms_ref)
 	
-	print "CCF:", ccf_end[2:5, 6]
-	print "Err:", rms_ccf[2:5, 6]
+	ccf_err = standard_ccf_err(n_bins, detchans, num_seg, ccf)
+	
+	print "CCF:", ccf[2:7, 6]
+	print "Err:", ccf_err[2:7, 6]
 	print "Countrate ci chan 6:", countrate_ci[6]
 	print "Countrate ref:", countrate_ref
-# 	var_ccf = ccf_end * 0.0
 	
-	return ccf_end, rms_ccf
+# 	out_file="./run_stats.dat"
+# 	with open(out_file, 'a') as out:
+# 		out.write("%.6e\t%.6e\t%.6e\t%.6e\t%.6e\n" % (countrate_ci[6], \
+# 			countrate_ref, np.sum(countrate_ci), absrms_var_ref, \
+# 			absrms_rms_ref / countrate_ref))
+	
+	return ccf, ccf_err
 	
 ## End of function 'UNFILT_cs_to_ccf_w_err'	
 
@@ -531,13 +549,18 @@ def make_cs(rate_ci, rate_ref, n_bins, detchans):
 	Generating the cross spectrum for one segment of the light curve.
 
 	"""
+	assert np.shape(rate_ci) == (n_bins, detchans), "ERROR: CoI light curve has\
+ wrong dimensions. Must have size (n_bins, detector channels)."
+	assert np.shape(rate_ref) == (n_bins, ), "ERROR: Reference light curve has \
+wrong dimensions. Must have size (n_bins, )."
+	
 	## Computing the mean count rate of the segment
-	mean_rate_seg_ci = np.mean(rate_ci, axis=0)
-	mean_rate_seg_ref = np.mean(rate_ref)
+	mean_rate_ci_seg = np.mean(rate_ci, axis=0)
+	mean_rate_ref_seg = np.mean(rate_ref)
 
 	## Subtracting the mean off each value of 'rate'
-	rate_sub_mean_ci = np.subtract(rate_ci, mean_rate_seg_ci)
-	rate_sub_mean_ref = np.subtract(rate_ref, mean_rate_seg_ref)
+	rate_sub_mean_ci = np.subtract(rate_ci, mean_rate_ci_seg)
+	rate_sub_mean_ref = np.subtract(rate_ref, mean_rate_ref_seg)
 
 	## Taking the FFT of the time-domain photon count rate
 	## SciPy is faster than NumPy or pyFFTW for my array sizes
@@ -554,44 +577,47 @@ def make_cs(rate_ci, rate_ref, n_bins, detchans):
 	
 	## Computing the cross spectrum from the fourier transform
 	cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
-
-	return cs_seg, mean_rate_seg_ci, mean_rate_seg_ref, power_ci, \
-		power_ref
+	
+# 	print cs_seg[1:5, 6]
+	
+	return cs_seg, mean_rate_ci_seg, mean_rate_ref_seg, power_ci, power_ref
 
 ## End of function 'make_cs'
 
 
 ################################################################################
-def print_seg_ccf(n_bins, dt, rate_ref, power_ref, cs_seg):
-
-	## Temporary, for getting covariance of CCF segments
+def print_seg_ccf(n_bins, detchans, dt, rate_ref, power_ref, cs_seg):
+	"""
+			print_seg_ccf
+	
+	Printing the first 200 values of each segment of the ccf so that I can 
+	compute the standard error on the mean ccf.
+	
+	"""
 	df = 1.0 / float(n_bins * dt)  # in Hz
-	absrms_noise_ref = 2.0 * rate_ref - 0.016*(2.0 * rate_ref)
+	absrms_noise_ref = 2.0 * rate_ref * 0.985
 	absrms_power_ref = power_ref * (2.0 * dt / float(n_bins)) - absrms_noise_ref
 	absrms_var_ref = np.sum(absrms_power_ref * df)
 # 	print "Ref band var:", absrms_var_ref, "(abs rms)"
 	
 	ccf = fftpack.ifft(cs_seg, axis=0).real
-# 	print ccf[0:4,15]
+	absrms_rms_ref = np.sqrt(absrms_var_ref)  
+	ccf *= (2.0 / float(n_bins) / absrms_rms_ref)	
 	
-	out_file="./testing_ccf_covariance.dat"
-	if absrms_var_ref > 0:
-	
-		absrms_rms_ref = np.sqrt(absrms_var_ref)  
-# 		print "Ref band rms:", absrms_rms_ref, "(abs rms)"
-# 		print "Ref band rms:", absrms_rms_ref / rate_ref, "(frac rms)"
-		ccf *= (2.0 / float(n_bins) / absrms_rms_ref)
-	
+	for i in range(0, detchans):
+		out_file = "./out_ccf/GX339-BQPO_ccf_segs_" + str(i) + ".dat"
+
 		with open(out_file, 'a') as out:
-			for element in ccf[0:100,15]:
+			for element in ccf[0:200,i]:
 				out.write("%.6e\t" % element)
 			out.write("\n")
+	
 	return
 			
 
 ################################################################################
 def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, detchans,
-	dt, start_time, end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref,
+	dt, start_time, end_time, obs_epoch, sum_rate_ci_whole, sum_rate_ref_whole,
 	sum_power_ci, sum_power_ref, cs_sum, sum_rate_ci):
 	"""
 			each_segment
@@ -604,8 +630,8 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, detchans,
 	assert len(time_ref) == len(energy_ref)
 	
 	## Initializations
-	mean_rate_seg_ci = np.zeros(64, dtype=np.float64)
-	mean_rate_seg_ref = np.zeros(64, dtype=np.float64)
+	mean_rate_ci_seg = np.zeros(64, dtype=np.float64)
+	mean_rate_ref_seg = np.zeros(64, dtype=np.float64)
 	cs_seg = np.zeros((n_bins, 64), dtype=np.complex128)
 	
 	##############################################################
@@ -620,36 +646,33 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, detchans,
 	## Stack the reference band
 	rate_ref = stack_reference_band(rate_ref_2d, obs_epoch)
 	
+	## Save the reference band light curve to a text file
+# 	out_file="./GX339-BQPO_ref_lc.dat"
+# 	f_handle = file(out_file, 'a')
+# 	np.savetxt(f_handle, rate_ref)
+# 	f_handle.close()
+	
 	###########################
 	## Make the cross spectrum
 	###########################
 	
-	cs_seg, mean_rate_seg_ci, mean_rate_seg_ref, power_ci, \
+	cs_seg, mean_rate_ci_seg, mean_rate_ref_seg, power_ci, \
 		power_ref = make_cs(rate_ci_2d, rate_ref, n_bins, detchans)
 	
-	## Temporary, for getting covariance of CCF segments
-# 	print_seg_ccf(n_bins, dt, mean_rate_seg_ref, power_ref, cs_seg)
-	
+	#####################################################
+	## Printing ccf to a file to later get error for ccf
+	#####################################################
+	print_seg_ccf(n_bins, detchans, dt, mean_rate_ref_seg, power_ref, cs_seg)
 	
 	## Sums across segments -- arrays, so it adds by index
-	sum_rate_whole_ci += mean_rate_seg_ci
-	sum_rate_whole_ref += mean_rate_seg_ref
+	sum_rate_ci_whole += mean_rate_ci_seg
+	sum_rate_ref_whole += mean_rate_ref_seg
 	sum_power_ci += power_ci
 	sum_power_ref += power_ref
 	cs_sum += cs_seg
 	sum_rate_ci += np.mean(rate_ci_2d)
-	
-	## Clearing variables from memory for the next iteration
-	cs_seg = None
-	mean_rate_seg_ci = None
-	mean_rate_seg_ref = None
-	power_ci = None
-	power_ref = None
-	rate_ref = None
-	rate_ci_2d = None
-	rate_ref_2d = None
 		
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, sum_power_ci, \
+	return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, sum_power_ci, \
 		sum_power_ref, sum_rate_ci
 	
 ## End of function 'each_segment'
@@ -689,8 +712,8 @@ def fits_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 	###################
 	
 	num_seg = 0
-	sum_rate_whole_ci = np.zeros(detchans, dtype=np.float64)
-	sum_rate_whole_ref = 0
+	sum_rate_ci_whole = np.zeros(detchans, dtype=np.float64)
+	sum_rate_ref_whole = 0
 	cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
 	sum_power_ci = np.zeros((n_bins, detchans), dtype=np.float64)
 	sum_power_ref = np.zeros(n_bins, dtype=np.float64)
@@ -763,10 +786,10 @@ def fits_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 			
 			num_seg += 1
 			
-			cs_sum, sum_rate_whole_ci, sum_rate_whole_ref,  sum_power_ci, \
+			cs_sum, sum_rate_ci_whole, sum_rate_ref_whole,  sum_power_ci, \
 				sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref, 
 				energy_ci, energy_ref, n_bins, detchans, dt, start_time, 
-				seg_end_time, obs_epoch, sum_rate_whole_ci, sum_rate_whole_ref, 
+				seg_end_time, obs_epoch, sum_rate_ci_whole, sum_rate_ref_whole, 
 				sum_power_ci, sum_power_ref, cs_sum, sum_rate_ci)
 
 			if num_seg % print_iterator == 0:
@@ -791,7 +814,7 @@ def fits_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 
 	## End of while-loop
 	
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, \
+	return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
 ## End of function 'fits_in'
@@ -814,8 +837,8 @@ def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 	###################
 
 	num_seg = 0
-	sum_rate_whole_ci = np.zeros(detchans, dtype=np.float64)
-	sum_rate_whole_ref = 0
+	sum_rate_ci_whole = np.zeros(detchans, dtype=np.float64)
+	sum_rate_ref_whole = 0
 	cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
 	time_ci = np.asarray([])
 	energy_ci = np.asarray([])
@@ -877,12 +900,12 @@ def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 
 						num_seg += 1
 
-						cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, \
+						cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, \
 							sum_power_ci, sum_power_ref, sum_rate_ci = \
 							each_segment(time_ci, time_ref, energy_ci,
 							energy_ref, n_bins, detchans, dt, start_time,
-							end_time, obs_epoch, sum_rate_whole_ci,
-							sum_rate_whole_ref, sum_power_ci, sum_power_ref,
+							end_time, obs_epoch, sum_rate_ci_whole,
+							sum_rate_ref_whole, sum_power_ci, sum_power_ref,
 							cs_sum, sum_rate_ci)
 
 						if num_seg % print_iterator == 0:
@@ -912,7 +935,7 @@ def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 		## End of for-loop
 	## End of with-block
 		
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, \
+	return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
 ## End of function 'dat_in'
@@ -950,7 +973,7 @@ def read_and_use_segments(in_file, n_bins, detchans, dt, test):
 	
 		obs_epoch = tools.obs_epoch_rxte(in_file)
 		
-		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, \
+		cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
 			sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file,
 			n_bins, detchans, dt, print_iterator, test, obs_epoch)
 		
@@ -959,7 +982,7 @@ def read_and_use_segments(in_file, n_bins, detchans, dt, test):
 		fits_file = in_file[0:-4] + ".fits"  ## Still need a fits file to get the observation time
 		obs_epoch = tools.obs_epoch_rxte(fits_file)
 
-		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, \
+		cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
 			sum_power_ci, sum_power_ref, sum_rate_ci = dat_in(in_file,
 			n_bins, detchans, dt, print_iterator, test, obs_epoch)
 			
@@ -967,7 +990,7 @@ def read_and_use_segments(in_file, n_bins, detchans, dt, test):
 		raise Exception("ERROR: Input file type not recognized. Must be .dat or\
 .fits.")
 	
-	return cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, \
+	return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
 ## End of function 'read_and_use_segments'
@@ -1051,7 +1074,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	## Reading in data, computing the cross spectrum
 	#################################################
 	
-	cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_seg, sum_power_ci, \
+	cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, sum_power_ci, \
 		sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, 
 		detchans, dt, test)
 
@@ -1059,8 +1082,8 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	## Turning sums over segments into means
 	#########################################
 
-	mean_rate_whole_ci = sum_rate_whole_ci / float(num_seg)
-	mean_rate_whole_ref = sum_rate_whole_ref / float(num_seg)
+	mean_rate_ci_whole = sum_rate_ci_whole / float(num_seg)
+	mean_rate_ref_whole = sum_rate_ref_whole / float(num_seg)
 	mean_power_ci = sum_power_ci / float(num_seg)
 	mean_power_ref = sum_power_ref / float(num_seg)
 	cs_avg = cs_sum / float(num_seg)
@@ -1076,18 +1099,18 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	## Subtracting the background count rate from the mean count rate
 	##################################################################
 
-	mean_rate_whole_ci -= bkgd_rate
+	mean_rate_ci_whole -= bkgd_rate
 
 	## Need to use a background from ref. PCU for the reference band...
 	ref_bkgd_rate = np.mean(bkgd_rate[2:26])
-	mean_rate_whole_ref -= ref_bkgd_rate
+	mean_rate_ref_whole -= ref_bkgd_rate
 
 	######################
 	## Making lag spectra
 	######################
 
 	make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
-		num_seg, mean_rate_whole_ci, mean_rate_whole_ref, cs_avg,
+		num_seg, mean_rate_ci_whole, mean_rate_ref_whole, cs_avg,
 		mean_power_ci, mean_power_ref)
 	
 	##############################################
@@ -1096,16 +1119,16 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	
 	if filter:
 		ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins,
-			detchans, num_seconds, num_seg, mean_rate_whole_ci,
-			mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
+			detchans, num_seconds, num_seg, mean_rate_ci_whole,
+			mean_rate_ref_whole, mean_power_ci, mean_power_ref, True)
 	else:
 		ccf_end, ccf_error = UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins,
-			detchans, num_seconds, num_seg, mean_rate_whole_ci,
-			mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
+			detchans, num_seconds, num_seg, mean_rate_ci_whole,
+			mean_rate_ref_whole, mean_power_ci, mean_power_ref, True)
 	
 	print "Number of segments:", num_seg
-	print "Sum of mean rate for ci:", np.sum(mean_rate_whole_ci)
-	print "Mean rate for ref:", np.mean(mean_rate_whole_ref)
+	print "Sum of mean rate for ci:", np.sum(mean_rate_ci_whole)
+	print "Mean rate for ref:", np.mean(mean_rate_ref_whole)
 	
 	t = np.arange(0, n_bins)
 	
@@ -1114,7 +1137,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	##########
 
 	fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
-		num_seg, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_end,
+		num_seg, mean_rate_ci_whole, mean_rate_ref_whole, t, ccf_end,
 		ccf_error, filter)
 	
 ## End of function 'main'
