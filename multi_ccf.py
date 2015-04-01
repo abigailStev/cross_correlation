@@ -170,8 +170,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 	###########################################################
 	
 	t_res = float(tools.get_key_val(input_files[0], 0, 'TIMEDEL'))
-	print t_res
-	print dt_mult
+# 	print t_res
+# 	print dt_mult
 	dt = dt_mult * t_res
 	n_bins = num_seconds * int(1.0 / dt)
 	detchans = int(tools.get_key_val(input_files[0], 0, 'DETCHANS'))
@@ -238,7 +238,10 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 	mean_power_ci = total_sum_power_ci / float(total_segments)
 	mean_power_ref = total_sum_power_ref / float(total_segments)
 	cs_avg = total_cs_sum / float(total_segments)
-
+	
+	
+	print "CS avg:", cs_avg[1:5, 6]
+	
 	################################################################
 	## Printing the cross spectrum to a file, for plotting/checking
 	################################################################
