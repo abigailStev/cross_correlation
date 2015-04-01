@@ -25,7 +25,7 @@ fi
 
 ## If heainit isn't running, start it
 if (( $(echo $DYLD_LIBRARY_PATH | grep heasoft | wc -l) < 1 )); then
-	. $HEADAS/headas-init.sh
+	. ${HEADAS}/headas-init.sh
 fi
 
 ################################################################################
@@ -49,7 +49,7 @@ numsec=64
 testing=0  # 0 for no, 1 for yes
 filtering=0 # 0 for no, 1 for yes
 
-tab_ext="fits"
+t_ext="fits"
 
 ################################################################################
 ################################################################################
@@ -69,10 +69,10 @@ fi
 ##################
 
 if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
-	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${tab_ext}" \
+	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
 		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtering"
 elif [ -e "$in_file" ]; then
-	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${tab_ext}" \
+	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
 		-n "$numsec" -m "$dt" -t "$testing" -f "$filtering"
 else
 	echo -e "\tERROR: ccf.py was not run. Eventlist and/or background energy \
@@ -84,19 +84,18 @@ fi
 ## Plotting ccfs
 #################
 
-if [ -e "${out_file}.${tab_ext}" ]; then
+if [ -e "${out_file}.${t_ext}" ]; then
 
-	python "$exe_dir"/plot_ccf.py "${out_file}.${tab_ext}" -o "${plot_root}" \
+	python "$exe_dir"/plot_ccf.py "${out_file}.${t_ext}" -o "${plot_root}" \
 		-p "${prefix}/${obsID}"
 	
-	if [ -e "${plot_root}_chan_06.png" ]; then open -a ImageJ "${plot_root}_chan_06.png"; fi
+	if [ -e "${plot_root}_chan_06.${p_ext}" ]; then open "${plot_root}_chan_06.${p_ext}"; fi
 
-	ccfs_plot="$exe_dir/${day}_ccfs.png"
-
-	python "$exe_dir"/plot_multi.py "${out_file}.${tab_ext}" "$ccfs_plot" \
+	ccfs_plot="${plot_root}_multiccfs.${plot_ext}"
+	python "$exe_dir"/plot_multi.py "${out_file}.${t_ext}" "$ccfs_plot" \
 		-p "${prefix}"
 
-	if [ -e "$ccfs_plot" ]; then open -a ImageJ "$ccfs_plot"; fi
+	if [ -e "$ccfs_plot" ]; then open "$ccfs_plot"; fi
 
 fi
 
@@ -105,13 +104,13 @@ fi
 ## Plotting the 2D ccf with colours
 ####################################
 
-plot_file="${plot_root}_2Dccf.png"
-if [ -e "${out_file}.${tab_ext}" ]; then
-	python "$exe_dir"/plot_2d.py "${out_file}.${tab_ext}" -o "${plot_file}" \
-		-p "${prefix}"
-	if [ -e "${plot_file}" ]; then open -a ImageJ "${plot_file}"; fi
-fi
-
+#plot_file="${plot_root}_2Dccf.${p_ext}"
+#if [ -e "${out_file}.${t_ext}" ]; then
+#	python "$exe_dir"/plot_2d.py "${out_file}.${t_ext}" -o "${plot_file}" \
+#		-p "${prefix}"
+#	if [ -e "${plot_file}" ]; then open "${plot_file}"; fi
+#fi
+#
 # plot_file="${plot_root}_2Dccf.fits"
 # 
 # if [ -e "$out_dir/temp.dat" ]; then
@@ -148,8 +147,8 @@ fi
 # 	plot_root="$lag_out_dir/test_${obsID}_${day}_t${dt}_${numsec}sec"
 # fi
 # 
-# if [ -e "${out_file}.${tab_ext}" ]; then
-# 	python "$lag_exe_dir"/plot_lags.py "${out_file}.${tab_ext}" -o "${plot_root}"	
+# if [ -e "${out_file}.${t_ext}" ]; then
+# 	python "$lag_exe_dir"/plot_lags.py "${out_file}.${t_ext}" -o "${plot_root}"	
 # else
 # 	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
 # fi
