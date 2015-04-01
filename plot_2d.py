@@ -68,6 +68,7 @@ along the x-axis. [100]")
 	n_bins = int(file_hdu[0].header["N_BINS"])
 	means_str = file_hdu[0].header["RATE_CI"]
 	detchans = int(file_hdu[0].header["DETCHANS"])	
+	dt = float(file_hdu[0].header["DT"])
 	table = file_hdu[1].data
 	file_hdu.close()
 	
@@ -75,11 +76,16 @@ along the x-axis. [100]")
 	ccf = np.reshape(table.field('CCF'), (n_bins, detchans), order='C')
 	
 	ccf = ccf[0:args.t_length,].T  ## Transpose it to get the axes we want
-	
+	time_bins = np.arange(n_bins)
+	frac_time = int(1.0/dt)  ## each time bin represents 1/frac_time sec
+
 	###################################################################
 	## Make a ratio of ccf to the mean count rate in the interest band
 	###################################################################
 	
+	mean_ccf = np.mean(ccf, axis=0)
+	ccf_resid = ccf - mean_ccf
+
 	a = np.array([mean_rate_ci,]*args.t_length).T
 	with np.errstate(all='ignore'):
 		ratio = np.where(a != 0, ccf / a, 0)
@@ -91,10 +97,9 @@ along the x-axis. [100]")
 	## Saving to a dat file so that we can use fimgcreate
 	######################################################
 	
-# 	ratio[np.where(np.abs(ratio) > 0.3)] = 0
-# 	print np.shape(ratio)
+# 	ratio[np.where(np.abs(ratio) > 0.75)] = 0
 	ratio[32:,] = 0
-	out_file = "out_ccf/temp.dat"
+	out_file = "./temp.dat"
 	R = ratio.flatten('C')
 	comment_str = "From %s" % args.tab_file
 	np.savetxt(out_file, R, comments=comment_str)
@@ -105,12 +110,18 @@ along the x-axis. [100]")
 	
 	font_prop = font_manager.FontProperties(size=16)
 	fig, ax = plt.subplots(1,1)
-	plt.pcolor(ratio, cmap='hot')  ## in future, can use vmin and vmax to set limits
-	plt.colorbar()
-	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
+# 	ax.pcolor(ratio, cmap='hot', vmin=-1.2, vmax=1.6)
+	plt.pcolor(ratio, cmap='hot')
+# 	plt.pcolor(ccf_resid, cmap='hot')
+	cbar = plt.colorbar()
+	cbar.set_label('Ratio of ccf to mean count rate', \
+		fontproperties=font_prop)
+	ax.set_xlabel(r'Time ( $\times\,\frac{1}{%d}\,$s)' % frac_time, \
+		fontproperties=font_prop)
 	ax.set_ylabel('Energy channel', fontproperties=font_prop)
-	ax.set_ylim(3, 31)
+	ax.set_ylim(2, 31)
 # 	ax.set_ylim(0,detchans)
+# 	ax.set_xticklabels(time_bins, ha='center')
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
 	ax.set_title(args.prefix)
