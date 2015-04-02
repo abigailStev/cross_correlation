@@ -7,6 +7,7 @@ import os
 from astropy.io import fits
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
+from matplotlib.ticker import MultipleLocator
 import tools
 
 __author__ = "Abigail Stevens"
@@ -48,6 +49,9 @@ help="The identifying prefix of the data (object nickname or proposal ID). \
 type=tools.type_positive_int, default=100, help="Number of time bins to use \
 along the x-axis. [100]")
 	
+	parser.add_argument('-e', dest='chan_to_en', help='Table of actual energy \
+boundaries for energy channels.')
+	
 	args = parser.parse_args()
 
 
@@ -55,7 +59,10 @@ along the x-axis. [100]")
 	assert args.tab_file[-4:].lower() == "fits", "ERROR: Data file must be in \
 	.fits format."
 	
-
+	energies = np.loadtxt("/Users/abigailstevens/Dropbox/Research/cross_correlation/GX339-BQPO_energies.txt")
+	print np.shape(energies)
+	
+	
 	#############################
 	## Load data from FITS table
 	#############################
@@ -107,27 +114,43 @@ along the x-axis. [100]")
 	#############
 	## Plotting!
 	#############
-	
+	print np.shape(ratio)
+
+	t_bins = np.arange(args.t_length+1)
 	font_prop = font_manager.FontProperties(size=16)
 	fig, ax = plt.subplots(1,1)
 # 	ax.pcolor(ratio, cmap='hot', vmin=-1.2, vmax=1.6)
-	plt.pcolor(ratio, cmap='hot')
+# 	plt.pcolor(ratio, cmap='hot')
+	plt.pcolor(t_bins, energies, ratio, cmap='hot')
 # 	plt.pcolor(ccf_resid, cmap='hot')
 	cbar = plt.colorbar()
 	cbar.set_label('Ratio of ccf to mean count rate', \
 		fontproperties=font_prop)
 	ax.set_xlabel(r'Time ( $\times\,\frac{1}{%d}\,$s)' % frac_time, \
 		fontproperties=font_prop)
-	ax.set_ylabel('Energy channel', fontproperties=font_prop)
-	ax.set_ylim(2, 31)
-# 	ax.set_ylim(0,detchans)
-# 	ax.set_xticklabels(time_bins, ha='center')
+# 	ax.set_ylabel('Energy channel', fontproperties=font_prop)
+# 	ax.set_ylim(2, 31)
+	ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
+	ax.set_ylim(3,25)
+# 	ax.set_yscale('log')
+
+	## Setting the axes' minor ticks. It's complicated.
+	x_maj_loc = ax.get_xticks()
+	y_maj_loc = ax.get_yticks()
+	x_min_mult = 0.1 * (x_maj_loc[1] - x_maj_loc[0])
+	y_min_mult = 0.2 * (y_maj_loc[1] - y_maj_loc[0])
+	xLocator = MultipleLocator(x_min_mult)  ## loc of minor ticks on x-axis
+	yLocator = MultipleLocator(y_min_mult)  ## loc of minor ticks on y-axis
+	ax.xaxis.set_minor_locator(xLocator)
+	ax.yaxis.set_minor_locator(yLocator)
+
+
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
-	ax.set_title(args.prefix)
+# 	ax.set_title(args.prefix)
 
 	fig.set_tight_layout(True)
-	plt.savefig(args.plot_file, dpi=150)
+	plt.savefig(args.plot_file, dpi=600)
 # 	plt.show()
 	plt.close()		
 	
