@@ -150,6 +150,7 @@ def get_phase_err(cs_avg, power_ci, power_ref, n, M):
 	with np.errstate(all='ignore'):
 		a = power_ci * power_ref
 		coherence = np.where(a != 0, np.abs(cs_avg)**2 / a, 0)
+		print np.shape(coherence)
 		phase_err = np.sqrt(np.where(coherence != 0, (1 - coherence) / \
 			(2 * coherence * n * M), 0))
 
@@ -165,7 +166,7 @@ def phase_to_tlags(phase, freq, detchans):
 	Converts a complex phase (in radians) to a time lag (in seconds).
 	
 	"""
-	f = np.repeat(freq[:, np.newaxis], detchans, axis=1)
+	f = np.resize(np.repeat(freq, detchans), (len(freq), detchans))
 	with np.errstate(all='ignore'):
 		tlags =  np.where(f != 0, phase / (2.0 * np.pi * f), 0)
 		
@@ -184,25 +185,33 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	writes the lag information to a .fits output file.
 	
 	"""
+	assert np.shape(power_ci) == (n_bins, detchans)
+	assert np.shape(power_ref) == (n_bins, )
+	assert np.shape(cs_avg) == (n_bins, detchans)
 	
+	## Getting the Fourier frequencies for the cross spectrum
 	freq = fftpack.fftfreq(n_bins, d=dt)
-	max_index = np.argmax(freq)+1  ## because in python, the scipy fft makes the
+	
+	## Only keeping the parts associated with positive Fourier frequencies
+	nyq_ind = np.argmax(freq)+1  ## because in python, the scipy fft makes the
 		## nyquist frequency negative, and we want it to be positive! (it is
 		## actually both pos and neg)
-	freq = np.abs(freq[1:max_index + 1])  ## because it slices at end-1, and we
-		## want to include 'max_index'; abs is because the nyquist freq is both
+	freq = np.abs(freq[1:nyq_ind + 1])  ## because it slices at end-1, and we
+		## want to include 'nyq_ind'; abs is because the nyquist freq is both
 		## pos and neg, and we want it pos here. but we don't want freq=0
 		## because that gives errors.
-	cs_avg = cs_avg[1:max_index + 1]
-	power_ci = power_ci[1:max_index + 1]
-	power_ref = power_ref[1:max_index + 1]
+	cs_avg = cs_avg[1:nyq_ind + 1]
+	power_ci = power_ci[1:nyq_ind + 1]
+	power_ref = power_ref[1:nyq_ind + 1]
+	
+	## Getting cross spectrum lag and error
 	phase = np.arctan2(cs_avg.imag, cs_avg.real)
-	err_phase = get_phase_err(cs_avg, power_ci,
-		np.repeat(power_ref[:, np.newaxis], detchans, axis=1), 1, num_seg)
+	err_phase = get_phase_err(cs_avg, power_ci, np.resize(np.repeat(power_ref, \
+		detchans), np.shape(power_ci)), 1, num_seg)
 	tlag = phase_to_tlags(phase, freq, detchans)
 	err_tlag = phase_to_tlags(err_phase, freq, detchans)
 
-	chan = np.arange(0,detchans)
+	chan = np.arange(0, detchans)
 	energy_channels = np.tile(chan, len(freq))
 	bins = np.repeat(freq, len(chan))    
 
@@ -1075,7 +1084,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	#################################################
 	
 	cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, sum_power_ci, \
-		sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, 
+		sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, \
 		detchans, dt, test)
 
 	#########################################
@@ -1109,21 +1118,21 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	## Making lag spectra
 	######################
 
-	make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
-		num_seg, mean_rate_ci_whole, mean_rate_ref_whole, cs_avg,
-		mean_power_ci, mean_power_ref)
+	make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, num_seg, \
+		mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, mean_power_ci, \
+		mean_power_ref)
 	
 	##############################################
 	## Computing ccf from cs, and computing error
 	##############################################
 	
 	if filter:
-		ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins,
-			detchans, num_seconds, num_seg, mean_rate_ci_whole,
-			mean_rate_ref_whole, mean_power_ci, mean_power_ref, True)
+		ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans,\
+			num_seconds, num_seg, mean_rate_ci_whole, mean_rate_ref_whole, \
+			mean_power_ci, mean_power_ref, True)
 	else:
-		ccf_end, ccf_error = UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins,
-			detchans, num_seconds, num_seg, mean_rate_ci_whole,
+		ccf_end, ccf_error = UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
+			detchans, num_seconds, num_seg, mean_rate_ci_whole, \
 			mean_rate_ref_whole, mean_power_ci, mean_power_ref, True)
 	
 	print "Number of segments:", num_seg
@@ -1136,8 +1145,8 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	## Output
 	##########
 
-	fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
-		num_seg, mean_rate_ci_whole, mean_rate_ref_whole, t, ccf_end,
+	fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds, \
+		num_seg, mean_rate_ci_whole, mean_rate_ref_whole, t, ccf_end, \
 		ccf_error, filter)
 	
 ## End of function 'main'
