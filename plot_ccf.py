@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import matplotlib.font_manager as font_manager
+from matplotlib.ticker import MultipleLocator
+
 
 __author__ = "Abigail Stevens"
 __author_email__ = "A.L.Stevens at uva.nl"
@@ -31,33 +33,36 @@ def make_plot(x_bins, ccf_amps, ccf_err, prefix, plot_file, chan, frac_time):
 	"""
 	font_prop = font_manager.FontProperties(size=20)
 
-	fig, ax = plt.subplots(1,1, figsize=(10,8))
+	fig, ax = plt.subplots(1,1)
 # 	ax.plot(x_bins, ccf_amps, lw=2, c='black')
-	ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=2, c='black', elinewidth=2, capsize=2)
-	# ax.plot([4, 11, 18, 24, 29, 34, 41, 48], [ccf_amps[4], ccf_amps[11], \
-# 		ccf_amps[18], ccf_amps[24], ccf_amps[29], ccf_amps[34], ccf_amps[41], \
-# 		ccf_amps[48]], 'g*', ms=8)
-	ax.plot([6, 13, 19, 24], [ccf_amps[6], ccf_amps[13], ccf_amps[19], \
-		ccf_amps[24]], 'm*', ms=15)
-	ax.set_xlabel(r'Time ($\times\,\frac{1}{%d}\,$s)' % frac_time, fontproperties=font_prop)
-	ax.set_ylabel(r'Deviation from mean (photons / s)', fontproperties=font_prop)
-	ax.set_xlim(0, 100)
-# 	ax.set_ylim(-15,25)
+	ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=1.5, c='black', \
+		drawstyle='steps-mid', elinewidth=1, capsize=1)
+	ax.plot([6], [ccf_amps[6]], "o", markeredgecolor='red', markeredgewidth=2, markerfacecolor='none', ms=12)
+	ax.plot([13], [ccf_amps[13]],"*",  markeredgecolor='orange', markeredgewidth=2, markerfacecolor='none', ms=16)
+	ax.plot([19], [ccf_amps[19]], "^", markeredgecolor='green', markeredgewidth=2, markerfacecolor='none', ms=12)
+	ax.plot([24], [ccf_amps[24]], 's', markeredgecolor='blue', markeredgewidth=2, markerfacecolor='none', ms=12)
+	ax.set_xlabel(r'Time ($\times\,\frac{1}{%d}\,$s)' % frac_time, \
+		fontproperties=font_prop)
+	ax.set_ylabel(r'Deviation from mean (photons / s)', \
+		fontproperties=font_prop)
+	ax.set_xlim(0, 80)
+
+	## Setting the axes' minor ticks. It's complicated.
+	x_maj_loc = ax.get_xticks()
+	y_maj_loc = ax.get_yticks()
+	x_min_mult = 0.1 * (x_maj_loc[1] - x_maj_loc[0])
+	y_min_mult = 0.2 * (y_maj_loc[1] - y_maj_loc[0])
+	xLocator = MultipleLocator(x_min_mult)  ## loc of minor ticks on x-axis
+	yLocator = MultipleLocator(y_min_mult)  ## loc of minor ticks on y-axis
+	ax.xaxis.set_minor_locator(xLocator)
+	ax.yaxis.set_minor_locator(yLocator)
+	
 	ax.tick_params(axis='x', labelsize=18)
 	ax.tick_params(axis='y', labelsize=18)
-	ax.set_title(prefix + ", Energy channel " + str(chan), fontproperties=font_prop)
-
-	## The following legend code was found on stack overflow
-	##  or a pyplot tutorial
-# 	legend = ax.legend(loc='lower right')
-# 	## Set the fontsize
-# 	for label in legend.get_texts():
-# 		label.set_fontsize('small')
-# 	for label in legend.get_lines():
-# 		label.set_linewidth(2)  # the legend line width
+# 	ax.set_title(prefix + ", Energy channel " + str(chan), fontproperties=font_prop)
 
 	fig.set_tight_layout(True)
-	plt.savefig(plot_file)
+	plt.savefig(plot_file, dpi=600)
 # 	plt.show()
 	plt.close()
 		
@@ -86,11 +91,14 @@ appended to name before saving. [./ccf]")
 	parser.add_argument('-p', '--prefix', dest='prefix', default="--", \
 help="The identifying prefix of the data (object nickname or proposal ID). \
 [--]")
-
+	
+	parser.add_argument('-e', '--ext', dest='plot_ext', default='png', \
+help="File extension for the plot. Do not include the '.' [png]")
+	
 	args = parser.parse_args()
 
 
-	print "Plotting the ccf: %s_chan_xx.png" % args.out_root
+	print "Plotting the ccf: %s_chan_xx.%s" % (args.out_root, args.plot_ext)
 	
 	if args.tab_file[-4:].lower() == ".dat":
 	
@@ -133,9 +141,9 @@ help="The identifying prefix of the data (object nickname or proposal ID). \
 			time_bins = table_i.field('TIME_BIN')
 
 			if i < 10:
-				plot_file = args.out_root + "_chan_" + str(0) + str(i) + ".png"
+				plot_file = args.out_root + "_chan_" + str(0) + str(i) + "." + args.plot_ext
 			else:
-				plot_file = args.out_root + "_chan_" + str(i) + ".png"
+				plot_file = args.out_root + "_chan_" + str(i) + "." + args.plot_ext
 			
 			
 			make_plot(time_bins, ccf, ccf_err, args.prefix, plot_file, i, frac_time)
