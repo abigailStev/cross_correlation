@@ -79,7 +79,7 @@ fi
 ##################
 
 for (( i=0; i<64; i++ )); do
-	tmp_file="$out_dir/${obsID}_ccf_segs_${i}.dat"
+	tmp_file="$out_dir/ccf_segs_${i}.dat"
 	if [ -e "$tmp_file" ]; then rm "$tmp_file"; fi; touch "$tmp_file"
 done
 
