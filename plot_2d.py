@@ -1,13 +1,13 @@
 import argparse
 import numpy as np
-import sys
 from scipy import fftpack
 from datetime import datetime
-import os
 from astropy.io import fits
+import os.path
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
 from matplotlib.ticker import MultipleLocator
+
 import tools
 
 __author__ = "Abigail Stevens"
@@ -31,9 +31,9 @@ if __name__ == "__main__":
 	###########################
 	
 	parser = argparse.ArgumentParser(usage="python plot_2d.py tab_file [-o \
-plot_file] [-p prefix]", description="Plots the ccf of multiple energy channels\
- in a 2D colour plot.", epilog="For optional arguments, default values are \
-given in brackets at end of description.")
+plot_file] [-p prefix] [-e chan_to_en]", description="Plots the ccf of multiple\
+ energy channels in a 2D colour plot.", epilog="For optional arguments, default\
+ values are given in brackets at end of description.")
 
 	parser.add_argument('tab_file', help="The table file, in .dat or .fits \
 format.")
@@ -50,27 +50,34 @@ type=tools.type_positive_int, default=100, help="Number of time bins to use \
 along the x-axis. [100]")
 	
 	parser.add_argument('-e', dest='chan_to_en', help='Table of actual energy \
-boundaries for energy channels.')
+boundaries for energy channels. If not given, plot will be vs energy channel. \
+[no default]')
 	
 	args = parser.parse_args()
 
 
 	print "Plotting the 2D CCF: %s" % args.plot_file
+	
+	## Idiot checks
 	assert args.tab_file[-4:].lower() == "fits", "ERROR: Data file must be in \
-	.fits format."
+.fits format."
+	if args.chan_to_en != None:  ## If args.chan_to_en exists as a variable
+		assert os.path.isfile(args.chan_to_en), "ERROR: Table of real energy \
+per energy channel does not exist."
 	
-	energies = np.loadtxt("/Users/abigailstevens/Dropbox/Research/cross_correlation/GX339-BQPO_energies.txt")
-	print np.shape(energies)
 	
+	##########################################
+	## Load data from FITS table and txt file
+	##########################################
 	
-	#############################
-	## Load data from FITS table
-	#############################
+	if args.chan_to_en != None:  ## If args.chan_to_en exists as a variable
+		energies = np.loadtxt(args.chan_to_en)	
+
 	try:
 		file_hdu = fits.open(args.tab_file)
 	except IOError:
 		print "\tERROR: File does not exist: %s" % args.tab_file
-		sys.exit()
+		exit()
 	
 	n_bins = int(file_hdu[0].header["N_BINS"])
 	means_str = file_hdu[0].header["RATE_CI"]
@@ -114,24 +121,30 @@ boundaries for energy channels.')
 	#############
 	## Plotting!
 	#############
-	print np.shape(ratio)
 
 	t_bins = np.arange(args.t_length+1)
 	font_prop = font_manager.FontProperties(size=16)
 	fig, ax = plt.subplots(1,1)
-# 	ax.pcolor(ratio, cmap='hot', vmin=-1.2, vmax=1.6)
-# 	plt.pcolor(ratio, cmap='hot')
-	plt.pcolor(t_bins, energies, ratio, cmap='hot')
-# 	plt.pcolor(ccf_resid, cmap='hot')
+
+	if energies[0] != None:  ## If energies exists as a variable
+		plt.pcolor(t_bins, energies, ratio, cmap='hot')
+	else:
+# 		ax.pcolor(ratio, cmap='hot', vmin=-1.2, vmax=1.6)
+		plt.pcolor(ratio, cmap='hot')
+# 		plt.pcolor(ccf_resid, cmap='hot')
+	
 	cbar = plt.colorbar()
-	cbar.set_label('Ratio of ccf to mean count rate', \
+	cbar.set_label('Ratio of CCF to mean count rate', \
 		fontproperties=font_prop)
 	ax.set_xlabel(r'Time ( $\times\,\frac{1}{%d}\,$s)' % frac_time, \
 		fontproperties=font_prop)
-# 	ax.set_ylabel('Energy channel', fontproperties=font_prop)
-# 	ax.set_ylim(2, 31)
-	ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
-	ax.set_ylim(3,25)
+
+	if energies[0] != None:  ## If energies exists as a variable
+		ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
+		ax.set_ylim(3,25)
+	else:
+		ax.set_ylabel('Energy channel', fontproperties=font_prop)
+		ax.set_ylim(2, 31)
 # 	ax.set_yscale('log')
 
 	## Setting the axes' minor ticks. It's complicated.
@@ -143,7 +156,6 @@ boundaries for energy channels.')
 	yLocator = MultipleLocator(y_min_mult)  ## loc of minor ticks on y-axis
 	ax.xaxis.set_minor_locator(xLocator)
 	ax.yaxis.set_minor_locator(yLocator)
-
 
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
