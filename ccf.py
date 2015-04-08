@@ -548,7 +548,7 @@ def standard_ccf_err(n_bins, detchans, num_seg):
 	"""
 	standard_err = np.zeros((200, detchans))
 	for i in range(detchans):
-		in_file = "./out_ccf/GX339-BQPO_ccf_segs_" + str(i) + ".dat"
+		in_file = "./out_ccf/ccf_segs_" + str(i) + ".dat"
 		table_i = np.loadtxt(in_file)
 		mean_ccf_i = np.mean(table_i, axis=0)
 		ccf_resid_i = table_i - mean_ccf_i
@@ -747,7 +747,7 @@ def print_seg_ccf(n_bins, detchans, dt, rate_ref, power_ref, cs_seg):
 	ccf *= (2.0 / float(n_bins) / absrms_rms_ref)	
 	
 	for i in range(0, detchans):
-		out_file = "./out_ccf/GX339-BQPO_ccf_segs_" + str(i) + ".dat"
+		out_file = "./out_ccf/ccf_segs_" + str(i) + ".dat"
 
 		with open(out_file, 'a') as out:
 			for element in ccf[0:200,i]:
