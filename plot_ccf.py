@@ -37,10 +37,10 @@ def make_plot(x_bins, ccf_amps, ccf_err, prefix, plot_file, chan, frac_time):
 # 	ax.plot(x_bins, ccf_amps, lw=2, c='black')
 	ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=1.5, c='black', \
 		drawstyle='steps-mid', elinewidth=1, capsize=1)
-	ax.plot([6], [ccf_amps[6]], "o", markeredgecolor='red', markeredgewidth=2, markerfacecolor='none', ms=12)
-	ax.plot([13], [ccf_amps[13]],"*",  markeredgecolor='orange', markeredgewidth=2, markerfacecolor='none', ms=16)
-	ax.plot([19], [ccf_amps[19]], "^", markeredgecolor='green', markeredgewidth=2, markerfacecolor='none', ms=12)
-	ax.plot([24], [ccf_amps[24]], 's', markeredgecolor='blue', markeredgewidth=2, markerfacecolor='none', ms=12)
+	ax.plot([6], [ccf_amps[6]], "o", markerfacecolor='red', markeredgewidth=1, markeredgecolor='black', ms=14)
+	ax.plot([13], [ccf_amps[13]],"*",  markerfacecolor='orange', markeredgewidth=1, markeredgecolor='black', ms=20)
+	ax.plot([19], [ccf_amps[19]], "^", markerfacecolor='green', markeredgewidth=1, markeredgecolor='black', ms=14)
+	ax.plot([24], [ccf_amps[24]], 's', markerfacecolor='blue', markeredgewidth=1, markeredgecolor='black', ms=14)
 	ax.set_xlabel(r'Time ($\times\,\frac{1}{%d}\,$s)' % frac_time, \
 		fontproperties=font_prop)
 	ax.set_ylabel(r'Deviation from mean (photons / s)', \
