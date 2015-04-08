@@ -23,7 +23,7 @@ Written in Python 2.7.
 
 ################################################################################
 def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
-	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error,
+	total_seg, mean_rate_ci_total, mean_rate_ref_total, t, ccf, ccf_error,
 	filtering):
 	"""
 			dat_out
@@ -45,11 +45,11 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
 		out.write("\n# Number of bins per segment = %d" % n_bins)
 		out.write("\n# DETCHANS = %d" % detchans)
 		out.write("\n# Total exposure time = %d seconds" % exposure)
-		out.write("\n# Total number of segments = %d " % total_segments)
+		out.write("\n# Total number of segments = %d " % total_seg)
 		out.write("\n# Mean count rate of ci = %s" % \
-			str(list(mean_rate_total_ci)))
+			str(list(mean_rate_ci_total)))
 		out.write("\n# Mean count rate of ref band = %.5f" % \
-			mean_rate_total_ref)
+			mean_rate_ref_total)
 		out.write("\n# Filter applied in frequency domain? %s" % str(filtering))
 		out.write("\n# ")
 		out.write("\n# Column 1: Time bins")
@@ -74,7 +74,7 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
 
 ################################################################################
 def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
-	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf, ccf_error,
+	total_seg, mean_rate_ci_total, mean_rate_ref_total, t, ccf, ccf_error,
 	filtering):
 	"""
 			fits_out
@@ -102,11 +102,11 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
 	prihdr.set('DT', dt, "seconds")
 	prihdr.set('N_BINS', n_bins, "time bins per segment")
 	prihdr.set('SEC_SEG', n_bins * dt, "seconds per segment")
-	prihdr.set('SEGMENTS', total_segments, "segments, of all data")
+	prihdr.set('SEGMENTS', total_seg, "segments, of all data")
 	prihdr.set('EXPOSURE', exposure, "seconds, of all data")
 	prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
-	prihdr.set('RATE_CI', str(mean_rate_total_ci.tolist()), "counts/second")
-	prihdr.set('RATE_REF', mean_rate_total_ref, "counts/second")
+	prihdr.set('RATE_CI', str(mean_rate_ci_total.tolist()), "counts/second")
+	prihdr.set('RATE_REF', mean_rate_ref_total, "counts/second")
 	prihdr.set('FILTER', str(filtering))
 	prihdu = fits.PrimaryHDU(header=prihdr)
 
@@ -176,18 +176,18 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 	dt = dt_mult * t_res
 	n_bins = num_seconds * int(1.0 / dt)
 	detchans = int(tools.get_key_val(input_files[0], 0, 'DETCHANS'))
-	nyquist_freq = 1.0 / (2.0 * dt)
+	nyq_freq = 1.0 / (2.0 * dt)
 
-	total_segments = 0
-	total_cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
-	sum_rate_total_ci = np.zeros(detchans)
-	sum_rate_total_ref = 0
-	total_sum_power_ci = np.zeros((n_bins, detchans), dtype=np.float64)
-	total_sum_power_ref = np.zeros(n_bins, dtype=np.float64)
+	total_seg = 0
+	cs_sum_total = np.zeros((n_bins, detchans), dtype=np.complex128)
+	sum_rate_ci_total = np.zeros(detchans)
+	sum_rate_ref_total = 0
+	sum_power_ci_total = np.zeros((n_bins, detchans), dtype=np.float64)
+	sum_power_ref_total = np.zeros(n_bins, dtype=np.float64)
 
 	print "\nDT = %.15f" % dt
 	print "N_bins = %d" % n_bins
-	print "Nyquist freq = %f" % nyquist_freq
+	print "Nyquist freq = %f" % nyq_freq
 	print "Filtering?", filtering
 
 	###################################################################
@@ -207,22 +207,22 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
 	for in_file in input_files:
 
-		cs_sum, sum_rate_whole_ci, sum_rate_whole_ref, num_segments, \
+		cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
 			sum_power_ci, sum_power_ref, sum_rate_ci = \
-			xcor.read_and_use_segments(in_file, n_bins, detchans, dt, test)
+			xcor.read_and_use_seg(in_file, n_bins, detchans, dt, test)
 
-		print "Segments for this file: %d\n" % num_segments
+		print "Segments for this file: %d\n" % num_seg
 
-		total_segments += num_segments
-		total_cs_sum += cs_sum
-		sum_rate_total_ci += sum_rate_whole_ci
-		sum_rate_total_ref += sum_rate_whole_ref
-		total_sum_power_ci += sum_power_ci
-		total_sum_power_ref += sum_power_ref
-		sum_rate_whole_ci = None
-		sum_rate_whole_ref = None
+		total_seg += num_seg
+		cs_sum_total += cs_sum
+		sum_rate_ci_total += sum_rate_ci_whole
+		sum_rate_ref_total += sum_rate_ref_whole
+		sum_power_ci_total += sum_power_ci
+		sum_power_ref_total += sum_power_ref
+		sum_rate_ci_whole = None
+		sum_rate_ref_whole = None
 		cs_sum = None
-		num_segments = None
+		num_seg = None
 		sum_power_ci = None
 		sum_power_ref = None
 
@@ -233,42 +233,42 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 	## Turning sums over segments into means
 	#########################################
 	
-	mean_ci = sum_rate_ci / float(total_segments)
-	mean_rate_total_ci = sum_rate_total_ci / float(total_segments)
-	mean_rate_total_ref = sum_rate_total_ref / float(total_segments)
-	mean_power_ci = total_sum_power_ci / float(total_segments)
-	mean_power_ref = total_sum_power_ref / float(total_segments)
-	cs_avg = total_cs_sum / float(total_segments)
+	mean_ci = sum_rate_ci / float(total_seg)
+	mean_rate_ci_total = sum_rate_ci_total / float(total_seg)
+	mean_rate_ref_total = sum_rate_ref_total / float(total_seg)
+	mean_power_ci = sum_power_ci_total / float(total_seg)
+	mean_power_ref = sum_power_ref_total / float(total_seg)
+	cs_avg = cs_sum_total / float(total_seg)
 	
+# 	print "CS avg:", cs_avg[1:5, 6]
 	
-	print "CS avg:", cs_avg[1:5, 6]
-	
-	################################################################
 	## Printing the cross spectrum to a file, for plotting/checking
-	################################################################
-
-	cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
-	np.savetxt('cs_avg.dat', cs_out)
+# 	cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
+# 	np.savetxt('cs_avg.dat', cs_out)
 
 	##################################################################
 	## Subtracting the background count rate from the mean count rate
 	##################################################################
 
-	mean_rate_total_ci -= bkgd_rate
+	mean_rate_ci_total -= bkgd_rate
 
 	## Need to use a background from ref pcu for the reference band...
 #     ref_bkgd_rate = np.mean(bkgd_rate[2:26])
-#     mean_rate_whole_ref -= ref_bkgd_rate    
-#     print np.shape(mean_rate_whole_ci)
-#     print np.shape(mean_rate_whole_ref)
+#     mean_rate_ref_total -= ref_bkgd_rate    
+#     print np.shape(mean_rate_ci_total)
+#     print np.shape(mean_rate_ref_total)
 
 	######################
 	## Making lag spectra
 	######################
-
-	xcor.make_lags(out_file, in_file_list, dt, n_bins, detchans, num_seconds,
-		total_segments, mean_rate_total_ci, mean_rate_total_ref, cs_avg,
-		mean_power_ci, mean_power_ref)
+	
+	xcor.save_for_lags(out_file, in_file_list, dt, n_bins, detchans, \
+		num_seconds, total_seg, mean_rate_ci_total, mean_rate_ref_total, \
+		cs_avg, mean_power_ci, mean_power_ref)
+		
+# 	xcor.make_lags(out_file, in_file_list, dt, n_bins, detchans, num_seconds,
+# 		total_seg, mean_rate_ci_total, mean_rate_ref_total, cs_avg,
+# 		mean_power_ci, mean_power_ref)
 	
 	##############################################
 	## Computing ccf from cs, and computing error
@@ -276,18 +276,18 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
 	if filtering:
 		ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins,
-			detchans, num_seconds, total_segments, mean_rate_total_ci,
-			mean_rate_total_ref, mean_power_ci, mean_power_ref, True)
+			detchans, num_seconds, total_seg, mean_rate_ci_total,
+			mean_rate_ref_total, mean_power_ci, mean_power_ref, True)
 	else:
 		ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins,
-			detchans, num_seconds, total_segments, mean_rate_total_ci,
-			mean_rate_total_ref, mean_power_ci, mean_power_ref, True)
+			detchans, num_seconds, total_seg, mean_rate_ci_total,
+			mean_rate_ref_total, mean_power_ci, mean_power_ref, True)
 
-	exposure = total_segments * num_seconds  ## Exposure time of data used
+	exposure = total_seg * num_seconds  ## Exposure time of data used
 	print "Exposure_time = %.3f seconds" % exposure
-	print "Total number of segments:", total_segments
-	print "Mean rate for all of ci:", np.sum(mean_rate_total_ci)
-	print "Mean rate for ref:", mean_rate_total_ref
+	print "Total number of segments:", total_seg
+	print "Mean rate for all of ci:", np.sum(mean_rate_ci_total)
+	print "Mean rate for ref:", mean_rate_ref_total
 
 	t = np.arange(0, n_bins)  ## gives the 'front of the bin'
 
@@ -296,11 +296,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 	##########
 
 #     dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure, \
-#     	total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end, \
+#     	total_seg, mean_rate_ci_total, mean_rate_ref_total, t, ccf_end, \
 #     	ccf_error, filtering)
 
 	fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
-		total_segments, mean_rate_total_ci, mean_rate_total_ref, t, ccf_end,
+		total_seg, mean_rate_ci_total, mean_rate_ref_total, t, ccf_end,
 		ccf_error, filtering)
 		
 ## End of the function 'main'
@@ -319,12 +319,11 @@ description='Computes the cross-correlation function of a channel of interest \
 with a reference band, over multiple RXTE eventlists.', epilog='For optional \
 arguments, default values are given in brackets at end of description.')
 
-	parser.add_argument('infile_list', help="The full path of the (ASCII/txt/\
-dat) input file listing the event lists to be used. One file per line. \
-Assuming that both PCU0 and PCU2 are in the event list.")
+	parser.add_argument('infile_list', help="The name of the (ASCII/txt/\
+dat) input file listing the event lists to be used. One file per line.")
 
-	parser.add_argument('outfile', help="The full path of the (ASCII/txt/dat) \
-output file to write the cross-correlation function to.")
+	parser.add_argument('outfile', help="The name of the FITS file to write the\
+ cross-correlation function to.")
 
 	parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
 help="Name of the (pha/fits) background spectrum. [none]")
