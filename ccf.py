@@ -62,13 +62,13 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 		out.write("\n# ")
 		for j in xrange(0, n_bins):
 			out.write("\n%d" % t[j])
-			for i in xrange(0, 64):
+			for i in xrange(0, detchans):
 				out.write("\t%.6e" % ccf[j][i])
 			if filter:
-				for i in xrange(0, 64):
+				for i in xrange(0, detchans):
 					out.write("\t%.6e" % ccf_error[i])
 			else:
-				for i in xrange(0, 64):
+				for i in xrange(0, detchans):
 					out.write("\t%.6e" % ccf_error[j][i])
 		## End of for-loops
 	## End of with-block
@@ -193,6 +193,8 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	assert np.shape(power_ref) == (n_bins, )
 	assert np.shape(cs_avg) == (n_bins, detchans)
 	
+# 	low_freq = 4.47
+# 	hi_freq = 6.35
 	low_freq = 4.0
 	hi_freq = 7.0
 	
@@ -212,7 +214,7 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	power_ref = power_ref[1:nyq_ind + 1]
 	
 	## Getting lag and error for lag-frequency plot
-	phase = -np.arctan2(cs_avg.imag, cs_avg.real) ## Negative sign is so that a positive lag is a hard energy lag
+	phase = -np.arctan2(cs_avg.imag, cs_avg.real) ## Negative sign is so that a positive lag is a hard energy lag?
 	err_phase = get_phase_err(cs_avg, power_ci, np.resize(np.repeat(power_ref, \
 		detchans), np.shape(power_ci)), 1, num_seg)
 	print np.shape(err_phase)
@@ -232,7 +234,7 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	frange_pow_ci = np.mean(power_ci[f_span_low:f_span_hi+1, ], axis=0)
 	frange_pow_ref = np.repeat(np.mean(power_ref[f_span_low:f_span_hi+1]), detchans)
 	print "Shape cs:", np.shape(frange_cs)
-	e_phase = -np.arctan2(frange_cs.imag, frange_cs.real) ## Negative sign is so that a positive lag is a hard energy lag
+	e_phase = -np.arctan2(frange_cs.imag, frange_cs.real) ## Negative sign is so that a positive lag is a hard energy lag?
 	e_err_phase = get_phase_err(frange_cs, frange_pow_ci, frange_pow_ref, f_span, num_seg)
 	print "Shape err phase:", np.shape(e_err_phase)
 	f = np.repeat(np.mean(frange_freq), detchans)
@@ -307,6 +309,84 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	thdulist.writeto(out_file)	
 	
 ## End of function 'make_lags'
+
+
+################################################################################
+def save_for_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, \
+	num_seg, mean_rate_ci, mean_rate_ref, cs_avg, power_ci, power_ref):
+	
+	## Getting the Fourier frequencies for the cross spectrum
+	freq = fftpack.fftfreq(n_bins, d=dt)
+	
+	## Only keeping the parts associated with positive Fourier frequencies
+	nyq_ind = np.argmax(freq)+1  ## because in python, the scipy fft makes the
+		## nyquist frequency negative, and we want it to be positive! (it is
+		## actually both pos and neg)
+	freq = np.abs(freq[0:nyq_ind + 1])  ## because it slices at end-1, and we
+		## want to include 'nyq_ind'; abs is because the nyquist freq is both
+		## pos and neg, and we want it pos here.
+	cs_avg = cs_avg[0:nyq_ind + 1, ]
+	power_ci = power_ci[0:nyq_ind + 1, ]
+	power_ref = power_ref[0:nyq_ind + 1]
+	
+	chan = np.arange(0, detchans)
+	energy_channels = np.tile(chan, len(freq))
+	
+	out_file = out_file.replace("cross_correlation/out_ccf", "lags/out_lags")
+	out_file = out_file.replace(".", "_cs.")
+	print "Output sent to: %s" % out_file
+	
+		## Making FITS header (extension 0)
+	prihdr = fits.Header()
+	prihdr.set('TYPE', "Cross spectrum, power spectrum ci, and power spectrum ref.")
+	prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
+	prihdr.set('EVTLIST', in_file)
+	prihdr.set('DT', dt, "seconds")
+	prihdr.set('N_BINS', n_bins, "time bins per segment")
+	prihdr.set('SEGMENTS', num_seg, "segments in the whole light curve")
+	prihdr.set('EXPOSURE', num_seg * n_bins * dt,
+		"seconds, of light curve")
+	prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
+	prihdr.set('RATE_CI', str(mean_rate_ci.tolist()), "counts/second")
+	prihdr.set('RATE_REF', mean_rate_ref, "counts/second")
+	prihdu = fits.PrimaryHDU(header=prihdr)
+
+	## Making FITS table for cross spectrum
+	col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
+	col2 = fits.Column(name='CROSS', unit='raw', format='D',
+		array=cs_avg.flatten('C'))
+	col3 = fits.Column(name='CHANNEL', unit='', format='I',
+		array=energy_channels)
+	cols = fits.ColDefs([col1, col2, col3])
+	tbhdu1 = fits.BinTableHDU.from_columns(cols)
+	
+	## Making FITS table for power spectrum of channels of interest
+	col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
+	col2 = fits.Column(name='POWER', unit='raw', format='D',
+		array=power_ci.flatten('C'))
+	col3 = fits.Column(name='CHANNEL', unit='', format='I',
+		array=energy_channels)
+	cols = fits.ColDefs([col1, col2, col3])
+	tbhdu2 = fits.BinTableHDU.from_columns(cols)
+	
+	## Making FITS table for power spectrum of reference band
+	col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
+	col2 = fits.Column(name='POWER', unit='raw', format='D',
+		array=power_ref)
+	cols = fits.ColDefs([col1, col2])
+	tbhdu3 = fits.BinTableHDU.from_columns(cols)
+	
+	## If the file already exists, remove it
+	assert out_file[-4:].lower() == "fits", \
+		'ERROR: Output file must have extension ".fits".'
+	if os.path.isfile(out_file):
+		subprocess.call(["rm", out_file])
+	
+	## Writing to a FITS file
+	thdulist = fits.HDUList([prihdu, tbhdu1, tbhdu2, tbhdu3])
+	thdulist.writeto(out_file)
+
+## End of function 'save_for_lags'
 
 
 ################################################################################
@@ -1164,10 +1244,14 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	######################
 	## Making lag spectra
 	######################
-
-	make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, num_seg, \
-		mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, mean_power_ci, \
-		mean_power_ref)
+	
+	save_for_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, \
+		num_seg, mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, \
+		mean_power_ci, mean_power_ref)
+	
+# 	make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, num_seg, \
+# 		mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, mean_power_ci, \
+# 		mean_power_ref)
 	
 	##############################################
 	## Computing ccf from cs, and computing error
@@ -1212,12 +1296,12 @@ description="Computes the cross-correlation function of a channel of interest \
 with a reference band.", epilog="For optional arguments, default values are \
 given in brackets at end of description.")
 
-	parser.add_argument('infile', help='Name of (ASCII/txt/dat) event list \
-containing both the reference band and the channels of interest. Assumes ref \
-band = PCU 0, interest = PCU 2.')
+	parser.add_argument('infile', help='The name of the FITS or .dat event list\
+ containing both the reference band and the channels of interest. Assumes \
+channels of interest = PCU 2, ref band = all other PCUs.')
 
-	parser.add_argument('outfile', help='The full path of the (ASCII/txt) file\
- to write the frequency and power to.')
+	parser.add_argument('outfile', help='The name the FITS file to write the \
+cross-correlation function to.')
 
 	parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
 help='Name of the background spectrum (in pha/fits format).')
