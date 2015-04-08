@@ -78,10 +78,10 @@ fi
 ## Running ccf.py
 ##################
 
-# for (( i=0; i<64; i++ )); do
-# 	tmp_file="$out_dir/${obsID}_ccf_segs_${i}.dat"
-# 	if [ -e "$tmp_file" ]; then rm "$tmp_file"; fi; touch "$tmp_file"
-# done
+for (( i=0; i<64; i++ )); do
+	tmp_file="$out_dir/${obsID}_ccf_segs_${i}.dat"
+	if [ -e "$tmp_file" ]; then rm "$tmp_file"; fi; touch "$tmp_file"
+done
 
 if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
 	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
