@@ -353,7 +353,7 @@ def save_for_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, \
 
 	## Making FITS table for cross spectrum
 	col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
-	col2 = fits.Column(name='CROSS', unit='raw', format='D',
+	col2 = fits.Column(name='CROSS', unit='raw', format='C',
 		array=cs_avg.flatten('C'))
 	col3 = fits.Column(name='CHANNEL', unit='', format='I',
 		array=energy_channels)
@@ -536,9 +536,15 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 
 
 ################################################################################
-def standard_ccf_err(n_bins, detchans, num_seg, ccf):
+def standard_ccf_err(n_bins, detchans, num_seg):
 	"""
 			standard_ccf_err
+	
+	Computes the standard error on each ccf bin from the segment-to-segment 
+	variations. Use this for *UNFILTERED* CCFs. 
+	
+	S. Vaughan 2013, "Scientific Inference", equations 2.3 and 2.4.
+	
 	"""
 	standard_err = np.zeros((200, detchans))
 	for i in range(detchans):
@@ -546,8 +552,8 @@ def standard_ccf_err(n_bins, detchans, num_seg, ccf):
 		table_i = np.loadtxt(in_file)
 		mean_ccf_i = np.mean(table_i, axis=0)
 		ccf_resid_i = table_i - mean_ccf_i
-		sample_var_i = np.sum(ccf_resid_i**2, axis=0) / float(num_seg-1)
-		standard_err_i = np.sqrt(sample_var_i/float(num_seg))
+		sample_var_i = np.sum(ccf_resid_i**2, axis=0) / float(num_seg-1)  ## eq 2.3
+		standard_err_i = np.sqrt(sample_var_i/float(num_seg))  ## eq 2.4
 		standard_err[:,i] = standard_err_i
 
 	return standard_err
@@ -560,7 +566,7 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 			UNFILT_cs_to_ccf_w_err
 	Takes the iFFT of the cross spectrum to get the cross-correlation function, 
 	and computes the error on the cross-correlation function. This error is 
-	independent both between energy bins and between time bins!
+	not correlated between energy bins but may be correlated between time bins.
 	
 	"""
 	
@@ -570,8 +576,8 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 		power_ref = power_ref[0:nyq_ind+1]
 		power_ci = power_ci[0:nyq_ind+1,]
 	
-	print "CI count rate:", countrate_ci
-	print "Ref count rate:", countrate_ref
+# 	print "CI count rate:", countrate_ci
+# 	print "Ref count rate:", countrate_ref
 	
 # 	print num_seconds * num_seg
 # 	counts_ci = countrate_ci * (num_seconds * num_seg)
@@ -627,7 +633,7 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 	## Dividing ccf by rms of signal in reference band
 	ccf *= (2.0 / float(n_bins) / absrms_rms_ref)
 	
-	ccf_err = standard_ccf_err(n_bins, detchans, num_seg, ccf)
+	ccf_err = standard_ccf_err(n_bins, detchans, num_seg)
 	
 	print "CCF:", ccf[2:7, 6]
 	print "Err:", ccf_err[2:7, 6]
