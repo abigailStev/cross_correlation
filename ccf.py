@@ -3,7 +3,8 @@ import numpy as np
 import sys
 from scipy import fftpack
 from datetime import datetime
-import os
+import os.path
+import subprocess
 from astropy.io import fits
 import tools  # https://github.com/abigailStev/whizzy_scripts
 
@@ -130,11 +131,12 @@ def fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 	assert out_file[-4:].lower() == "fits", \
 		'ERROR: Output file must have extension ".fits".'
 	if os.path.isfile(out_file):
-		os.remove(out_file)
+		subprocess.call(['rm', out_file])
 
 	## Writing to a FITS file
 	thdulist = fits.HDUList([prihdu, tbhdu])
 	thdulist.writeto(out_file)
+	
 ## End of function 'fits_out'
 
 
@@ -159,14 +161,16 @@ def get_phase_err(cs_avg, power_ci, power_ref, n, M):
 
 
 ################################################################################
-def phase_to_tlags(phase, freq, detchans):
+def phase_to_tlags(phase, f, detchans):
 	"""
 			phase_to_tlags
 	
 	Converts a complex phase (in radians) to a time lag (in seconds).
 	
 	"""
-	f = np.resize(np.repeat(freq, detchans), (len(freq), detchans))
+	assert np.shape(phase) == np.shape(f), "ERROR: Phase must have same \
+dimensions as f."
+
 	with np.errstate(all='ignore'):
 		tlags =  np.where(f != 0, phase / (2.0 * np.pi * f), 0)
 		
@@ -189,6 +193,9 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	assert np.shape(power_ref) == (n_bins, )
 	assert np.shape(cs_avg) == (n_bins, detchans)
 	
+	low_freq = 4.0
+	hi_freq = 7.0
+	
 	## Getting the Fourier frequencies for the cross spectrum
 	freq = fftpack.fftfreq(n_bins, d=dt)
 	
@@ -200,17 +207,43 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 		## want to include 'nyq_ind'; abs is because the nyquist freq is both
 		## pos and neg, and we want it pos here. but we don't want freq=0
 		## because that gives errors.
-	cs_avg = cs_avg[1:nyq_ind + 1]
-	power_ci = power_ci[1:nyq_ind + 1]
+	cs_avg = cs_avg[1:nyq_ind + 1, ]
+	power_ci = power_ci[1:nyq_ind + 1, ]
 	power_ref = power_ref[1:nyq_ind + 1]
 	
-	## Getting cross spectrum lag and error
-	phase = np.arctan2(cs_avg.imag, cs_avg.real)
+	## Getting lag and error for lag-frequency plot
+	phase = -np.arctan2(cs_avg.imag, cs_avg.real) ## Negative sign is so that a positive lag is a hard energy lag
 	err_phase = get_phase_err(cs_avg, power_ci, np.resize(np.repeat(power_ref, \
 		detchans), np.shape(power_ci)), 1, num_seg)
-	tlag = phase_to_tlags(phase, freq, detchans)
-	err_tlag = phase_to_tlags(err_phase, freq, detchans)
-
+	print np.shape(err_phase)
+	f = np.resize(np.repeat(freq, detchans), (len(freq), detchans))
+	tlag = phase_to_tlags(phase, f, detchans)
+	err_tlag = phase_to_tlags(err_phase, f, detchans)
+	
+	## Getting lag and error for lag-energy plot (averaging over frequencies)
+	f_span_low = np.argmax(freq == low_freq)
+	f_span_hi = np.argmax(freq == hi_freq)
+	f_span = f_span_hi - f_span_low
+	print "Fspan low:", f_span_low
+	print "Fspan hi:", f_span_hi
+	print "F span:", f_span
+	frange_freq = freq[f_span_low:f_span_hi+1]
+	frange_cs = np.mean(cs_avg[f_span_low:f_span_hi+1, ], axis=0)
+	frange_pow_ci = np.mean(power_ci[f_span_low:f_span_hi+1, ], axis=0)
+	frange_pow_ref = np.repeat(np.mean(power_ref[f_span_low:f_span_hi+1]), detchans)
+	print "Shape cs:", np.shape(frange_cs)
+	e_phase = -np.arctan2(frange_cs.imag, frange_cs.real) ## Negative sign is so that a positive lag is a hard energy lag
+	e_err_phase = get_phase_err(frange_cs, frange_pow_ci, frange_pow_ref, f_span, num_seg)
+	print "Shape err phase:", np.shape(e_err_phase)
+	f = np.repeat(np.mean(frange_freq), detchans)
+	print "Shape phase:", np.shape(e_phase)
+	print "Shape f:", np.shape(f)
+# 	exit()
+	e_tlag = phase_to_tlags(e_phase, f, detchans)
+	print "Shape tlag:", np.shape(e_tlag)
+	e_err_tlag = phase_to_tlags(e_err_phase, f, detchans)
+	print "Shape err tlag:", np.shape(e_err_tlag)
+	
 	chan = np.arange(0, detchans)
 	energy_channels = np.tile(chan, len(freq))
 	bins = np.repeat(freq, len(chan))    
@@ -229,12 +262,14 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	prihdr.set('EXPOSURE', num_seg * n_bins * dt,
 		"seconds, of light curve")
 	prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
+	prihdr.set('LOWFREQ', low_freq)
+	prihdr.set('HIGHFREQ', hi_freq)
 	prihdr.set('RATE_CI', str(mean_rate_ci_whole.tolist()), "counts/second")
 	prihdr.set('RATE_REF', mean_rate_ref_whole, "counts/second")
 	prihdr.set('FILTER', str(filter))
 	prihdu = fits.PrimaryHDU(header=prihdr)
 
-	## Making FITS table (extension 1)
+	## Making FITS table for lag-frequency plot (extension 1)
 	col1 = fits.Column(name='FREQUENCY', format='D', array=bins)
 	col2 = fits.Column(name='PHASE', unit='radians', format='D',
 		array=phase.flatten('C'))
@@ -247,16 +282,28 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	col6 = fits.Column(name='CHANNEL', unit='', format='I',
 		array=energy_channels)
 	cols = fits.ColDefs([col1, col2, col3, col4, col5, col6])
-	tbhdu = fits.BinTableHDU.from_columns(cols)
-
+	tbhdu1 = fits.BinTableHDU.from_columns(cols)
+	
+	## Making FITS table for lag-energy plot (extension 2)
+	col1 = fits.Column(name='PHASE', unit='radians', format='D', array=e_phase)
+	col2 = fits.Column(name='PHASE_ERR', unit='radians', format='D', \
+		array=e_err_phase)
+	col3 = fits.Column(name='TIME_LAG', unit='s', format='D', array=e_tlag)
+	col4 = fits.Column(name='TIME_LAG_ERR', unit='s', format='D', \
+		array=e_err_tlag)
+	col5 = fits.Column(name='CHANNEL', unit='', format='I', \
+		array=chan)
+	cols = fits.ColDefs([col1, col2, col3, col4, col5])
+	tbhdu2 = fits.BinTableHDU.from_columns(cols)
+	
 	## If the file already exists, remove it
 	assert out_file[-4:].lower() == "fits", \
 		'ERROR: Output file must have extension ".fits".'
 	if os.path.isfile(out_file):
-		os.remove(out_file)
+		subprocess.call(["rm", out_file])
 	
 	## Writing to a FITS file
-	thdulist = fits.HDUList([prihdu, tbhdu])
+	thdulist = fits.HDUList([prihdu, tbhdu1, tbhdu2])
 	thdulist.writeto(out_file)	
 	
 ## End of function 'make_lags'
