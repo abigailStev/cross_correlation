@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
-import os
+import os.path
+import subprocess
 from scipy import fftpack
 from datetime import datetime
 from astropy.io import fits
@@ -124,7 +125,7 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
 	assert out_file[-4:].lower() == "fits", \
 		'ERROR: Output file must have extension ".fits".'
 	if os.path.isfile(out_file):
-		os.remove(out_file)
+		subprocess.call(["rm", out_file])
 
 	## Writing to a FITS file
 	thdulist = fits.HDUList([prihdu, tbhdu])
