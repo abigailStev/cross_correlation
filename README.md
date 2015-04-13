@@ -30,4 +30,4 @@ Bash script to run multi_ccf.py and plotting scripts.
 
 
 
-THIS CODE COMES WITH NO LEGAL GUARANTEES.
+#### This code comes with no legal guarantees.
