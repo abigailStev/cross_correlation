@@ -1,22 +1,32 @@
-		cross_correlation
-		
-Computing the cross-correlation function of a reference band with channels of interest.
+# cross_correlation
+Computes the cross-correlation function of a broad reference energy band with narrow energy channels of interest.
 
-CONTENTS:
+## Contents
 
-ccf.py -- Computes the cross-correlation function of two light curves to do phase-resolved 
-spectroscopy. Able to read light curves from data with the program 'populate_lightcurve'.
+### ccf.py
+Computes the cross-correlation function of two light curves to do phase-resolved spectroscopy. 
+Able to read light curves from data with the program 'populate_lightcurve'.
 
-multi_ccf.py -- Computes the cross-correlation function of a band of interest with a 
-reference band over multiple data files.
+### loop_ccf.sh
+Bash script to compute the ccf of individual observations and stitch the plots together in a gif!
 
-plot_ccf.py -- Plots the cross-correlation function.
+### multi_ccf.py
+Computes the cross-correlation function of a band of interest with a reference band over multiple data files.
 
-plot_multi.py -- Plots multiple cross-correlation functions on one plot.
+### plot_2d.py
+Plots the two-dimensional cross correlation function.
 
-run_ccf.sh -- Bash script to run ccf.py.
+### plot_ccf.py
+Plots the cross-correlation function in one dimension (i.e. for one energy channel).
 
-run_multi_ccf.sh -- Bash script to run multi_ccf.py
+### plot_multi.py
+Plots multiple 1-D cross-correlation functions from different energy channels on one plot.
+
+### run_ccf.sh
+Bash script to run ccf.py and plotting scripts.
+
+### run_multi_ccf.sh
+Bash script to run multi_ccf.py and plotting scripts.
 
 
 
