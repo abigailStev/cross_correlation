@@ -19,6 +19,9 @@ Plots the two-dimensional cross correlation function.
 ### plot_ccf.py
 Plots the cross-correlation function in one dimension (i.e. for one energy channel).
 
+### plot_cs.py
+Plots the cross spectrum. Only intended for testing purposes.
+
 ### plot_multi.py
 Plots multiple 1-D cross-correlation functions from different energy channels on one plot.
 
@@ -30,4 +33,4 @@ Bash script to run multi_ccf.py and plotting scripts.
 
 
 
-#### This code comes with no legal guarantees.
+##### Disclaimer: This code comes with no legal guarantees.
