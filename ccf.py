@@ -1135,6 +1135,10 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	nyquist_freq = 1.0 / (2.0 * dt)
 	detchans = int(tools.get_key_val(in_file, 0, 'DETCHANS'))
 
+    param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
+                 'df': df, 'nyquist': nyquist_freq, 'n_bins': n_bins, \
+                 'detchans': detchans}
+
 	print "\nDT = %f" % dt
 	print "N_bins = %d" % n_bins
 	print "Nyquist freq =", nyquist_freq
