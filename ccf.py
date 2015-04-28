@@ -1139,9 +1139,9 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
                  'df': df, 'nyquist': nyquist_freq, 'n_bins': n_bins, \
                  'detchans': detchans}
 
-    print "\nDT = %f" % dt
-    print "N_bins = %d" % n_bins
-    print "Nyquist freq =", nyquist_freq
+    print "\nDT = %f" % param_dict['dt']
+    print "N_bins = %d" % param_dict['n_bins']
+    print "Nyquist freq =", param_dict['nyquist']
     print "Filtering?", filter
 
     ###################################################################
@@ -1159,24 +1159,27 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     #################################################
 
     cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, sum_power_ci, \
-        sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, n_bins, \
-        detchans, dt, test)
+        sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, \
+        param_dict['n_bins'], param_dict['detchans'], param_dict['dt'], test)
+
+    param_dict['num_seg'] = num_seg
 
     #########################################
     ## Turning sums over segments into means
     #########################################
 
-    mean_rate_ci_whole = sum_rate_ci_whole / float(num_seg)
-    mean_rate_ref_whole = sum_rate_ref_whole / float(num_seg)
-    mean_power_ci = sum_power_ci / float(num_seg)
-    mean_power_ref = sum_power_ref / float(num_seg)
-    cs_avg = cs_sum / float(num_seg)
+    mean_rate_ci_whole = sum_rate_ci_whole / float(param_dict['num_seg'])
+    mean_rate_ref_whole = sum_rate_ref_whole / float(param_dict['num_seg'])
+    mean_power_ci = sum_power_ci / float(param_dict['num_seg'])
+    mean_power_ref = sum_power_ref / float(param_dict['num_seg'])
+    cs_avg = cs_sum / float(param_dict['num_seg'])
 
     ################################################################
     ## Printing the cross spectrum to a file, for plotting/checking
     ################################################################
 
-    cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
+    cs_out = np.column_stack((fftpack.fftfreq(param_dict['n_bins'], \
+                                              d=param_dict['dt']), cs_avg))
     np.savetxt('cs_avg.dat', cs_out)
 
     ##################################################################
@@ -1214,11 +1217,11 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
             detchans, num_seconds, num_seg, mean_rate_ci_whole, \
             mean_rate_ref_whole, mean_power_ci, mean_power_ref, True)
 
-    print "Number of segments:", num_seg
+    print "Number of segments:", param_dict['num_seg']
     print "Sum of mean rate for ci:", np.sum(mean_rate_ci_whole)
     print "Mean rate for ref:", np.mean(mean_rate_ref_whole)
 
-    t = np.arange(0, n_bins)
+    t = np.arange(0, param_dict['n_bins'])
 
     ##########
     ## Output
