@@ -9,15 +9,14 @@ from astropy.io import fits
 import tools  # https://github.com/abigailStev/whizzy_scripts
 
 __author__ = "Abigail Stevens"
-__author_email__ = "A.L.Stevens at uva.nl"
-__year__ = "2014-2015"
-__description__ = "Computes the cross-correlation function of an interest band \
-with a reference band from RXTE event-mode data."
 
 """
-		ccf.py
+ccf.py
 
-Written in Python 2.7.
+Computes the cross-correlation function of narrow energy channels of interest
+with a broad energy reference band from RXTE event-mode data.
+
+Abigail Stevens, A.L.Stevens@uva.nl, 2014-2015
 
 """
 
@@ -26,8 +25,6 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 	num_seg, mean_rate_ci_whole, mean_rate_ref_whole, t, ccf, ccf_error,
 	filter):
 	"""
-			dat_out
-
 	Writes the cross-correlation function to a .dat output file.
 
 	"""
@@ -70,9 +67,6 @@ def dat_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 			else:
 				for i in xrange(0, detchans):
 					out.write("\t%.6e" % ccf_error[j][i])
-		## End of for-loops
-	## End of with-block
-## End of function 'dat_out'
 
 
 ################################################################################
@@ -136,8 +130,6 @@ def fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds,
 	## Writing to a FITS file
 	thdulist = fits.HDUList([prihdu, tbhdu])
 	thdulist.writeto(out_file)
-	
-## End of function 'fits_out'
 
 
 ################################################################################
@@ -157,14 +149,11 @@ def get_phase_err(cs_avg, power_ci, power_ref, n, M):
 			(2 * coherence * n * M), 0))
 
 	return phase_err
-## End of function 'get_phase_err'
 
 
 ################################################################################
 def phase_to_tlags(phase, f, detchans):
 	"""
-			phase_to_tlags
-	
 	Converts a complex phase (in radians) to a time lag (in seconds).
 	
 	"""
@@ -175,7 +164,6 @@ dimensions as f."
 		tlags =  np.where(f != 0, phase / (2.0 * np.pi * f), 0)
 		
 	return tlags
-## End of function 'phase_to_tlags'
 
 
 ################################################################################
@@ -183,8 +171,6 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	num_seg, mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, power_ci,
 	power_ref):
 	"""
-			make_lags
-			
 	Computes the phase lag and time lag from the average cross spectrum, and 
 	writes the lag information to a .fits output file.
 	
@@ -307,14 +293,17 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
 	## Writing to a FITS file
 	thdulist = fits.HDUList([prihdu, tbhdu1, tbhdu2])
 	thdulist.writeto(out_file)	
-	
-## End of function 'make_lags'
 
 
 ################################################################################
 def save_for_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, \
 	num_seg, mean_rate_ci, mean_rate_ref, cs_avg, power_ci, power_ref):
-	
+	"""
+    Saving header data, the cross spectrum, CoI power spectrum, and reference
+    band power spectrum to a FITS file to use in the program make_lags.py to get
+    cross-spectral lags.
+
+	"""
 	## Getting the Fourier frequencies for the cross spectrum
 	freq = fftpack.fftfreq(n_bins, d=dt)
 	
@@ -336,7 +325,7 @@ def save_for_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, \
 	out_file = out_file.replace(".", "_cs.")
 	print "Output sent to: %s" % out_file
 	
-		## Making FITS header (extension 0)
+	## Making FITS header (extension 0)
 	prihdr = fits.Header()
 	prihdr.set('TYPE', "Cross spectrum, power spectrum ci, and power spectrum ref.")
 	prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
@@ -386,14 +375,10 @@ def save_for_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, \
 	thdulist = fits.HDUList([prihdu, tbhdu1, tbhdu2, tbhdu3])
 	thdulist.writeto(out_file)
 
-## End of function 'save_for_lags'
-
 
 ################################################################################
 def find_pulse_freq(freq, power_ref):
 	"""
-			find_pulse_freq
-	
 	Determines the frequency of a coherent pulse above 100 Hz (to not confuse
 	with broadband noise).
 	
@@ -408,14 +393,11 @@ def find_pulse_freq(freq, power_ref):
 	pulse_freq = hf_freq[np.argmax(hf_power)]
 
 	return pulse_freq
-## End of function 'find_pulse_freq'
 
 
 ################################################################################
 def filter_freq(freq_space_array, dt, n_bins, detchans, power_ref):
 	"""
-			filter_freq
-
 	Applying a filter to the averaged cross-spectrum per energy channel (in
 	frequency space). Any cross spectrum amplitudes above or below pulse_freq
 	get zeroed out.
@@ -454,15 +436,11 @@ as the original cross spectrum. Something went wrong."
 
 	return filt_freq_space_array, j_min, j_max
 
-## End of function 'filter_freq'
-	
 
 ################################################################################
 def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 	total_segments, countrate_ci, countrate_ref, power_ci, power_ref, noisy):
 	"""
-			FILT_cs_to_ccf_w_err
-	
 	Filters the cross-spectrum in frequency space, takes the iFFT of the 
 	filtered cross spectrum to get the cross-correlation function, and computes
 	the error on the cross-correlation function. Note that error is NOT
@@ -516,7 +494,6 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 	cs_signal_amp = np.sum(temp1, axis=0)
 
 	## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
-	error_ratio = np.zeros(detchans, dtype=np.float64)
 	with np.errstate(all='ignore'):
 		error_ratio = np.where(cs_signal_amp != 0, cs_noise_amp / cs_signal_amp, 0)
 	
@@ -532,14 +509,10 @@ def FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 	
 	return ccf_end, ccf_error
 
-## End of function 'FILT_cs_to_ccf_w_err'
-
 
 ################################################################################
 def standard_ccf_err(n_bins, detchans, num_seg):
 	"""
-			standard_ccf_err
-	
 	Computes the standard error on each ccf bin from the segment-to-segment 
 	variations. Use this for *UNFILTERED* CCFs. 
 	
@@ -563,8 +536,7 @@ def standard_ccf_err(n_bins, detchans, num_seg):
 def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 	num_seg, countrate_ci, countrate_ref, power_ci, power_ref, noisy):
 	"""
-			UNFILT_cs_to_ccf_w_err
-	Takes the iFFT of the cross spectrum to get the cross-correlation function, 
+	Takes the iFFT of the cross spectrum to get the cross-correlation function,
 	and computes the error on the cross-correlation function. This error is 
 	not correlated between energy bins but may be correlated between time bins.
 	
@@ -594,8 +566,8 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 	## higher frequencies as the noise level
 	
 	if noisy: 
-		absrms_noise_ci = 2.0 * countrate_ci * 0.985
-		absrms_noise_ref = 2.0 * countrate_ref * 0.985
+		absrms_noise_ci = 2.0 * countrate_ci #* 0.985
+		absrms_noise_ref = 2.0 * countrate_ref #* 0.985
 	else:
 		absrms_noise_ci = 0.0
 		absrms_noise_ref = 0.0
@@ -609,10 +581,10 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 # 	## Getting rms of reference band, to normalize the ccf and acf
 	absrms_var_ref = np.sum(absrms_power_ref * df)
 	absrms_rms_ref = np.sqrt(absrms_var_ref)  
-# 	print "Ref band var:", absrms_var_ref, "(abs rms)"
-# 	print "Ref band rms:", absrms_rms_ref, "(abs rms)"
-# 	print "Ref band var:", absrms_var_ref / (countrate_ref ** 2), "(frac rms)"
-# 	print "Ref band rms:", absrms_rms_ref / countrate_ref, "(frac rms)"
+	print "Ref band var:", absrms_var_ref, "(abs rms)"
+	print "Ref band rms:", absrms_rms_ref, "(abs rms)"
+	print "Ref band var:", absrms_var_ref / (countrate_ref ** 2), "(frac rms)"
+	print "Ref band rms:", absrms_rms_ref / countrate_ref, "(frac rms)"
 # 	
 # 	## Computing the autocorrelation functions from the power spectra
 # 	acf_ci = fftpack.ifft(power_ci).real
@@ -647,15 +619,11 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, detchans, num_seconds,
 # 			absrms_rms_ref / countrate_ref))
 	
 	return ccf, ccf_err
-	
-## End of function 'UNFILT_cs_to_ccf_w_err'	
 
 
 ################################################################################
 def stack_reference_band(rate_ref_2d, obs_epoch):
 	"""
-			stack_reference_band
-	
 	WARNING: Only tested with RXTE event-mode detector channels, 0-63 incl.
 	
 	Stacks the photons in the reference band from 3-20 keV to make one 'band'.
@@ -680,14 +648,10 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
 
 	return rate_ref
 
-## End of function 'stack_reference_band'
-
 
 ################################################################################
 def make_cs(rate_ci, rate_ref, n_bins, detchans):
 	"""
-			make_cs
-
 	Generating the cross spectrum for one segment of the light curve.
 
 	"""
@@ -724,14 +688,10 @@ wrong dimensions. Must have size (n_bins, )."
 	
 	return cs_seg, mean_rate_ci_seg, mean_rate_ref_seg, power_ci, power_ref
 
-## End of function 'make_cs'
-
 
 ################################################################################
 def print_seg_ccf(n_bins, detchans, dt, rate_ref, power_ref, cs_seg):
 	"""
-			print_seg_ccf
-	
 	Printing the first 200 values of each segment of the ccf so that I can 
 	compute the standard error on the mean ccf.
 	
@@ -753,17 +713,13 @@ def print_seg_ccf(n_bins, detchans, dt, rate_ref, power_ref, cs_seg):
 			for element in ccf[0:200,i]:
 				out.write("%.6e\t" % element)
 			out.write("\n")
-	
-	return
-			
+
 
 ################################################################################
 def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, detchans,
 	dt, start_time, end_time, obs_epoch, sum_rate_ci_whole, sum_rate_ref_whole,
 	sum_power_ci, sum_power_ref, cs_sum, sum_rate_ci):
 	"""
-			each_segment
-	
 	Turns the event list into a populated histogram, stacks the reference band, 
 	and makes the cross spectrum, per segment of light curve.
 	
@@ -816,15 +772,11 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, n_bins, detchans,
 		
 	return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, sum_power_ci, \
 		sum_power_ref, sum_rate_ci
-	
-## End of function 'each_segment'
 
 
 ################################################################################
 def fits_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 	"""
-			fits_in
-	
 	Reading in an eventlist in .fits format to make the cross spectrum. Reads 
 	in a clock-corrected GTI'd event list, populates the light curves, computes 
 	cross spectrum per energy channel and keeps running average of the cross 
@@ -959,14 +911,10 @@ def fits_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 	return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
-## End of function 'fits_in'
-
 
 ################################################################################
 def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 	"""
-			dat_in
-
 	Reading in the eventlist to make the cross spectrum. Reads in a clock-
 	corrected GTI'd event list, populates the light curves, computes cross
 	spectrum per energy channel and keeps running average of the cross spectrum,
@@ -1080,14 +1028,10 @@ def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 	return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
-## End of function 'dat_in'
-
 
 ################################################################################
 def read_and_use_segments(in_file, n_bins, detchans, dt, test):
 	"""
-			read_and_use_segments
-	
 	Reads in segments of a light curve from a .dat or .fits file. Split into 
 	'fits_in' and 'dat_in' for easier readability.
 		
@@ -1135,14 +1079,10 @@ def read_and_use_segments(in_file, n_bins, detchans, dt, test):
 	return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
 		sum_power_ci, sum_power_ref, sum_rate_ci
 
-## End of function 'read_and_use_segments'
-
 
 ################################################################################
 def get_background(bkgd_file):
 	"""
-			get_background
-	
 	Get the background count rate from a background spectrum file.
 	
 	"""
@@ -1170,13 +1110,11 @@ def get_background(bkgd_file):
 ################################################################################
 def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	"""
-			main
-
-	Reads in one event list, splits into two light curves, makes segments and
-	populates them to give them length n_bins, computes the cross spectrum of
-	each segment per energy channel and then averaged cross spectrum of all the
-	segments per energy channel, and then computes the cross-correlation
-	function (ccf) per energy channel.
+	Reads in one event list, splits into reference band and channels of
+	interest (CoI), makes segments and populates them to give them length
+	n_bins, computes the cross spectrum of each segment per energy channel and
+	then averaged cross spectrum of all the segments per energy channel, and
+	then computes the cross-correlation function (ccf) per energy channel.
 
 	"""
 
@@ -1285,8 +1223,6 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 	fits_out(out_file, in_file, bkgd_file, dt, n_bins, detchans, num_seconds, \
 		num_seg, mean_rate_ci_whole, mean_rate_ref_whole, t, ccf_end, \
 		ccf_error, filter)
-	
-## End of function 'main'
 
 
 ################################################################################
@@ -1296,37 +1232,38 @@ if __name__ == "__main__":
 	## Parsing input arguments and calling 'main'
 	##############################################
 	
-	parser = argparse.ArgumentParser(usage="python ccf.py infile outfile [-b \
-BKGD_SPECTRUM] [-n NUM_SECONDS] [-m DT_MULT] [-t {0,1}] [-f {0,1}]",
-description="Computes the cross-correlation function of a channel of interest \
-with a reference band.", epilog="For optional arguments, default values are \
-given in brackets at end of description.")
+	parser = argparse.ArgumentParser(usage="python ccf.py infile outfile [-b "\
+        "BKGD_SPECTRUM] [-n NUM_SECONDS] [-m DT_MULT] [-t {0,1}] [-f {0,1}]",
+        description="Computes the cross-correlation function of a channel of "\
+        "interest with a reference band.", epilog="For optional arguments, "\
+        "default values are given in brackets at end of description.")
 
-	parser.add_argument('infile', help='The name of the FITS or .dat event list\
- containing both the reference band and the channels of interest. Assumes \
-channels of interest = PCU 2, ref band = all other PCUs.')
+	parser.add_argument('infile', help="The name of the .fits or .dat event "\
+	    "list containing both the reference band and the channels of interest. "\
+	    "Assumes channels of interest = PCU 2, ref band = all other PCUs.")
 
-	parser.add_argument('outfile', help='The name the FITS file to write the \
-cross-correlation function to.')
+	parser.add_argument('outfile', help="The name the FITS file to write the "\
+        "cross-correlation function to.")
 
 	parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
-help='Name of the background spectrum (in pha/fits format).')
+        help="Name of the background spectrum (in pha/fits format).")
 
 	parser.add_argument('-n', '--num_seconds', type=tools.type_power_of_two,
-default=1, dest='num_seconds', help='Number of seconds in each Fourier segment.\
- Must be a power of 2, positive, integer. [1]')
+        default=1, dest='num_seconds', help="Number of seconds in each Fourier"\
+        " segment. Must be a power of 2, positive, integer. [1]")
 
 	parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two,
-default=1, dest='dt_mult', help='Multiple of dt (dt is from data file) for \
-timestep between bins. Must be a power of 2, positive, integer. [1]')
+        default=1, dest='dt_mult', help="Multiple of dt (dt is from data file)"\
+        " for timestep between bins. Must be a power of 2, positive, integer. "\
+        "[1]")
 
 	parser.add_argument('-t', '--test', type=int, default=0, choices={0,1},
-dest='test', help='Int flag: 0 if computing all segments, 1 if only computing \
-one segment for testing. [0]')
+        dest='test', help="Int flag: 0 if computing all segments, 1 if only "\
+        "computing one segment for testing. [0]")
 
 	parser.add_argument('-f', '--filter', type=int, default=0, choices={0,1},
-dest='filter', help='Int flag: 0 if NOT applying a filter in frequency-space, \
-1 if applying frequency filter (around a pulsation). [0]')
+        dest='filter', help="Int flag: 0 if NOT applying a filter in frequency"\
+        "-space, 1 if applying frequency filter (around a pulsation). [0]")
 
 	args = parser.parse_args()
 
@@ -1341,6 +1278,4 @@ dest='filter', help='Int flag: 0 if NOT applying a filter in frequency-space, \
 	main(args.infile, args.outfile, args.bkgd_file, args.num_seconds,
 		args.dt_mult, test, filter)
 
-
-## End of program 'ccf.py'
 ################################################################################
