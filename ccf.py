@@ -1147,7 +1147,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     if bkgd_file:
         bkgd_rate = get_background(bkgd_file)
     else:
-        bkgd_rate = np.zeros(detchans)
+        bkgd_rate = np.zeros(param_dict['detchans'])
     print " "
 
     #################################################
