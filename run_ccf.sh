@@ -38,27 +38,28 @@ xte_exe_dir="$home_dir/Dropbox/Research/rxte_reduce"
 lag_exe_dir="$home_dir/Dropbox/Research/lags"
 lag_out_dir="$lag_exe_dir/out_lags"
 
-# prefix="P70080"
-# obsID="70080-01-01-02"
-prefix="GX339-BQPO"
-obsID="95335-01-01-06"
+prefix="j1808-1HzQPO"
+obsID="70080-03-11-00"
+# prefix="GX339-BQPO"
+# obsID="95335-01-01-06"
 
 red_dir="$home_dir/Reduced_data/${prefix}/$obsID"
 # red_dir="$home_dur/Dropbox/Research/sample_data"
 in_file="$red_dir/GTId_eventlist.fits"
 bkgd_spec="$home_dir/Reduced_data/$prefix/evt_bkgd_rebinned.pha"
 ec_table_file="$xte_exe_dir/e-c_table.txt"
-chan_bin_file="$red_dir/chan.txt"
-energies_file="$red_dir/energies.txt"
+chan_bin_file="$home_dir/Reduced_data/${prefix}/chan.txt"
+energies_file="$home_dir/Reduced_data/${prefix}/energies.txt"
 
-dt=64
-numsec=64
+dt=256
+numsec=128
 testing=0  # 0 for no, 1 for yes
 filtering=0 # 0 for no, 1 for yes
-t_len=80
+tlen=300
 obs_epoch=5
 
 t_ext="fits"
+p_ext="png"
 
 ################################################################################
 ################################################################################
@@ -104,13 +105,13 @@ if [ -e "${out_file}.${t_ext}" ]; then
 	python "$exe_dir"/plot_ccf.py "${out_file}.${t_ext}" -o "${plot_root}" \
 		-p "${prefix}/${obsID}"
 	
-	if [ -e "${plot_root}_chan_06.${p_ext}" ]; then open "${plot_root}_chan_06.${p_ext}"; fi
+# 	if [ -e "${plot_root}_chan_15.${p_ext}" ]; then open "${plot_root}_chan_15.${p_ext}"; fi
 
-	ccfs_plot="${plot_root}_multiccfs.${p_ext}"
-	python "$exe_dir"/plot_multi.py "${out_file}.${t_ext}" "$ccfs_plot" \
+	multi_plot="${plot_root}_multiccfs.${p_ext}"
+	python "$exe_dir"/plot_multi.py "${out_file}.${t_ext}" "$multi_plot" \
 		-p "${prefix}/${obsID}"
 
-	if [ -e "$ccfs_plot" ]; then open "$ccfs_plot"; fi
+# 	if [ -e "$ccfs_plot" ]; then open "$ccfs_plot"; fi
 
 fi
 
@@ -136,7 +137,7 @@ plot_file="${plot_root}_2Dccf.${p_ext}"
 if [ -e "${out_file}.${t_ext}" ]; then
 	python "$exe_dir"/plot_2d.py "${out_file}.${t_ext}" -o "${plot_file}" \
 		-p "${prefix}/${obsID}" -l "$tlen" -e "$energies_file"
-# 	if [ -e "${plot_file}" ]; then open "${plot_file}"; fi
+	if [ -e "${plot_file}" ]; then open "${plot_file}"; fi
 fi
 
 plot_file="${plot_root}_2Dccf.fits"
