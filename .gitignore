@@ -1,9 +1,9 @@
-.dat
-.aux
-.txt
-.synctex.gz
-.png
-.xml
+*.dat
+*.aux
+*.txt
+*.synctex.gz
+*.png
+*.xml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
