@@ -111,8 +111,9 @@ per energy channel does not exist."
 	## Saving to a dat file so that we can use fimgcreate
 	######################################################
 	
-# 	ratio[np.where(np.abs(ratio) > 0.75)] = 0
-	ratio[32:,] = 0
+# 	ratio[np.where(np.abs(ratio) > 4.0)] = 0
+	ratio[27:,] = 0
+# 	ratio[32:,] = 0
 	out_file = "./temp.dat"
 	R = ratio.flatten('C')
 	comment_str = "From %s" % args.tab_file
@@ -127,21 +128,22 @@ per energy channel does not exist."
 	fig, ax = plt.subplots(1,1)
 
 	if energies[0] != None:  ## If energies exists as a variable
-		plt.pcolor(t_bins, energies, ratio, cmap='hot')
+# 		plt.pcolor(t_bins, energies, ratio, cmap='hot')
+		plt.pcolor(t_bins, energies, ratio, cmap='hot', vmin=-1, vmax=1.5)
 	else:
-# 		ax.pcolor(ratio, cmap='hot', vmin=-1.2, vmax=1.6)
+# 		plt.pcolor(ratio, cmap='hot', vmin=-4.0, vmax=4.0)
 		plt.pcolor(ratio, cmap='hot')
-# 		plt.pcolor(ccf_resid, cmap='hot')
 	
 	cbar = plt.colorbar()
-	cbar.set_label('Ratio of CCF to mean count rate', \
+	cbar.set_label('Ratio of CCF amplitude to mean count rate', \
 		fontproperties=font_prop)
 	ax.set_xlabel(r'Time ( $\times\,\frac{1}{%d}\,$s)' % frac_time, \
 		fontproperties=font_prop)
 
 	if energies[0] != None:  ## If energies exists as a variable
 		ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
-		ax.set_ylim(3,25)
+# 		ax.set_ylim(3,25)
+		ax.set_ylim(3,20)
 	else:
 		ax.set_ylabel('Energy channel', fontproperties=font_prop)
 		ax.set_ylim(2, 31)
@@ -159,10 +161,10 @@ per energy channel does not exist."
 
 	ax.tick_params(axis='x', labelsize=14)
 	ax.tick_params(axis='y', labelsize=14)
-# 	ax.set_title(args.prefix)
+	ax.set_title(args.prefix)
 
 	fig.set_tight_layout(True)
-	plt.savefig(args.plot_file, dpi=600)
+	plt.savefig(args.plot_file, dpi=200)
 # 	plt.show()
 	plt.close()		
 	

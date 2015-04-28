@@ -8,7 +8,7 @@ from matplotlib.ticker import MultipleLocator
 
 __author__ = "Abigail Stevens"
 __author_email__ = "A.L.Stevens at uva.nl"
-__year__ = "2014"
+__year__ = "2014-2015"
 __description__ = "Plots the cross-correlation per energy channel, in the time domain."
 
 """
@@ -37,15 +37,16 @@ def make_plot(x_bins, ccf_amps, ccf_err, prefix, plot_file, chan, frac_time):
 # 	ax.plot(x_bins, ccf_amps, lw=2, c='black')
 	ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=1.5, c='black', \
 		drawstyle='steps-mid', elinewidth=1, capsize=1)
-	ax.plot([6], [ccf_amps[6]], "o", markerfacecolor='red', markeredgewidth=1, markeredgecolor='black', ms=14)
-	ax.plot([13], [ccf_amps[13]],"*",  markerfacecolor='orange', markeredgewidth=1, markeredgecolor='black', ms=20)
-	ax.plot([19], [ccf_amps[19]], "^", markerfacecolor='green', markeredgewidth=1, markeredgecolor='black', ms=14)
-	ax.plot([24], [ccf_amps[24]], 's', markerfacecolor='blue', markeredgewidth=1, markeredgecolor='black', ms=14)
+# 	ax.plot([6], [ccf_amps[6]], "o", mfc='red', mew=1, mec='black', ms=14)
+# 	ax.plot([13], [ccf_amps[13]],"*",  mfc='orange', mew=1, mec='black', ms=20)
+# 	ax.plot([19], [ccf_amps[19]], "^", mfc='green', mew=1, mec='black', ms=14)
+# 	ax.plot([24], [ccf_amps[24]], 's', mfc='blue', mew=1, mec='black', ms=14)
 	ax.set_xlabel(r'Time ($\times\,\frac{1}{%d}\,$s)' % frac_time, \
 		fontproperties=font_prop)
 	ax.set_ylabel(r'Deviation from mean (photons / s)', \
 		fontproperties=font_prop)
-	ax.set_xlim(0, 80)
+	ax.set_xlim(0, 60)
+	ax.set_ylim(-1, 2)
 
 	## Setting the axes' minor ticks. It's complicated.
 	x_maj_loc = ax.get_xticks()
@@ -59,10 +60,10 @@ def make_plot(x_bins, ccf_amps, ccf_err, prefix, plot_file, chan, frac_time):
 	
 	ax.tick_params(axis='x', labelsize=18)
 	ax.tick_params(axis='y', labelsize=18)
-# 	ax.set_title(prefix + ", Energy channel " + str(chan), fontproperties=font_prop)
+	ax.set_title(prefix + ", Energy channel " + str(chan), fontproperties=font_prop)
 
 	fig.set_tight_layout(True)
-	plt.savefig(plot_file, dpi=600)
+	plt.savefig(plot_file, dpi=200)
 # 	plt.show()
 	plt.close()
 		
@@ -133,7 +134,8 @@ help="File extension for the plot. Do not include the '.' [png]")
 		file_hdu.close()
 		frac_time = int(1.0/dt)  ## each time bin represents 1/frac_time seconds
 		
-		for i in range(15, 16):
+# 		for i in range(15, 16):
+		for i in range(6, 7):
 			channel_mask = table.field('CHANNEL') == i  ## make data mask for the energy channels i want
 			table_i = table[channel_mask]
 			ccf = table_i.field('CCF')
