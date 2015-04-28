@@ -9,25 +9,21 @@ import tools  # https://github.com/abigailStev/whizzy_scripts
 import ccf as xcor
 
 __author__ = "Abigail Stevens"
-__author_email__ = "A.L.Stevens at uva.nl"
-__year__ = "2014-2015"
-__description__ = "Computes the cross-correlation function of a band of \
-interest with a reference band, over multiple RXTE event-mode data files."
 
 """
-        multi_ccf.py
+multi_ccf.py
 
-Written in Python 2.7.
+Computes the cross-correlation function of narrow energy channels of interest
+with a broad energy reference band, over multiple RXTE event-mode data files.
+
+Abigail Stevens, A.L.Stevens at uva.nl, 2014-2015
 
 """
 
 ################################################################################
-def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
-    total_seg, mean_rate_ci_total, mean_rate_ref_total, t, ccf, ccf_error,
-    filtering):
+def dat_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total, \
+    mean_rate_ref_total, t, ccf, ccf_error, filtering):
     """
-            dat_out
-
     Writes the cross-correlation function to a .dat output file.
 
     """
@@ -41,11 +37,12 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
         out.write("\n# Date(YYYY-MM-DD localtime): %s" % str(datetime.now()))
         out.write("\n# List of event lists: %s" % in_file_list)
         out.write("\n# Background spectrum: %s" % bkgd_file)
-        out.write("\n# Time bin size = %.21f seconds" % dt)
-        out.write("\n# Number of bins per segment = %d" % n_bins)
-        out.write("\n# DETCHANS = %d" % detchans)
-        out.write("\n# Total exposure time = %d seconds" % exposure)
-        out.write("\n# Total number of segments = %d " % total_seg)
+        out.write("\n# Time bin size = %.21f seconds" % param_dict['dt'])
+        out.write("\n# Number of bins per segment = %d" % param_dict['n_bins'])
+        out.write("\n# DETCHANS = %d" % param_dict['detchans'])
+        out.write("\n# Total exposure time = %d seconds" % \
+            (param_dict['num_seg'] * param_dict['num_seconds']))
+        out.write("\n# Total number of segments = %d " % param_dict['num_seg'])
         out.write("\n# Mean count rate of ci = %s" % \
             str(list(mean_rate_ci_total)))
         out.write("\n# Mean count rate of ref band = %.5f" % \
@@ -54,37 +51,31 @@ def dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
         out.write("\n# ")
         out.write("\n# Column 1: Time bins")
         out.write("\n# Column 2-65: CCF per energy channel [count rate]")
-        out.write("\n# Column 66-129: Error on ccf per energy channel [count rate]")
+        out.write("\n# Column 66-129: Error on ccf per energy channel [count "\
+            "rate]")
         out.write("\n# ")
-        for j in xrange(0, n_bins):
+        for j in xrange(0, param_dict['n_bins']):
             out.write("\n%d" % t[j])
-            for i in xrange(0, 64):
+            for i in xrange(0, param_dict['detchans']):
                 out.write("\t%.6e" % ccf[j][i].real)
             if filtering:
-                for i in xrange(0, 64):
+                for i in xrange(0, param_dict['detchans']):
                     out.write("\t%.6e" % ccf_error[i].real)
             else:
-                for i in xrange(0, 64):
+                for i in xrange(0, param_dict['detchans']):
                     out.write("\t%.6e" % ccf_error[j][i].real)
-
-        ## End of for-loops
-    ## End of with-block
-## End of function 'dat_out'
 
 
 ################################################################################
-def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
-    total_seg, mean_rate_ci_total, mean_rate_ref_total, t, ccf, ccf_error,
-    filtering):
+def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
+    mean_rate_ref_total, t, ccf, ccf_error, filtering):
     """
-            fits_out
-
     Writes the cross-correlation function to a .fits output file.
 
     """
     print "\nOutput sent to: %s" % out_file
 
-    chan = np.arange(0, detchans)
+    chan = np.arange(0, param_dict['detchans'])
     energy_channels = np.tile(chan, len(t))
     if filtering:
         ccf_error = np.tile(ccf_error, len(t))
@@ -99,12 +90,14 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
     prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
     prihdr.set('EVTLIST', in_file_list)
     prihdr.set('BKGD', bkgd_file)
-    prihdr.set('DT', dt, "seconds")
-    prihdr.set('N_BINS', n_bins, "time bins per segment")
-    prihdr.set('SEC_SEG', n_bins * dt, "seconds per segment")
-    prihdr.set('SEGMENTS', total_seg, "segments, of all data")
-    prihdr.set('EXPOSURE', exposure, "seconds, of all data")
-    prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
+    prihdr.set('DT', param_dict['dt'], "seconds")
+    prihdr.set('N_BINS', param_dict['n_bins'], "time bins per segment")
+    prihdr.set('SEC_SEG', param_dict['num_seconds'], "seconds per segment")
+    prihdr.set('SEGMENTS', param_dict['num_seg'], "segments, of all data")
+    prihdr.set('EXPOSURE', param_dict['num_seg'] * param_dict['num_seconds'], \
+        "seconds, of all data")
+    prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy "\
+        "channels")
     prihdr.set('RATE_CI', str(mean_rate_ci_total.tolist()), "counts/second")
     prihdr.set('RATE_REF', mean_rate_ref_total, "counts/second")
     prihdr.set('FILTER', str(filtering))
@@ -131,15 +124,11 @@ def fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
     thdulist = fits.HDUList([prihdu, tbhdu])
     thdulist.writeto(out_file)
 
-## End of function 'fits_out'
-
 
 ################################################################################
 def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     filtering):
     """
-            main
-
     Reads in multiple event lists, splits into two light curves, makes segments
     and populates them to give them length n_bins, computes the cross spectrum
     of each segment per energy channel and then averaged cross spectrum of all
@@ -280,35 +269,31 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ##############################################
 
     if filtering:
-        ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(cs_avg, dt, n_bins,
-            detchans, num_seconds, total_seg, mean_rate_ci_total,
-            mean_rate_ref_total, mean_power_ci, mean_power_ref, True)
+        ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(cs_avg, param_dict,
+            mean_rate_ci_total, mean_rate_ref_total, mean_power_ci,
+            mean_power_ref, True)
     else:
-        ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins,
-            detchans, num_seconds, total_seg, mean_rate_ci_total,
-            mean_rate_ref_total, mean_power_ci, mean_power_ref, True)
+        ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
+            mean_rate_ci_total, mean_rate_ref_total, mean_power_ci,
+            mean_power_ref, True)
 
-    exposure = total_seg * num_seconds  ## Exposure time of data used
+    exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
-    print "Total number of segments:", total_seg
+    print "Total number of segments:", param_dict['num_seg']
     print "Mean rate for all of ci:", np.sum(mean_rate_ci_total)
     print "Mean rate for ref:", mean_rate_ref_total
 
-    t = np.arange(0, n_bins)  ## gives the 'front of the bin'
+    t = np.arange(0, param_dict['n_bins'])  ## gives the 'front of the bin'
 
     ##########
     ## Output
     ##########
 
-#     dat_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure, \
-#     	total_seg, mean_rate_ci_total, mean_rate_ref_total, t, ccf_end, \
-#     	ccf_error, filtering)
+#     dat_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,
+#       mean_rate_ref_total, t, ccf_end, ccf_error, filtering)
 
-    fits_out(out_file, in_file_list, bkgd_file, dt, n_bins, detchans, exposure,
-        total_seg, mean_rate_ci_total, mean_rate_ref_total, t, ccf_end,
-        ccf_error, filtering)
-
-## End of the function 'main'
+    fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
+        mean_rate_ref_total, t, ccf_end, ccf_error, filtering)
 
 
 ################################################################################
@@ -362,5 +347,4 @@ dest='filter', help='Int flag: 0 if NOT applying a filter in frequency-space, \
     main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds,
         args.dt_mult, test, filtering)
 
-## End of the program 'multi_ccf.py'
 ################################################################################
