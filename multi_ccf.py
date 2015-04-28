@@ -189,9 +189,9 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     sum_power_ci_total = np.zeros((n_bins, detchans), dtype=np.float64)
     sum_power_ref_total = np.zeros(n_bins, dtype=np.float64)
 
-    print "\nDT = %.15f" % dt
-    print "N_bins = %d" % n_bins
-    print "Nyquist freq = %f" % nyq_freq
+    print "\nDT = %.15f" % param_dict['dt']
+    print "N_bins = %d" % param_dict['n_bins']
+    print "Nyquist freq = %f" % param_dict['nyquist']
     print "Filtering?", filtering
 
     ###################################################################
@@ -233,16 +233,18 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ## End of for-loop
     print " "
 
+    param_dict['num_seg'] = total_seg
+
     #########################################
     ## Turning sums over segments into means
     #########################################
 
-    mean_ci = sum_rate_ci / float(total_seg)
-    mean_rate_ci_total = sum_rate_ci_total / float(total_seg)
-    mean_rate_ref_total = sum_rate_ref_total / float(total_seg)
-    mean_power_ci = sum_power_ci_total / float(total_seg)
-    mean_power_ref = sum_power_ref_total / float(total_seg)
-    cs_avg = cs_sum_total / float(total_seg)
+    mean_ci = sum_rate_ci / float(param_dict['num_seg'])
+    mean_rate_ci_total = sum_rate_ci_total / float(param_dict['num_seg'])
+    mean_rate_ref_total = sum_rate_ref_total / float(param_dict['num_seg'])
+    mean_power_ci = sum_power_ci_total / float(param_dict['num_seg'])
+    mean_power_ref = sum_power_ref_total / float(param_dict['num_seg'])
+    cs_avg = cs_sum_total / float(param_dict['num_seg'])
 
 # 	print "CS avg:", cs_avg[1:5, 6]
 
@@ -266,9 +268,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ## Making lag spectra
     ######################
 
-    xcor.save_for_lags(out_file, in_file_list, dt, n_bins, detchans, \
-        num_seconds, total_seg, mean_rate_ci_total, mean_rate_ref_total, \
-        cs_avg, mean_power_ci, mean_power_ref)
+    xcor.save_for_lags(out_file, in_file_list, param_dict, mean_rate_ci_total,
+        mean_rate_ref_total, cs_avg, mean_power_ci, mean_power_ref)
 
 # 	xcor.make_lags(out_file, in_file_list, dt, n_bins, detchans, num_seconds,
 # 		total_seg, mean_rate_ci_total, mean_rate_ref_total, cs_avg,
