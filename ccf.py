@@ -1030,21 +1030,21 @@ def dat_in(in_file, n_bins, detchans, dt, print_iterator, test, obs_epoch):
 
 
 ################################################################################
-def read_and_use_segments(in_file, n_bins, detchans, dt, test):
+def read_and_use_segments(in_file, param_dict, test):
     """
     Reads in segments of a light curve from a .dat or .fits file. Split into
     'fits_in' and 'dat_in' for easier readability.
 
     """
 
-    assert tools.power_of_two(n_bins), "ERROR: n_bins must be a power of 2."
+    assert tools.power_of_two(param_dict['n_bins']), "ERROR: n_bins must be a power of 2."
 
     print "Input file: %s" % in_file
 
     ## Determining print iterator for segments
-    if n_bins == 32768:
+    if param_dict['n_bins'] == 32768:
         print_iterator = int(10)
-    elif n_bins < 32768:
+    elif param_dict['n_bins'] < 32768:
         print_iterator = int(10)
     else:
         print_iterator = int(1)
@@ -1058,19 +1058,21 @@ def read_and_use_segments(in_file, n_bins, detchans, dt, test):
     if (in_file[-5:].lower() == ".fits"):
 
         obs_epoch = tools.obs_epoch_rxte(in_file)
+        param_dict['obs_epoch'] = obs_epoch
 
         cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
             sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file,
-            n_bins, detchans, dt, print_iterator, test, obs_epoch)
+            param_dict['n_bins'], param_dict['detchans'], param_dict['dt'], print_iterator, test, param_dict['obs_epoch'])
 
     elif (in_file[-4:].lower() == ".dat"):
 
         fits_file = in_file[0:-4] + ".fits"  ## Still need a fits file to get the observation time
         obs_epoch = tools.obs_epoch_rxte(fits_file)
+        param_dict['obs_epoch'] = obs_epoch
 
         cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
             sum_power_ci, sum_power_ref, sum_rate_ci = dat_in(in_file,
-            n_bins, detchans, dt, print_iterator, test, obs_epoch)
+            param_dict['n_bins'], param_dict['detchans'], param_dict['dt'], print_iterator, test, param_dict['obs_epoch'])
 
     else:
         raise Exception("ERROR: Input file type not recognized. Must be .dat or\
@@ -1134,7 +1136,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     n_bins = num_seconds * int(1.0 / dt)
     nyquist_freq = 1.0 / (2.0 * dt)
     detchans = int(tools.get_key_val(in_file, 0, 'DETCHANS'))
-
+    df = 1.0 / float(num_seconds)
     param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
                  'df': df, 'nyquist': nyquist_freq, 'n_bins': n_bins, \
                  'detchans': detchans}
@@ -1160,7 +1162,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 
     cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, sum_power_ci, \
         sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, \
-        param_dict['n_bins'], param_dict['detchans'], param_dict['dt'], test)
+        param_dict, test)
 
     param_dict['num_seg'] = num_seg
 
