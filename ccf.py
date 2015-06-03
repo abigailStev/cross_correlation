@@ -883,8 +883,7 @@ def fits_in(in_file, param_dict, print_iterator, test):
 ################################################################################
 def read_and_use_segments(in_file, param_dict, test):
     """
-    Reads in segments of a light curve from a .dat or .fits file. Split into
-    'fits_in' and 'dat_in' for easier readability.
+    Reads in segments of a light curve from .fits file.
 
     """
 
@@ -906,26 +905,12 @@ def read_and_use_segments(in_file, param_dict, test):
     ## Data is read in differently from fits and dat files
     #######################################################
 
-    if (in_file[-5:].lower() == ".fits"):
 
-        param_dict['obs_epoch'] = tools.obs_epoch_rxte(in_file)
+    param_dict['obs_epoch'] = tools.obs_epoch_rxte(in_file)
 
-        cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
+    cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
             sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file,
             param_dict, print_iterator, test)
-
-    elif (in_file[-4:].lower() == ".dat"):
-
-        fits_file = in_file[0:-4] + ".fits"  ## Still need a fits file to get the observation time
-        param_dict['obs_epoch'] = tools.obs_epoch_rxte(fits_file)
-
-        cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
-            sum_power_ci, sum_power_ref, sum_rate_ci = dat_in(in_file,
-            param_dict, print_iterator, test)
-
-    else:
-        raise Exception("ERROR: Input file type not recognized. Must be .dat or\
-.fits.")
 
     return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
         sum_power_ci, sum_power_ref, sum_rate_ci
@@ -1094,7 +1079,7 @@ if __name__ == "__main__":
         "interest with a reference band.", epilog="For optional arguments, "\
         "default values are given in brackets at end of description.")
 
-    parser.add_argument('infile', help="The name of the .fits or .dat event "\
+    parser.add_argument('infile', help="The name of the GTI'd FITS event "\
         "list containing both the reference band and the channels of interest. "\
         "Assumes channels of interest = PCU 2, ref band = all other PCUs.")
 
