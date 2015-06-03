@@ -8,7 +8,7 @@ import subprocess
 from astropy.io import fits
 import tools  # https://github.com/abigailStev/whizzy_scripts
 
-__author__ = "Abigail Stevens"
+__author__ = "Abigail Stevens, A.L.Stevens at uva.nl"
 
 """
 ccf.py
@@ -16,9 +16,27 @@ ccf.py
 Computes the cross-correlation function of narrow energy channels of interest
 with a broad energy reference band from RXTE event-mode data.
 
-Abigail Stevens, A.L.Stevens@uva.nl, 2014-2015
+Abigail Stevens, A.L.Stevens at uva.nl, 2014-2015
 
 """
+
+class PSD(object):
+    def __init__(self):
+        self.power = np.asarray([])
+        self.noise = 0
+        self.variance = 0
+        self.rms = 0
+
+class Lightcurve(object):
+    def __init__(self):
+        self.mean_rate = 0
+        self.time = np.asarray([])
+        self.energy = np.asarray([])
+        self.raw = PSD()
+        self.absrms = PSD()
+        self.fracrms = PSD()
+        self.leahy = PSD()
+
 
 ################################################################################
 def dat_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci_whole,
@@ -523,7 +541,7 @@ def standard_ccf_err(param_dict):
         sample_var_i = np.sum(ccf_resid_i**2, axis=0) / float(param_dict['num_seg']-1)  ## eq 2.3
         standard_err_i = np.sqrt(sample_var_i/float(param_dict['num_seg']))  ## eq 2.4
         standard_err[:,i] = standard_err_i
-
+    print(standard_err)
     return standard_err
 
 
@@ -701,13 +719,14 @@ def print_seg_ccf(param_dict, rate_ref, power_ref, cs_seg):
     absrms_rms_ref = np.sqrt(absrms_var_ref)
     ccf *= (2.0 / float(param_dict['n_bins']) / absrms_rms_ref)
 
-    for i in range(0, param_dict['detchans']):
-        out_file = "./out_ccf/ccf_segs_" + str(i) + ".dat"
+    if not np.isnan(absrms_rms_ref):
+        for i in range(0, param_dict['detchans']):
+            out_file = "./out_ccf/ccf_segs_" + str(i) + ".dat"
 
-        with open(out_file, 'a') as out:
-            for element in ccf[0:200,i]:
-                out.write("%.6e\t" % element)
-            out.write("\n")
+            with open(out_file, 'a') as out:
+                for element in ccf[0:200,i]:
+                    out.write("%.6e\t" % element)
+                out.write("\n")
 
 
 ################################################################################
