@@ -30,8 +30,6 @@ class PSD(object):
 class Lightcurve(object):
     def __init__(self):
         self.mean_rate = 0
-        self.time = np.asarray([])
-        self.energy = np.asarray([])
         self.raw = PSD()
         self.absrms = PSD()
         self.fracrms = PSD()
@@ -625,13 +623,16 @@ def make_cs(rate_ci, rate_ref, param_dict):
     assert np.shape(rate_ref) == (param_dict['n_bins'], ), "ERROR: Reference "\
         "light curve has wrong dimensions. Must have size (n_bins, )."
 
+    ci_seg = Lightcurve()
+    ref_seg = Lightcurve()
+
     ## Computing the mean count rate of the segment
-    mean_rate_ci_seg = np.mean(rate_ci, axis=0)
-    mean_rate_ref_seg = np.mean(rate_ref)
+    ci_seg.mean_rate = np.mean(rate_ci, axis=0)
+    ref_seg.mean_rate = np.mean(rate_ref)
 
     ## Subtracting the mean off each value of 'rate'
-    rate_sub_mean_ci = np.subtract(rate_ci, mean_rate_ci_seg)
-    rate_sub_mean_ref = np.subtract(rate_ref, mean_rate_ref_seg)
+    rate_sub_mean_ci = np.subtract(rate_ci, ci_seg.mean_rate)
+    rate_sub_mean_ref = np.subtract(rate_ref, ref_seg.mean_rate)
 
     ## Taking the FFT of the time-domain photon count rate
     ## SciPy is faster than NumPy or pyFFTW for my array sizes
@@ -639,8 +640,8 @@ def make_cs(rate_ci, rate_ref, param_dict):
     fft_data_ref = fftpack.fft(rate_sub_mean_ref)
 
     ## Computing the power from the fourier transform
-    power_ci = np.absolute(fft_data_ci) ** 2
-    power_ref = np.absolute(fft_data_ref) ** 2
+    ci_seg.raw.power = np.absolute(fft_data_ci) ** 2
+    ref_seg.raw.power = np.absolute(fft_data_ref) ** 2
 
     ## Broadcasting fft of ref into same shape as fft of ci
     fft_data_ref = np.resize(np.repeat(fft_data_ref, param_dict['detchans']), \
@@ -651,17 +652,17 @@ def make_cs(rate_ci, rate_ref, param_dict):
 
 # 	print cs_seg[1:5, 6]
 
-    return cs_seg, mean_rate_ci_seg, mean_rate_ref_seg, power_ci, power_ref
+    return cs_seg, ci_seg, ref_seg
 
 
 ################################################################################
-def print_seg_ccf(param_dict, rate_ref, power_ref, cs_seg):
+def print_seg_ccf(param_dict, meanrate_ref, power_ref, cs_seg):
     """
-    Printing the first 200 values of each segment of the ccf so that I can
+    Printing the first 200 values of each segment of the ccf so that we can
     compute the standard error on the mean ccf.
 
     """
-    absrms_noise_ref = 2.0 * rate_ref * 0.985
+    absrms_noise_ref = 2.0 * meanrate_ref * 0.985
     absrms_power_ref = power_ref * (2.0 * param_dict['dt'] / \
         float(param_dict['n_bins'])) - absrms_noise_ref
     absrms_var_ref = np.sum(absrms_power_ref * param_dict['df'])
@@ -683,8 +684,7 @@ def print_seg_ccf(param_dict, rate_ref, power_ref, cs_seg):
 
 ################################################################################
 def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
-    start_time, sum_rate_ci_whole, sum_rate_ref_whole, sum_power_ci, \
-    sum_power_ref, cs_sum, sum_rate_ci):
+    start_time, ci_file, ref_file, cs_sum, sum_rate_ci):
     """
     Turns the event list into a populated histogram, stacks the reference band,
     and makes the cross spectrum, per segment of light curve.
@@ -692,11 +692,6 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
     """
     assert len(time_ci) == len(energy_ci)
     assert len(time_ref) == len(energy_ref)
-
-    ## Initializations
-    mean_rate_ci_seg = np.zeros(param_dict['detchans'], dtype=np.float64)
-    mean_rate_ref_seg = np.zeros(param_dict['detchans'], dtype=np.float64)
-    cs_seg = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.complex128)
 
     ##############################################################
     ## Populate the light curves for interest and reference bands
@@ -722,28 +717,26 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
     ## Make the cross spectrum
     ###########################
 
-    cs_seg, mean_rate_ci_seg, mean_rate_ref_seg, power_ci, \
-        power_ref = make_cs(rate_ci_2d, rate_ref, param_dict)
+    cs_seg, ci_seg, ref_seg = make_cs(rate_ci_2d, rate_ref, param_dict)
 
     #####################################################
     ## Printing ccf to a file to later get error for ccf
     #####################################################
-    print_seg_ccf(param_dict, mean_rate_ref_seg, power_ref, cs_seg)
+    print_seg_ccf(param_dict, ref_seg.mean_rate, ref_seg.raw.power, cs_seg)
 
     ## Sums across segments -- arrays, so it adds by index
-    sum_rate_ci_whole += mean_rate_ci_seg
-    sum_rate_ref_whole += mean_rate_ref_seg
-    sum_power_ci += power_ci
-    sum_power_ref += power_ref
+    ci_file.mean_rate += ci_seg.mean_rate
+    ref_file.mean_rate += ref_seg.mean_rate
+    ci_file.raw.power += ci_seg.raw.power
+    ref_file.raw.power += ref_seg.raw.power
     cs_sum += cs_seg
     sum_rate_ci += np.mean(rate_ci_2d)
 
-    return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, sum_power_ci, \
-        sum_power_ref, sum_rate_ci
+    return cs_sum, ci_file, ref_file, sum_rate_ci
 
 
 ################################################################################
-def fits_in(in_file, param_dict, print_iterator, test):
+def fits_in(in_file, param_dict, print_iterator):
     """
     Reading in an eventlist in .fits format to make the cross spectrum. Reads
     in a clock-corrected GTI'd event list, populates the light curves, computes
@@ -774,13 +767,16 @@ def fits_in(in_file, param_dict, print_iterator, test):
     ###################
 
     num_seg = 0
-    sum_rate_ci_whole = np.zeros(param_dict['detchans'], dtype=np.float64)
-    sum_rate_ref_whole = 0
+
+    ci = Lightcurve()
+    ref = Lightcurve()
+
+    ci.mean_rate = np.zeros(param_dict['detchans'], dtype=np.float64)
+    ref.mean_rate = 0
     cs_sum = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.complex128)
-    sum_power_ci = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.float64)
-    sum_power_ref = np.zeros(param_dict['n_bins'], dtype=np.float64)
+    ci.raw.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.float64)
+    ref.raw.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
     sum_rate_ci = 0
-    sum_acf_ref = np.zeros(param_dict['n_bins'])
 
     start_time = data.field('TIME')[0]
     final_time = data.field('TIME')[-1]
@@ -848,15 +844,13 @@ def fits_in(in_file, param_dict, print_iterator, test):
 
             num_seg += 1
 
-            cs_sum, sum_rate_ci_whole, sum_rate_ref_whole,  sum_power_ci, \
-                sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref,
+            cs_sum, ci, ref, sum_rate_ci = each_segment(time_ci, time_ref,
                 energy_ci, energy_ref, param_dict, start_time,
-                sum_rate_ci_whole, sum_rate_ref_whole,
-                sum_power_ci, sum_power_ref, cs_sum, sum_rate_ci)
+                ci, ref, cs_sum, sum_rate_ci)
 
             if num_seg % print_iterator == 0:
                 print "\t", num_seg
-            if test is True and num_seg == 1:  # For testing
+            if param_dict['test'] is True and num_seg == 1:  # For testing
                 break
 
             start_time += param_dict['num_seconds']
@@ -876,18 +870,19 @@ def fits_in(in_file, param_dict, print_iterator, test):
 
     ## End of while-loop
 
-    return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
-        sum_power_ci, sum_power_ref, sum_rate_ci
+    return cs_sum, ci.mean_rate, ref.mean_rate, num_seg, \
+        ci.raw.power, ref.raw.power, sum_rate_ci
 
 
 ################################################################################
-def read_and_use_segments(in_file, param_dict, test):
+def read_and_use_segments(in_file, param_dict):
     """
     Reads in segments of a light curve from .fits file.
 
     """
 
-    assert tools.power_of_two(param_dict['n_bins']), "ERROR: n_bins must be a power of 2."
+    assert tools.power_of_two(param_dict['n_bins']), "ERROR: n_bins must be a "\
+            "power of 2."
 
     print "Input file: %s" % in_file
 
@@ -910,7 +905,7 @@ def read_and_use_segments(in_file, param_dict, test):
 
     cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
             sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file,
-            param_dict, print_iterator, test)
+            param_dict, print_iterator)
 
     return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
         sum_power_ci, sum_power_ref, sum_rate_ci
@@ -973,7 +968,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     df = 1.0 / float(num_seconds)
     param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
                  'df': df, 'nyquist': nyquist_freq, 'n_bins': n_bins, \
-                 'detchans': detchans}
+                 'detchans': detchans, 'test': test}
 
     print "\nDT = %f" % param_dict['dt']
     print "N_bins = %d" % param_dict['n_bins']
@@ -996,7 +991,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 
     cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, sum_power_ci, \
         sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, \
-        param_dict, test)
+        param_dict)
 
     param_dict['num_seg'] = num_seg
 
