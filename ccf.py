@@ -11,8 +11,6 @@ import tools  # https://github.com/abigailStev/whizzy_scripts
 __author__ = "Abigail Stevens, A.L.Stevens at uva.nl"
 
 """
-ccf.py
-
 Computes the cross-correlation function of narrow energy channels of interest
 with a broad energy reference band from RXTE event-mode data.
 
@@ -37,8 +35,8 @@ class Lightcurve(object):
 
 
 ################################################################################
-def fits_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci_whole, \
-    mean_rate_ref_whole, t, ccf, ccf_error, filter):
+def fits_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci, \
+    mean_rate_ref, t, ccf, ccf_error, filter):
     """
     Writes the cross-correlation function to a .fits output file.
 
@@ -71,8 +69,8 @@ def fits_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci_whole, \
         "seconds, of light curve")
     prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy"\
         " channels")
-    prihdr.set('RATE_CI', str(mean_rate_ci_whole.tolist()), "counts/second")
-    prihdr.set('RATE_REF', mean_rate_ref_whole, "counts/second")
+    prihdr.set('RATE_CI', str(mean_rate_ci.tolist()), "counts/second")
+    prihdr.set('RATE_REF', mean_rate_ref, "counts/second")
     prihdr.set('FILTER', str(filter))
     prihdu = fits.PrimaryHDU(header=prihdr)
 
@@ -643,8 +641,6 @@ def make_cs(rate_ci, rate_ref, param_dict):
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
 
-# 	print cs_seg[1:5, 6]
-
     return cs_seg, ci_seg, ref_seg
 
 
@@ -938,7 +934,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     df = 1.0 / float(num_seconds)
     param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
             'df': df, 'nyquist': nyquist_freq, 'n_bins': n_bins, \
-            'detchans': detchans, 'test': test, 'num_seg':0, \
+            'detchans': detchans, 'test': test, 'num_seg': 0, \
             'obs_epoch': tools.obs_epoch_rxte(in_file)}
 
     print "\nDT = %f" % param_dict['dt']
