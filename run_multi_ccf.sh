@@ -57,14 +57,14 @@ if [ ! -d "$lag_out_dir" ]; then mkdir -p "$lag_out_dir"; fi
 
 bkgd_spec="$home_dir/Reduced_data/$prefix/evt_bkgd_rebinned.pha"
 
-# lag_lf=4.0  ## Lower frequency bound for lag spectra, in Hz
-# lag_uf=7.0  ## Upper frequency bound for lag spectra, in Hz
-lag_lf=0.566
-lag_uf=1.786
+lag_lf=4.0  ## Lower frequency bound for lag spectra, in Hz
+lag_uf=7.0  ## Upper frequency bound for lag spectra, in Hz
+#lag_lf=0.566
+#lag_uf=1.786
 lag_le=3
 lag_ue=9
 
-tlen=100  ## Number of time bins to plot along the 2D CCF x-axis
+tlen=70  ## Number of time bins to plot along the 2D CCF x-axis
 obs_epoch=5
 
 t_ext="fits"
@@ -96,11 +96,11 @@ done
 
 if [ -e "$saved_file_list" ] && [ -e "$bkgd_spec" ]; then
 	python "$exe_dir"/multi_CCF.py "$saved_file_list" "${out_file}.${t_ext}" \
-		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtering"	
+		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtering"
 elif [ -e "$saved_file_list" ]; then
 	python "$exe_dir"/multi_CCF.py "$saved_file_list" "${out_file}.${t_ext}" \
 		-n "$numsec" -m "$dt" -t "$testing" -f "$filtering"
-else 
+else
 	echo -e "\tERROR: multi_ccf.py was not run. List of eventlists and/or \
 background energy spectrum doesn't exist."
 fi
@@ -112,7 +112,7 @@ fi
 if [ -e "${out_file}.${t_ext}" ]; then
 	python "$exe_dir"/plot_CCF.py "${out_file}.${t_ext}" -o "${plot_root}" \
 		-p "$prefix" --ext "$p_ext"
-#	if [ -e "${plot_root}_chan_15.${p_ext}" ]; then open "${plot_root}_chan_15.${p_ext}"; fi
+	if [ -e "${plot_root}_chan_15.${p_ext}" ]; then open "${plot_root}_chan_15.${p_ext}"; fi
 	
 	multi_plot="${plot_root}_multiccfs.${p_ext}"
 	python "$exe_dir"/plot_multi.py "${out_file}.${t_ext}" "$multi_plot" \
@@ -170,28 +170,30 @@ fi
 #####################
 ## Plotting the lags
 #####################
-#
-#cd "$lag_exe_dir"
-#
-#if (( $testing == 0 )); then
-#	out_file="$lag_out_dir/${prefix}_${day}_t${dt}_${numsec}sec"
-#	plot_root="$lag_out_dir/${prefix}_${day}_t${dt}_${numsec}sec"
-#elif (( $testing == 1 )); then
-#	out_file="$lag_out_dir/test_${prefix}_${day}_t${dt}_${numsec}sec"
-#	plot_root="$lag_out_dir/test_${prefix}_${day}_t${dt}_${numsec}sec"
-#fi
-#
-#if [ -e "${out_file}_cs.${t_ext}" ]; then
-#
-#	python "$lag_exe_dir"/get_lags.py "${out_file}_cs.${t_ext}" \
-#		"${out_file}_lag.${t_ext}" -o "${plot_root}" -p "$prefix" -e "${p_ext}"\
-#		--lf "${lag_lf}" --uf "${lag_uf}" --le "${lag_le}" --ue "${lag_ue}"
-##	if [ -e "$plot_root"_lag-energy.png ]; then open "$plot_root"_lag-energy.png; fi
-##	if [ -e "$plot_root"_lag-freq.png ]; then open "$plot_root"_lag-freq.png; fi
-#
-#else
-#	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
-#fi
+
+cd "$lag_exe_dir"
+
+if (( $testing == 0 )); then
+	out_file="$lag_out_dir/${prefix}_${day}_t${dt}_${numsec}sec"
+	plot_root="$lag_out_dir/${prefix}_${day}_t${dt}_${numsec}sec"
+elif (( $testing == 1 )); then
+	out_file="$lag_out_dir/test_${prefix}_${day}_t${dt}_${numsec}sec"
+	plot_root="$lag_out_dir/test_${prefix}_${day}_t${dt}_${numsec}sec"
+fi
+
+if [ -e "${out_file}_cs.${t_ext}" ]; then
+
+	python "$lag_exe_dir"/get_lags.py "${out_file}_cs.${t_ext}" \
+			"${out_file}_lag.${t_ext}" -o "${plot_root}" -p "$prefix" \
+			-e "${p_ext}" --lf "${lag_lf}" --uf "${lag_uf}" --le "${lag_le}" \
+			--ue "${lag_ue}"
+
+	if [ -e "$plot_root"_lag-energy.png ]; then open "$plot_root"_lag-energy.png; fi
+#	if [ -e "$plot_root"_lag-freq.png ]; then open "$plot_root"_lag-freq.png; fi
+
+else
+	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
+fi
 
 ################################################################################
 ## All done!
