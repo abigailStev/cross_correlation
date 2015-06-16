@@ -6,7 +6,7 @@ from datetime import datetime
 import os.path
 import subprocess
 from astropy.io import fits
-import tools  # https://github.com/abigailStev/whizzy_scripts
+import tools  # in https://github.com/abigailStev/whizzy_scripts
 
 __author__ = "Abigail Stevens, A.L.Stevens at uva.nl"
 
