@@ -309,7 +309,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
         cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
             sum_power_ci, sum_power_ref, sum_rate_ci = \
-            xcor.read_and_use_segments(in_file, param_dict, test)
+            xcor.fits_in(in_file, param_dict, test)
 
         print "Segments for this file: %d\n" % num_seg
 

@@ -28,9 +28,8 @@ class PSD(object):
 class Lightcurve(object):
     def __init__(self):
         self.mean_rate = 0
-        self.time = np.asarray([])
-        self.energy = np.asarray([])
-        self.raw = PSD()
+        self.raw_full = PSD()
+        self.raw_half = PSD()
         self.absrms = PSD()
         self.fracrms = PSD()
         self.leahy = PSD()
@@ -741,7 +740,7 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
 
 
 ################################################################################
-def fits_in(in_file, param_dict, print_iterator, test):
+def fits_in(in_file, param_dict, test):
     """
     Reading in an eventlist in .fits format to make the cross spectrum. Reads
     in a clock-corrected GTI'd event list, populates the light curves, computes
@@ -752,6 +751,20 @@ def fits_in(in_file, param_dict, print_iterator, test):
     counting and/or skipping events.
 
     """
+
+    assert tools.power_of_two(param_dict['n_bins']), "ERROR: n_bins must be a "\
+            "power of 2."
+    param_dict['obs_epoch'] = tools.obs_epoch_rxte(in_file)
+
+    print "Input file: %s" % in_file
+
+    ## Determining print iterator for segments
+    if param_dict['n_bins'] == 32768:
+        print_iterator = int(10)
+    elif param_dict['n_bins'] < 32768:
+        print_iterator = int(10)
+    else:
+        print_iterator = int(1)
 
     #######################################################
     ## Check if the FITS file exists; if so, load the data
@@ -817,6 +830,7 @@ def fits_in(in_file, param_dict, print_iterator, test):
     ############################
     ## Looping through segments
     ############################
+    print "Segments computed:"
 
     while seg_end_time < final_time:
 
@@ -873,57 +887,6 @@ def fits_in(in_file, param_dict, print_iterator, test):
         ## End of 'if there are counts in this segment'
 
     ## End of while-loop
-
-    return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
-        sum_power_ci, sum_power_ref, sum_rate_ci
-
-
-################################################################################
-def read_and_use_segments(in_file, param_dict, test):
-    """
-    Reads in segments of a light curve from a .dat or .fits file. Split into
-    'fits_in' and 'dat_in' for easier readability.
-
-    """
-
-    assert tools.power_of_two(param_dict['n_bins']), "ERROR: n_bins must be a power of 2."
-
-    print "Input file: %s" % in_file
-
-    ## Determining print iterator for segments
-    if param_dict['n_bins'] == 32768:
-        print_iterator = int(10)
-    elif param_dict['n_bins'] < 32768:
-        print_iterator = int(10)
-    else:
-        print_iterator = int(1)
-
-    print "Segments computed:"
-
-    #######################################################
-    ## Data is read in differently from fits and dat files
-    #######################################################
-
-    if (in_file[-5:].lower() == ".fits"):
-
-        param_dict['obs_epoch'] = tools.obs_epoch_rxte(in_file)
-
-        cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
-            sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file,
-            param_dict, print_iterator, test)
-
-    elif (in_file[-4:].lower() == ".dat"):
-
-        fits_file = in_file[0:-4] + ".fits"  ## Still need a fits file to get the observation time
-        param_dict['obs_epoch'] = tools.obs_epoch_rxte(fits_file)
-
-        cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
-            sum_power_ci, sum_power_ref, sum_rate_ci = dat_in(in_file,
-            param_dict, print_iterator, test)
-
-    else:
-        raise Exception("ERROR: Input file type not recognized. Must be .dat or\
-.fits.")
 
     return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
         sum_power_ci, sum_power_ref, sum_rate_ci
@@ -1007,9 +970,9 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Reading in data, computing the cross spectrum
     #################################################
 
-    cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, sum_power_ci, \
-        sum_power_ref, sum_rate_ci = read_and_use_segments(in_file, \
-        param_dict, test)
+    cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
+            sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file,
+            param_dict, test)
 
     param_dict['num_seg'] = num_seg
 
