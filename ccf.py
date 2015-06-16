@@ -649,7 +649,8 @@ def make_cs(rate_ci, rate_ref, param_dict):
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
 
-    return cs_seg, ci_seg.mean_rate, ref_seg.mean_rate, ci_seg.raw_full, ref_seg.raw_full
+    # return cs_seg, ci_seg.mean_rate, ref_seg.mean_rate, ci_seg.raw_full, ref_seg.raw_full
+    return cs_seg, ci_seg, ref_seg
 
 
 ################################################################################
@@ -720,19 +721,20 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
     ## Make the cross spectrum
     ###########################
 
-    cs_seg, mean_rate_ci_seg, mean_rate_ref_seg, power_ci, \
-        power_ref = make_cs(rate_ci_2d, rate_ref, param_dict)
+    # cs_seg, mean_rate_ci_seg, mean_rate_ref_seg, power_ci, \
+    #     power_ref = make_cs(rate_ci_2d, rate_ref, param_dict)
+    cs_seg, ci_seg, ref_seg = make_cs(rate_ci_2d, rate_ref, param_dict)
 
     #####################################################
     ## Printing ccf to a file to later get error for ccf
     #####################################################
-    print_seg_ccf(param_dict, mean_rate_ref_seg, power_ref, cs_seg)
+    print_seg_ccf(param_dict, ref_seg.mean_rate, ref_seg.raw_full, cs_seg)
 
     ## Sums across segments -- arrays, so it adds by index
-    sum_rate_ci_whole += mean_rate_ci_seg
-    sum_rate_ref_whole += mean_rate_ref_seg
-    sum_power_ci += power_ci
-    sum_power_ref += power_ref
+    sum_rate_ci_whole += ci_seg.mean_rate
+    sum_rate_ref_whole += ref_seg.mean_rate
+    sum_power_ci += ci_seg.raw_full
+    sum_power_ref += ref_seg.raw_full
     cs_sum += cs_seg
     sum_rate_ci += np.mean(rate_ci_2d)
 
