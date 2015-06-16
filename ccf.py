@@ -20,7 +20,7 @@ with a broad energy reference band from RXTE event-mode data.
 
 class PSD(object):
     def __init__(self):
-        self.power = np.asarray([])
+        self.power = 0
         self.noise = 0
         self.variance = 0
         self.rms = 0
@@ -28,8 +28,7 @@ class PSD(object):
 class Lightcurve(object):
     def __init__(self):
         self.mean_rate = 0
-        self.raw_full = PSD()
-        self.raw_half = PSD()
+        self.raw = PSD()
         self.absrms = PSD()
         self.fracrms = PSD()
 
@@ -495,8 +494,9 @@ def standard_ccf_err(param_dict):
 
 
 ################################################################################
-def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref,
-    power_ci, power_ref, noisy):
+# def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, ci, ref, noisy):
+def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
+        power_ci, power_ref, noisy):
     """
     Takes the iFFT of the cross spectrum to get the cross-correlation function,
     and computes the error on the cross-correlation function. This error is
@@ -639,8 +639,8 @@ def make_cs(rate_ci, rate_ref, param_dict):
     fft_data_ref = fftpack.fft(rate_sub_mean_ref)
 
     ## Computing the power from the fourier transform
-    ci_seg.raw_full = np.absolute(fft_data_ci) ** 2
-    ref_seg.raw_full = np.absolute(fft_data_ref) ** 2
+    ci_seg.raw.power = np.absolute(fft_data_ci) ** 2
+    ref_seg.raw.power = np.absolute(fft_data_ref) ** 2
 
     ## Broadcasting fft of ref into same shape as fft of ci
     fft_data_ref = np.resize(np.repeat(fft_data_ref, param_dict['detchans']), \
@@ -649,7 +649,7 @@ def make_cs(rate_ci, rate_ref, param_dict):
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
 
-    # return cs_seg, ci_seg.mean_rate, ref_seg.mean_rate, ci_seg.raw_full, ref_seg.raw_full
+    # return cs_seg, ci_seg.mean_rate, ref_seg.mean_rate, ci_seg.raw.power, ref_seg.raw.power
     return cs_seg, ci_seg, ref_seg
 
 
@@ -727,7 +727,7 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
     #####################################################
     ## Printing ccf to a file to later get error for ccf
     #####################################################
-    print_seg_ccf(param_dict, ref_seg.mean_rate, ref_seg.raw_full, cs_seg)
+    print_seg_ccf(param_dict, ref_seg.mean_rate, ref_seg.raw.power, cs_seg)
 
     return cs_seg, ci_seg, ref_seg, np.mean(rate_ci_2d)
 
@@ -788,8 +788,8 @@ def fits_in(in_file, param_dict, test):
 
     ci_whole = Lightcurve()
     ref_whole = Lightcurve()
-    ci_whole.raw_full = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.float64)
-    ref_whole.raw_full = np.zeros(param_dict['n_bins'], dtype=np.float64)
+    ci_whole.raw.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.float64)
+    ref_whole.raw.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
     ci_whole.mean_rate = np.zeros(param_dict['detchans'], dtype=np.float64)
     ref_whole.mean_rate = 0
 
@@ -865,8 +865,8 @@ def fits_in(in_file, param_dict, test):
             num_seg += 1
             ci_whole.mean_rate += ci_seg.mean_rate
             ref_whole.mean_rate += ref_seg.mean_rate
-            ci_whole.raw_full += ci_seg.raw_full
-            ref_whole.raw_full += ref_seg.raw_full
+            ci_whole.raw.power += ci_seg.raw.power
+            ref_whole.raw.power += ref_seg.raw.power
             cs_sum += cs_seg
             sum_rate_ci += rate_ci
 
@@ -984,8 +984,8 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     cs_avg = cs_sum / float(param_dict['num_seg'])
     ci_whole.mean_rate /= float(param_dict['num_seg'])
     ref_whole.mean_rate /= float(param_dict['num_seg'])
-    ci_whole.raw_full /= float(param_dict['num_seg'])
-    ref_whole.raw_full /= float(param_dict['num_seg'])
+    ci_whole.raw.power /= float(param_dict['num_seg'])
+    ref_whole.raw.power /= float(param_dict['num_seg'])
 
     ################################################################
     ## Printing the cross spectrum to a file, for plotting/checking
@@ -1010,7 +1010,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ######################
 
     save_for_lags(out_file, in_file, param_dict, ci_whole.mean_rate,
-        ref_whole.mean_rate, cs_avg, ci_whole.raw_full, ref_whole.raw_full)
+        ref_whole.mean_rate, cs_avg, ci_whole.raw.power, ref_whole.raw.power)
 
     ##############################################
     ## Computing ccf from cs, and computing error
@@ -1018,12 +1018,12 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 
     if filter:
         ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, param_dict,
-            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.raw_full,
-            ref_whole.raw_full, True)
+            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.raw.power,
+            ref_whole.raw.power, True)
     else:
         ccf_end, ccf_error = UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
-            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.raw_full,
-            ref_whole.raw_full, True)
+            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.raw.power,
+            ref_whole.raw.power, True)
 
     print "Number of segments:", param_dict['num_seg']
     print "Sum of mean rate for ci:", np.sum(ci_whole.mean_rate)
