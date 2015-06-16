@@ -649,8 +649,6 @@ def make_cs(rate_ci, rate_ref, param_dict):
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
 
-# 	print cs_seg[1:5, 6]
-
     return cs_seg, ci_seg.mean_rate, ref_seg.mean_rate, ci_seg.raw_full, ref_seg.raw_full
 
 
