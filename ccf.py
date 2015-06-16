@@ -682,8 +682,7 @@ def print_seg_ccf(param_dict, rate_ref, power_ref, cs_seg):
 
 ################################################################################
 def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
-    start_time, sum_rate_ci_whole, sum_rate_ref_whole, sum_power_ci, \
-    sum_power_ref, cs_sum, sum_rate_ci):
+    start_time):
     """
     Turns the event list into a populated histogram, stacks the reference band,
     and makes the cross spectrum, per segment of light curve.
@@ -730,16 +729,7 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
     #####################################################
     print_seg_ccf(param_dict, ref_seg.mean_rate, ref_seg.raw_full, cs_seg)
 
-    ## Sums across segments -- arrays, so it adds by index
-    sum_rate_ci_whole += ci_seg.mean_rate
-    sum_rate_ref_whole += ref_seg.mean_rate
-    sum_power_ci += ci_seg.raw_full
-    sum_power_ref += ref_seg.raw_full
-    cs_sum += cs_seg
-    sum_rate_ci += np.mean(rate_ci_2d)
-
-    return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, sum_power_ci, \
-        sum_power_ref, sum_rate_ci
+    return cs_seg, ci_seg, ref_seg, np.mean(rate_ci_2d)
 
 
 ################################################################################
@@ -788,13 +778,20 @@ def fits_in(in_file, param_dict, test):
     ###################
 
     num_seg = 0
-    sum_rate_ci_whole = np.zeros(param_dict['detchans'], dtype=np.float64)
-    sum_rate_ref_whole = 0
+    # sum_rate_ci_whole = np.zeros(param_dict['detchans'], dtype=np.float64)
+    # sum_rate_ref_whole = 0
+    # sum_power_ci = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.float64)
+    # sum_power_ref = np.zeros(param_dict['n_bins'], dtype=np.float64)
+
     cs_sum = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.complex128)
-    sum_power_ci = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.float64)
-    sum_power_ref = np.zeros(param_dict['n_bins'], dtype=np.float64)
     sum_rate_ci = 0
-    sum_acf_ref = np.zeros(param_dict['n_bins'])
+
+    ci_whole = Lightcurve()
+    ref_whole = Lightcurve()
+    ci_whole.raw_full = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.float64)
+    ref_whole.raw_full = np.zeros(param_dict['n_bins'], dtype=np.float64)
+    ci_whole.mean_rate = np.zeros(param_dict['detchans'], dtype=np.float64)
+    ref_whole.mean_rate = 0
 
     start_time = data.field('TIME')[0]
     final_time = data.field('TIME')[-1]
@@ -863,11 +860,16 @@ def fits_in(in_file, param_dict, test):
 
             num_seg += 1
 
-            cs_sum, sum_rate_ci_whole, sum_rate_ref_whole,  sum_power_ci, \
-                sum_power_ref, sum_rate_ci = each_segment(time_ci, time_ref,
-                energy_ci, energy_ref, param_dict, start_time,
-                sum_rate_ci_whole, sum_rate_ref_whole,
-                sum_power_ci, sum_power_ref, cs_sum, sum_rate_ci)
+            cs_seg, ci_seg, ref_seg, rate_ci = each_segment(time_ci, \
+                    time_ref, energy_ci, energy_ref, param_dict, start_time)
+
+            ## Sums across segments -- arrays, so it adds by index
+            ci_whole.mean_rate += ci_seg.mean_rate
+            ref_whole.mean_rate += ref_seg.mean_rate
+            ci_whole.raw_full += ci_seg.raw_full
+            ref_whole.raw_full += ref_seg.raw_full
+            cs_sum += cs_seg
+            sum_rate_ci += rate_ci
 
             if num_seg % print_iterator == 0:
                 print "\t", num_seg
@@ -891,8 +893,8 @@ def fits_in(in_file, param_dict, test):
 
     ## End of while-loop
 
-    return cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
-        sum_power_ci, sum_power_ref, sum_rate_ci
+    return cs_sum, ci_whole.mean_rate, ref_whole.mean_rate, num_seg, \
+        ci_whole.raw_full, ref_whole.raw_full, sum_rate_ci
 
 
 ################################################################################
