@@ -272,24 +272,16 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
                  'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
                  'detchans': detchans}
-
+    ci_total = xcor.Lightcurve()
+    ref_total = xcor.Lightcurve()
     total_seg = 0
     cs_sum_total = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
         dtype=np.complex128)
-
-    ci_total = xcor.Lightcurve()
-    ref_total = xcor.Lightcurve()
     ci_total.mean_rate = np.zeros(param_dict['detchans'])
     ref_total.mean_rate = 0
     ci_total.raw_full = np.zeros((param_dict['n_bins'], \
         param_dict['detchans']), dtype=np.float64)
     ref_total.raw_full = np.zeros(param_dict['n_bins'], dtype=np.float64)
-
-    # sum_rate_ci_total = np.zeros(param_dict['detchans'])
-    # sum_rate_ref_total = 0
-    # sum_power_ci_total = np.zeros((param_dict['n_bins'], \
-    #     param_dict['detchans']), dtype=np.float64)
-    # sum_power_ref_total = np.zeros(param_dict['n_bins'], dtype=np.float64)
 
     print "\nDT = %.15f" % param_dict['dt']
     print "N_bins = %d" % param_dict['n_bins']
@@ -320,22 +312,10 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
         total_seg += num_seg
         cs_sum_total += cs_sum
-        # sum_rate_ci_total += sum_rate_ci_whole
-        # sum_rate_ref_total += sum_rate_ref_whole
-        # sum_power_ci_total += sum_power_ci
-        # sum_power_ref_total += sum_power_ref
-
         ci_total.mean_rate += ci_whole.mean_rate
         ref_total.mean_rate += ref_whole.mean_rate
         ci_total.raw_full += ci_whole.raw_full
         ref_total.raw_full += ref_whole.raw_full
-
-        # sum_rate_ci_whole = None
-        # sum_rate_ref_whole = None
-        # cs_sum = None
-        # num_seg = None
-        # sum_power_ci = None
-        # sum_power_ref = None
 
     ## End of for-loop
     print " "
@@ -346,19 +326,12 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ## Turning sums over segments into means
     #########################################
 
-    # mean_ci = sum_rate_ci / float(param_dict['num_seg'])
-    # mean_rate_ci_total = sum_rate_ci_total / float(param_dict['num_seg'])
-    # mean_rate_ref_total = sum_rate_ref_total / float(param_dict['num_seg'])
-    # mean_power_ci = sum_power_ci_total / float(param_dict['num_seg'])
-    # mean_power_ref = sum_power_ref_total / float(param_dict['num_seg'])
     cs_avg = cs_sum_total / float(param_dict['num_seg'])
 
     ci_total.mean_rate /= float(param_dict['num_seg'])
     ref_total.mean_rate /= float(param_dict['num_seg'])
     ci_total.raw_full /= float(param_dict['num_seg'])
     ref_total.raw_full /= float(param_dict['num_seg'])
-
-# 	print "CS avg:", cs_avg[1:5, 6]
 
     ## Printing the cross spectrum to a file, for plotting/checking
 # 	cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
@@ -372,17 +345,12 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ci_total.mean_rate -= bkgd_rate
 
     ## Need to use a background from ref pcu for the reference band...
-#     ref_bkgd_rate = np.mean(bkgd_rate[2:26])
-#     mean_rate_ref_total -= ref_bkgd_rate
     # ref_bkgd_rate = np.mean(bkgd_rate[2:26])
     # ref_total.mean_rate -= ref_bkgd_rate
 
     ######################
     ## Making lag spectra
     ######################
-
-    # xcor.save_for_lags(out_file, in_file_list, param_dict, mean_rate_ci_total,
-    #     mean_rate_ref_total, cs_avg, mean_power_ci, mean_power_ref)
 
     xcor.save_for_lags(out_file, in_file_list, param_dict, ci_total.mean_rate,
         ref_total.mean_rate, cs_avg, ci_total.raw_full, ref_total.raw_full)
@@ -393,12 +361,9 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
     if filtering:
         ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(cs_avg, param_dict,
-            mean_rate_ci_total, mean_rate_ref_total, mean_power_ci,
-            mean_power_ref, True)
+            ci_total.mean_rate, ref_total.mean_rate, ci_total.raw_full,
+            ref_total.raw_full, True)
     else:
-        # ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
-        #     mean_rate_ci_total, mean_rate_ref_total, mean_power_ci,
-        #     mean_power_ref, True)
         ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
             ci_total.mean_rate, ref_total.mean_rate, ci_total.raw_full,
             ref_total.raw_full, True)
@@ -417,8 +382,6 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ## Output
     ##########
 
-    # fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
-    #     mean_rate_ref_total, t, ccf_end, ccf_error, filtering)
     fits_out(out_file, in_file_list, bkgd_file, param_dict, ci_total.mean_rate,\
         ref_total.mean_rate, t, ccf_end, ccf_error, filtering)
 

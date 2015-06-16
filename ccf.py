@@ -32,7 +32,6 @@ class Lightcurve(object):
         self.raw_half = PSD()
         self.absrms = PSD()
         self.fracrms = PSD()
-        self.leahy = PSD()
 
 
 ################################################################################
@@ -274,8 +273,8 @@ def save_for_lags(out_file, in_file, param_dict, mean_rate_ci, mean_rate_ref,
 
     ## Only keeping the parts associated with positive Fourier frequencies
     freq = np.abs(freq[0:nyq_index + 1])  ## because it slices at end-1, and we
-        ## want to include 'nyq_index'; abs is because the nyquist freq is both
-        ## pos and neg, and we want it pos here.
+            ## want to include 'nyq_index'; abs is because the nyquist freq is
+            ## both pos and neg, and we want it pos here.
     cs_avg = cs_avg[0:nyq_index + 1, ]
     power_ci = power_ci[0:nyq_index + 1, ]
     power_ref = power_ref[0:nyq_index + 1]
@@ -290,16 +289,17 @@ def save_for_lags(out_file, in_file, param_dict, mean_rate_ci, mean_rate_ref,
     ## Making FITS header (extension 0)
     prihdr = fits.Header()
     prihdr.set('TYPE', "Cross spectrum, power spectrum ci, and power spectrum "\
-        "ref.")
+            "ref.")
     prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
     prihdr.set('EVTLIST', in_file)
     prihdr.set('DT', param_dict['dt'], "seconds")
     prihdr.set('N_BINS', param_dict['n_bins'], "time bins per segment")
     prihdr.set('SEGMENTS', param_dict['num_seg'], "segments in the whole light"\
-        " curve")
+            " curve")
     prihdr.set('EXPOSURE', param_dict['num_seg'] * param_dict['num_seconds'],
-        "seconds, of light curve")
-    prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy channels")
+            "seconds, of light curve")
+    prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy"\
+            " channels")
     prihdr.set('RATE_CI', str(mean_rate_ci.tolist()), "counts/second")
     prihdr.set('RATE_REF', mean_rate_ref, "counts/second")
     prihdu = fits.PrimaryHDU(header=prihdr)
@@ -307,31 +307,31 @@ def save_for_lags(out_file, in_file, param_dict, mean_rate_ci, mean_rate_ref,
     ## Making FITS table for cross spectrum
     col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
     col2 = fits.Column(name='CROSS', unit='raw', format='C',
-        array=cs_avg.flatten('C'))
+            array=cs_avg.flatten('C'))
     col3 = fits.Column(name='CHANNEL', unit='', format='I',
-        array=energy_channels)
+            array=energy_channels)
     cols = fits.ColDefs([col1, col2, col3])
     tbhdu1 = fits.BinTableHDU.from_columns(cols)
 
     ## Making FITS table for power spectrum of channels of interest
     col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
     col2 = fits.Column(name='POWER', unit='raw', format='D',
-        array=power_ci.flatten('C'))
+            array=power_ci.flatten('C'))
     col3 = fits.Column(name='CHANNEL', unit='', format='I',
-        array=energy_channels)
+            array=energy_channels)
     cols = fits.ColDefs([col1, col2, col3])
     tbhdu2 = fits.BinTableHDU.from_columns(cols)
 
     ## Making FITS table for power spectrum of reference band
     col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
     col2 = fits.Column(name='POWER', unit='raw', format='D',
-        array=power_ref)
+            array=power_ref)
     cols = fits.ColDefs([col1, col2])
     tbhdu3 = fits.BinTableHDU.from_columns(cols)
 
     ## If the file already exists, remove it
-    assert out_file[-4:].lower() == "fits", \
-        'ERROR: Output file must have extension ".fits".'
+    assert out_file[-4:].lower() == "fits", "ERROR: Output file must have "\
+            "extension '.fits'."
     if os.path.isfile(out_file):
         subprocess.call(["rm", out_file])
 
@@ -891,8 +891,6 @@ def fits_in(in_file, param_dict, test):
 
     ## End of while-loop
 
-    # return cs_sum, ci_whole.mean_rate, ref_whole.mean_rate, num_seg, \
-    #     ci_whole.raw_full, ref_whole.raw_full, sum_rate_ci
     return cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci
 
 
@@ -974,10 +972,6 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Reading in data, computing the cross spectrum
     #################################################
 
-    # cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
-    #         sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file,
-    #         param_dict, test)
-
     cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci = fits_in(in_file, \
             param_dict, test)
 
@@ -987,13 +981,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Turning sums over segments into means
     #########################################
 
-    # mean_rate_ci_whole = sum_rate_ci_whole / float(param_dict['num_seg'])
-    # mean_rate_ref_whole = sum_rate_ref_whole / float(param_dict['num_seg'])
-    # mean_power_ci = sum_power_ci / float(param_dict['num_seg'])
-    # mean_power_ref = sum_power_ref / float(param_dict['num_seg'])
-
     cs_avg = cs_sum / float(param_dict['num_seg'])
-
     ci_whole.mean_rate /= float(param_dict['num_seg'])
     ref_whole.mean_rate /= float(param_dict['num_seg'])
     ci_whole.raw_full /= float(param_dict['num_seg'])
@@ -1011,26 +999,18 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Subtracting the background count rate from the mean count rate
     ##################################################################
 
-    # mean_rate_ci_whole -= bkgd_rate
     ci_whole.mean_rate -= bkgd_rate
 
     ## Need to use a background from ref. PCU for the reference band...
     ref_bkgd_rate = np.mean(bkgd_rate[2:26])
-    # mean_rate_ref_whole -= ref_bkgd_rate
     ref_whole.mean_rate -= ref_bkgd_rate
 
     ######################
     ## Making lag spectra
     ######################
 
-    # save_for_lags(out_file, in_file, param_dict, mean_rate_ci_whole,
-    #     mean_rate_ref_whole, cs_avg, mean_power_ci, mean_power_ref)
     save_for_lags(out_file, in_file, param_dict, ci_whole.mean_rate,
         ref_whole.mean_rate, cs_avg, ci_whole.raw_full, ref_whole.raw_full)
-
-# 	make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, num_seg, \
-# 		mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, mean_power_ci, \
-# 		mean_power_ref)
 
     ##############################################
     ## Computing ccf from cs, and computing error
@@ -1038,16 +1018,14 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 
     if filter:
         ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, param_dict,
-            mean_rate_ci_whole, mean_rate_ref_whole, mean_power_ci,
-            mean_power_ref, True)
+            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.raw_full,
+            ref_whole.raw_full, True)
     else:
         ccf_end, ccf_error = UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
             ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.raw_full,
             ref_whole.raw_full, True)
 
     print "Number of segments:", param_dict['num_seg']
-    # print "Sum of mean rate for ci:", np.sum(mean_rate_ci_whole)
-    # print "Mean rate for ref:", np.mean(mean_rate_ref_whole)
     print "Sum of mean rate for ci:", np.sum(ci_whole.mean_rate)
     print "Mean rate for ref:", np.mean(ref_whole.mean_rate)
 
