@@ -622,13 +622,16 @@ def make_cs(rate_ci, rate_ref, param_dict):
     assert np.shape(rate_ref) == (param_dict['n_bins'], ), "ERROR: Reference "\
         "light curve has wrong dimensions. Must have size (n_bins, )."
 
+    ci_seg = Lightcurve()
+    ref_seg = Lightcurve()
+
     ## Computing the mean count rate of the segment
-    mean_rate_ci_seg = np.mean(rate_ci, axis=0)
-    mean_rate_ref_seg = np.mean(rate_ref)
+    ci_seg.mean_rate = np.mean(rate_ci, axis=0)
+    ref_seg.mean_rate = np.mean(rate_ref)
 
     ## Subtracting the mean off each value of 'rate'
-    rate_sub_mean_ci = np.subtract(rate_ci, mean_rate_ci_seg)
-    rate_sub_mean_ref = np.subtract(rate_ref, mean_rate_ref_seg)
+    rate_sub_mean_ci = np.subtract(rate_ci, ci_seg.mean_rate)
+    rate_sub_mean_ref = np.subtract(rate_ref, ref_seg.mean_rate)
 
     ## Taking the FFT of the time-domain photon count rate
     ## SciPy is faster than NumPy or pyFFTW for my array sizes
@@ -636,8 +639,8 @@ def make_cs(rate_ci, rate_ref, param_dict):
     fft_data_ref = fftpack.fft(rate_sub_mean_ref)
 
     ## Computing the power from the fourier transform
-    power_ci = np.absolute(fft_data_ci) ** 2
-    power_ref = np.absolute(fft_data_ref) ** 2
+    ci_seg.raw_full = np.absolute(fft_data_ci) ** 2
+    ref_seg.raw_full = np.absolute(fft_data_ref) ** 2
 
     ## Broadcasting fft of ref into same shape as fft of ci
     fft_data_ref = np.resize(np.repeat(fft_data_ref, param_dict['detchans']), \
@@ -648,7 +651,7 @@ def make_cs(rate_ci, rate_ref, param_dict):
 
 # 	print cs_seg[1:5, 6]
 
-    return cs_seg, mean_rate_ci_seg, mean_rate_ref_seg, power_ci, power_ref
+    return cs_seg, ci_seg.mean_rate, ref_seg.mean_rate, ci_seg.raw_full, ref_seg.raw_full
 
 
 ################################################################################
