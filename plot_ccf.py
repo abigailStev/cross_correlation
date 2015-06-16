@@ -8,13 +8,11 @@ from matplotlib.ticker import MultipleLocator
 __author__ = "Abigail Stevens, A.L.Stevens at uva.nl"
 
 """
-        plot_ccf.py
-
 Plots the cross-correlation per energy channel, in the time domain.
 
 Enter   python plot_ccf.py -h   at the command line for help.
 
-Abigail Stevens, A.L.Stevens at uva.nl, 2014-2015
+2014-2015
 
 """
 
@@ -31,8 +29,8 @@ def make_plot(x_bins, ccf_amps, ccf_err, prefix, plot_file, chan, frac_time):
 
     fig, ax = plt.subplots(1,1, figsize=(12,6))
 # 	ax.plot(x_bins, ccf_amps, lw=2, c='black')
-    print( len(ccf_err) )
-    print( len(ccf_amps) )
+#     print( len(ccf_err) )
+#     print( len(ccf_amps) )
     ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=1.5, c='black', \
         drawstyle='steps-mid', elinewidth=1, capsize=1)
     ax.vlines(0.0, -1.5, 2.5, linestyle='dashed')
@@ -159,8 +157,8 @@ help="File extension for the plot. Do not include the '.' [png]")
         neg_time_ccf_err = pos_time_ccf_err[::-1]
         # neg_time_ccf_err = ccf_err[n_bins/2:]
 
-        print( neg_time_ccf_err )
-        print( pos_time_ccf_err )
+        # print( neg_time_ccf_err )
+        # print( pos_time_ccf_err )
         ccf_err = np.append(neg_time_ccf_err, pos_time_ccf_err)
 
         if i < 10:
