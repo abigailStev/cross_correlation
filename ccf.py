@@ -858,12 +858,11 @@ def fits_in(in_file, param_dict, test):
 
         if len(time_ci) > 0 and len(time_ref) > 0:
 
-            num_seg += 1
-
             cs_seg, ci_seg, ref_seg, rate_ci = each_segment(time_ci, \
                     time_ref, energy_ci, energy_ref, param_dict, start_time)
 
             ## Sums across segments -- arrays, so it adds by index
+            num_seg += 1
             ci_whole.mean_rate += ci_seg.mean_rate
             ref_whole.mean_rate += ref_seg.mean_rate
             ci_whole.raw_full += ci_seg.raw_full
@@ -881,7 +880,6 @@ def fits_in(in_file, param_dict, test):
 
         ## This next bit deals with gappy data
         elif len(time_ci) == 0 and len(time_ref) == 0:
-
             start_time = min(all_time_ci[0], all_time_ref[0])
             seg_end_time = start_time + param_dict['num_seconds']
 
@@ -893,8 +891,9 @@ def fits_in(in_file, param_dict, test):
 
     ## End of while-loop
 
-    return cs_sum, ci_whole.mean_rate, ref_whole.mean_rate, num_seg, \
-        ci_whole.raw_full, ref_whole.raw_full, sum_rate_ci
+    # return cs_sum, ci_whole.mean_rate, ref_whole.mean_rate, num_seg, \
+    #     ci_whole.raw_full, ref_whole.raw_full, sum_rate_ci
+    return cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci
 
 
 ################################################################################
@@ -975,8 +974,11 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Reading in data, computing the cross spectrum
     #################################################
 
-    cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
-            sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file,
+    # cs_sum, sum_rate_ci_whole, sum_rate_ref_whole, num_seg, \
+    #         sum_power_ci, sum_power_ref, sum_rate_ci = fits_in(in_file,
+    #         param_dict, test)
+
+    cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci = fits_in(in_file, \
             param_dict, test)
 
     param_dict['num_seg'] = num_seg
@@ -985,11 +987,17 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Turning sums over segments into means
     #########################################
 
-    mean_rate_ci_whole = sum_rate_ci_whole / float(param_dict['num_seg'])
-    mean_rate_ref_whole = sum_rate_ref_whole / float(param_dict['num_seg'])
-    mean_power_ci = sum_power_ci / float(param_dict['num_seg'])
-    mean_power_ref = sum_power_ref / float(param_dict['num_seg'])
+    # mean_rate_ci_whole = sum_rate_ci_whole / float(param_dict['num_seg'])
+    # mean_rate_ref_whole = sum_rate_ref_whole / float(param_dict['num_seg'])
+    # mean_power_ci = sum_power_ci / float(param_dict['num_seg'])
+    # mean_power_ref = sum_power_ref / float(param_dict['num_seg'])
+
     cs_avg = cs_sum / float(param_dict['num_seg'])
+
+    ci_whole.mean_rate /= float(param_dict['num_seg'])
+    ref_whole.mean_rate /= float(param_dict['num_seg'])
+    ci_whole.raw_full /= float(param_dict['num_seg'])
+    ref_whole.raw_full /= float(param_dict['num_seg'])
 
     ################################################################
     ## Printing the cross spectrum to a file, for plotting/checking
@@ -1003,18 +1011,22 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Subtracting the background count rate from the mean count rate
     ##################################################################
 
-    mean_rate_ci_whole -= bkgd_rate
+    # mean_rate_ci_whole -= bkgd_rate
+    ci_whole.mean_rate -= bkgd_rate
 
     ## Need to use a background from ref. PCU for the reference band...
     ref_bkgd_rate = np.mean(bkgd_rate[2:26])
-    mean_rate_ref_whole -= ref_bkgd_rate
+    # mean_rate_ref_whole -= ref_bkgd_rate
+    ref_whole.mean_rate -= ref_bkgd_rate
 
     ######################
     ## Making lag spectra
     ######################
 
-    save_for_lags(out_file, in_file, param_dict, mean_rate_ci_whole,
-        mean_rate_ref_whole, cs_avg, mean_power_ci, mean_power_ref)
+    # save_for_lags(out_file, in_file, param_dict, mean_rate_ci_whole,
+    #     mean_rate_ref_whole, cs_avg, mean_power_ci, mean_power_ref)
+    save_for_lags(out_file, in_file, param_dict, ci_whole.mean_rate,
+        ref_whole.mean_rate, cs_avg, ci_whole.raw_full, ref_whole.raw_full)
 
 # 	make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds, num_seg, \
 # 		mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, mean_power_ci, \
@@ -1030,12 +1042,14 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
             mean_power_ref, True)
     else:
         ccf_end, ccf_error = UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
-            mean_rate_ci_whole, mean_rate_ref_whole, mean_power_ci,
-            mean_power_ref, True)
+            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.raw_full,
+            ref_whole.raw_full, True)
 
     print "Number of segments:", param_dict['num_seg']
-    print "Sum of mean rate for ci:", np.sum(mean_rate_ci_whole)
-    print "Mean rate for ref:", np.mean(mean_rate_ref_whole)
+    # print "Sum of mean rate for ci:", np.sum(mean_rate_ci_whole)
+    # print "Mean rate for ref:", np.mean(mean_rate_ref_whole)
+    print "Sum of mean rate for ci:", np.sum(ci_whole.mean_rate)
+    print "Mean rate for ref:", np.mean(ref_whole.mean_rate)
 
     t = np.arange(0, param_dict['n_bins'])
 
@@ -1043,8 +1057,8 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Output
     ##########
 
-    fits_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci_whole, \
-        mean_rate_ref_whole, t, ccf_end, ccf_error, filter)
+    fits_out(out_file, in_file, bkgd_file, param_dict, ci_whole.mean_rate, \
+        ref_whole.mean_rate, t, ccf_end, ccf_error, filter)
 
 
 ################################################################################
