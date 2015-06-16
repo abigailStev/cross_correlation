@@ -511,9 +511,6 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
         power_ref = power_ref[0:nyq_index+1]
         power_ci = power_ci[0:nyq_index+1, ]
 
-# 	print "CI count rate:", countrate_ci
-# 	print "Ref count rate:", countrate_ref
-
 # 	print num_seconds * num_seg
 # 	counts_ci = countrate_ci * (num_seconds * num_seg)
 # 	np.savetxt('GX339-BQPO_channel_counts.txt', counts_ci)

@@ -371,8 +371,6 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
     print "Total number of segments:", param_dict['num_seg']
-    # print "Mean rate for all of ci:", np.sum(mean_rate_ci_total)
-    # print "Mean rate for ref:", mean_rate_ref_total
     print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
     print "Mean rate for ref:", ref_total.mean_rate
 
