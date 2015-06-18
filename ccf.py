@@ -664,19 +664,14 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
     fracrms_power_ref = raw_to_fracrms(power_ref, countrate_ref, \
             param_dict['n_bins'], param_dict['dt'], noisy)
 
-# 	## Getting rms of reference band, to normalize the ccf and acf
-    absrms_var_ref = np.sum(absrms_power_ref * param_dict['df'])
-    absrms_rms_ref = np.sqrt(absrms_var_ref)
-
+# 	## Getting rms of reference band, to normalize the ccf
     absrms_var_ref, absrms_rms_ref = var_and_rms(absrms_power_ref, param_dict['df'])
     fracrms_var_ref, fracrms_rms_ref = var_and_rms(fracrms_power_ref, param_dict['df'])
 
     print "Ref band var:", absrms_var_ref, "(abs rms)"
     print "Ref band rms:", absrms_rms_ref, "(abs rms)"
-    print "Ref band var:", absrms_var_ref / (countrate_ref ** 2), "(frac rms)"
-    print "Ref band rms:", absrms_rms_ref / countrate_ref, "(frac rms)"
-    print "             ", fracrms_var_ref
-    print "             ", fracrms_rms_ref
+    print "Ref band var:", fracrms_var_ref, "(frac rms)"
+    print "Ref band rms:", fracrms_rms_ref, "(frac rms)"
 
     ## Dividing ccf by rms of signal in reference band
     ccf *= (2.0 / float(param_dict['n_bins']) / absrms_rms_ref)
@@ -687,6 +682,15 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
     print "Err:", ccf_err[2:7, 6]
     print "Countrate ci chan 6:", countrate_ci[6]
     print "Countrate ref:", countrate_ref
+
+    ccf_should_be = [6.42431753, 3.42944342, 4.89985092, 3.15374201, -6.34984769]
+    err_should_be = [3.09208798, 3.71701276, 2.23034766, 3.42450043, 1.84851443]
+
+    for (e1, e2) in zip(ccf[2:7, 6], ccf_should_be):
+        print "\t", round(e1, 8) == e2
+
+    for (e1, e2) in zip(ccf_err[2:7, 6], err_should_be):
+        print "\t", round(e1, 8) == e2
 
     return ccf, ccf_err
 
