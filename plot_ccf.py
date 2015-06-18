@@ -27,7 +27,9 @@ def make_plot(x_bins, ccf_amps, ccf_err, prefix, plot_file, chan, frac_time):
 
     font_prop = font_manager.FontProperties(size=20)
 
-    fig, ax = plt.subplots(1,1, figsize=(12,6))
+    # fig, ax = plt.subplots(1,1, figsize=(12,6))
+    fig, ax = plt.subplots(1,1)
+
 # 	ax.plot(x_bins, ccf_amps, lw=2, c='black')
 #     print( len(ccf_err) )
 #     print( len(ccf_amps) )
@@ -42,13 +44,16 @@ def make_plot(x_bins, ccf_amps, ccf_err, prefix, plot_file, chan, frac_time):
         fontproperties=font_prop)
     ax.set_ylabel(r'Deviation from mean rate (cts / s)', \
         fontproperties=font_prop)
-    ax.set_xlim(-100, 100)
+    ax.set_xlim(0, 100)
     ax.set_ylim(-1.5, 2.5)
 
     ## Setting the axes' minor ticks. It's complicated.
-    x_maj_loc = ax.get_xticks()
+    # x_maj_loc = ax.get_xticks()
+    x_maj_loc = [0, 50, 100]
+    ax.set_xticks(x_maj_loc)
     y_maj_loc = ax.get_yticks()
-    x_min_mult = 0.1 * (x_maj_loc[1] - x_maj_loc[0])
+
+    x_min_mult = 0.2 * (x_maj_loc[1] - x_maj_loc[0])
     y_min_mult = 0.2 * (y_maj_loc[1] - y_maj_loc[0])
     xLocator = MultipleLocator(x_min_mult)  ## loc of minor ticks on x-axis
     yLocator = MultipleLocator(y_min_mult)  ## loc of minor ticks on y-axis
@@ -63,8 +68,6 @@ def make_plot(x_bins, ccf_amps, ccf_err, prefix, plot_file, chan, frac_time):
     plt.savefig(plot_file, dpi=200)
 # 	plt.show()
     plt.close()
-
-## End of function 'make_plot'
 
 
 ################################################################################
