@@ -632,7 +632,7 @@ def standard_ccf_err(param_dict):
         sample_var_i = np.sum(ccf_resid_i**2, axis=0) / float(param_dict['num_seg']-1)  ## eq 2.3
         standard_err_i = np.sqrt(sample_var_i/float(param_dict['num_seg']))  ## eq 2.4
         standard_err[:,i] = standard_err_i
-    print(standard_err)
+    # print(standard_err)
     return standard_err
 
 
@@ -659,21 +659,24 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
 
     ccf = fftpack.ifft(cs_avg, axis=0).real
 
-    if noisy:
-        absrms_noise_ref = 2.0 * countrate_ref
-    else:
-        absrms_noise_ref = 0.0
-
-    ## Putting powers into absolute rms2 normalization, subtracting noise
-    absrms_power_ref = power_ref * (2.0 * param_dict['dt'] / float(param_dict['n_bins'])) - absrms_noise_ref
+    absrms_power_ref = raw_to_absrms(power_ref, countrate_ref, \
+            param_dict['n_bins'], param_dict['dt'], noisy)
+    fracrms_power_ref = raw_to_fracrms(power_ref, countrate_ref, \
+            param_dict['n_bins'], param_dict['dt'], noisy)
 
 # 	## Getting rms of reference band, to normalize the ccf and acf
     absrms_var_ref = np.sum(absrms_power_ref * param_dict['df'])
     absrms_rms_ref = np.sqrt(absrms_var_ref)
+
+    absrms_var_ref, absrms_rms_ref = var_and_rms(absrms_power_ref, param_dict['df'])
+    fracrms_var_ref, fracrms_rms_ref = var_and_rms(fracrms_power_ref, param_dict['df'])
+
     print "Ref band var:", absrms_var_ref, "(abs rms)"
     print "Ref band rms:", absrms_rms_ref, "(abs rms)"
     print "Ref band var:", absrms_var_ref / (countrate_ref ** 2), "(frac rms)"
     print "Ref band rms:", absrms_rms_ref / countrate_ref, "(frac rms)"
+    print "             ", fracrms_var_ref
+    print "             ", fracrms_rms_ref
 
     ## Dividing ccf by rms of signal in reference band
     ccf *= (2.0 / float(param_dict['n_bins']) / absrms_rms_ref)
