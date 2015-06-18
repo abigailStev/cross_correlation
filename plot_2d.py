@@ -95,8 +95,8 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
     ######################################################
 
 # 	ratio[np.where(np.abs(ratio) > 4.0)] = 0
-    ratio[27:, ] = 0
-    # ratio[32:,] = 0
+#     ratio[27:, ] = 0
+    ratio[32:,] = 0
     out_file = "./temp.dat"
     R = ratio.flatten('C')
     comment_str = "From %s" % tab_file
@@ -113,13 +113,13 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
     if energies[0] != None:  ## If energies exists as a variable
 # 		plt.pcolor(t_bins, energies, ratio, cmap='hot')
 #         plt.pcolor(t_bins, energies, ratio, cmap='hot', vmin=-1, vmax=1.5)
-        plt.pcolor(t_bins, energies, ratio, cmap='hot', vmin=-0.04, vmax=0.04)
+        plt.pcolor(t_bins, energies, ratio, cmap='spring', vmin=-0.04, vmax=0.04)
     else:
 # 		plt.pcolor(ratio, cmap='hot', vmin=-4.0, vmax=4.0)
         plt.pcolor(ratio, cmap='hot')
 
     cbar = plt.colorbar()
-    cbar.set_label('Ratio of CCF amplitude to mean count rate', \
+    cbar.set_label('Ratio of CCF to mean count rate', \
         fontproperties=font_prop)
     cbar.set_ticks([-0.04, -0.03, -0.02, -0.01, 0.00, 0.01, 0.02, 0.03, 0.04])
     ax.set_xlabel(r'Time ( $\times\,\frac{1}{%d}\,$s)' % frac_time, \
@@ -127,8 +127,8 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
 
     if energies[0] != None:  ## If energies exists as a variable
         ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
-        # ax.set_ylim(3, 25)
-        ax.set_ylim(3, 20)
+        ax.set_ylim(3, 25)
+        # ax.set_ylim(3, 20)
     else:
         ax.set_ylabel('Energy channel', fontproperties=font_prop)
         ax.set_ylim(2, 31)
@@ -136,12 +136,12 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
 
     ## Setting the axes' minor ticks. It's complicated.
     x_maj_loc = ax.get_xticks()
-    # y_maj_loc = ax.get_yticks()
+    y_maj_loc = ax.get_yticks()
 
-    print x_maj_loc
+    # print x_maj_loc
     # print y_maj_loc
-    y_maj_loc = [5, 10, 15, 20]
-    ax.set_yticks(y_maj_loc)
+    # y_maj_loc = [5, 10, 15, 20, 25]
+    # ax.set_yticks(y_maj_loc)
     x_min_mult = 0.1 * (x_maj_loc[1] - x_maj_loc[0])
     y_min_mult = 0.2 * (y_maj_loc[1] - y_maj_loc[0])
     xLocator = MultipleLocator(x_min_mult)  ## loc of minor ticks on x-axis
