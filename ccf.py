@@ -18,19 +18,18 @@ with a broad energy reference band from RXTE event-mode data.
 
 """
 
-class PSD(object):
+class Lightcurve(object):
+    def __init__(self):
+        self.mean_rate = 0
+        self.power = 0
+        self.pos_power = 0
+
+class NormPSD(object):
     def __init__(self):
         self.power = 0
         self.noise = 0
         self.variance = 0
         self.rms = 0
-
-class Lightcurve(object):
-    def __init__(self):
-        self.mean_rate = 0
-        self.raw = PSD()
-        self.absrms = PSD()
-        self.fracrms = PSD()
 
 
 ################################################################################
@@ -637,9 +636,7 @@ def standard_ccf_err(param_dict):
 
 
 ################################################################################
-# def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, ci, ref, noisy):
-def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
-        power_ci, power_ref, noisy):
+def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, ref, noisy):
     """
     Takes the iFFT of the cross spectrum to get the cross-correlation function,
     and computes the error on the cross-correlation function. This error is
@@ -647,11 +644,11 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
 
     """
 
-    if len(power_ref) == param_dict['n_bins']:
+    if len(ref.power) == param_dict['n_bins']:
         freq = fftpack.fftfreq(param_dict['n_bins'], d=param_dict['dt'])
         nyq_index = param_dict['n_bins'] / 2
         assert np.abs(freq[nyq_index]) == param_dict['nyquist']
-        power_ref = power_ref[0:nyq_index+1]
+        ref.pos_power = ref.power[0:nyq_index+1]
 
     ######################################################
     ## Take the IFFT of the cross spectrum to get the CCF
@@ -659,29 +656,31 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
 
     ccf = fftpack.ifft(cs_avg, axis=0).real
 
-    absrms_power_ref = raw_to_absrms(power_ref, countrate_ref, \
+    ## Get the variance and rms of the reference band
+    absrms = NormPSD()
+    fracrms = NormPSD
+
+    absrms.power = raw_to_absrms(ref.pos_power, ref.mean_rate, \
             param_dict['n_bins'], param_dict['dt'], noisy)
-    fracrms_power_ref = raw_to_fracrms(power_ref, countrate_ref, \
+    fracrms.power = raw_to_fracrms(ref.pos_power, ref.mean_rate, \
             param_dict['n_bins'], param_dict['dt'], noisy)
 
 # 	## Getting rms of reference band, to normalize the ccf
-    absrms_var_ref, absrms_rms_ref = var_and_rms(absrms_power_ref, param_dict['df'])
-    fracrms_var_ref, fracrms_rms_ref = var_and_rms(fracrms_power_ref, param_dict['df'])
+    absrms.var, absrms.rms = var_and_rms(absrms.power, param_dict['df'])
+    fracrms.var, fracrms.rms = var_and_rms(fracrms.power, param_dict['df'])
 
-    print "Ref band var:", absrms_var_ref, "(abs rms)"
-    print "Ref band rms:", absrms_rms_ref, "(abs rms)"
-    print "Ref band var:", fracrms_var_ref, "(frac rms)"
-    print "Ref band rms:", fracrms_rms_ref, "(frac rms)"
+    print "Ref band var:", absrms.var, "(abs rms)"
+    print "Ref band rms:", absrms.rms, "(abs rms)"
+    print "Ref band var:", fracrms.var, "(frac rms)"
+    print "Ref band rms:", fracrms.rms, "(frac rms)"
 
     ## Dividing ccf by rms of signal in reference band
-    ccf *= (2.0 / float(param_dict['n_bins']) / absrms_rms_ref)
+    ccf *= (2.0 / float(param_dict['n_bins']) / absrms.rms)
 
     ccf_err = standard_ccf_err(param_dict)
 
     print "CCF:", ccf[2:7, 6]
     print "Err:", ccf_err[2:7, 6]
-    print "Countrate ci chan 6:", countrate_ci[6]
-    print "Countrate ref:", countrate_ref
 
     ccf_should_be = [6.42431753, 3.42944342, 4.89985092, 3.15374201, -6.34984769]
     err_should_be = [3.09208798, 3.71701276, 2.23034766, 3.42450043, 1.84851443]
@@ -752,8 +751,8 @@ def make_cs(rate_ci, rate_ref, param_dict):
     fft_data_ref = fftpack.fft(rate_sub_mean_ref)
 
     ## Computing the power from the fourier transform
-    ci_seg.raw.power = np.absolute(fft_data_ci) ** 2
-    ref_seg.raw.power = np.absolute(fft_data_ref) ** 2
+    ci_seg.power = np.absolute(fft_data_ci) ** 2
+    ref_seg.power = np.absolute(fft_data_ref) ** 2
 
     ## Broadcasting fft of ref into same shape as fft of ci
     fft_data_ref = np.resize(np.repeat(fft_data_ref, param_dict['detchans']), \
@@ -762,7 +761,7 @@ def make_cs(rate_ci, rate_ref, param_dict):
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
 
-    # return cs_seg, ci_seg.mean_rate, ref_seg.mean_rate, ci_seg.raw.power, ref_seg.raw.power
+    # return cs_seg, ci_seg.mean_rate, ref_seg.mean_rate, ci_seg.power, ref_seg.power
     return cs_seg, ci_seg, ref_seg
 
 
@@ -840,7 +839,7 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
     #####################################################
     ## Printing ccf to a file to later get error for ccf
     #####################################################
-    print_seg_ccf(param_dict, ref_seg.mean_rate, ref_seg.raw.power, cs_seg)
+    print_seg_ccf(param_dict, ref_seg.mean_rate, ref_seg.power, cs_seg)
 
     return cs_seg, ci_seg, ref_seg, np.mean(rate_ci_2d)
 
@@ -901,8 +900,8 @@ def fits_in(in_file, param_dict, test):
 
     ci_whole = Lightcurve()
     ref_whole = Lightcurve()
-    ci_whole.raw.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.float64)
-    ref_whole.raw.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
+    ci_whole.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.float64)
+    ref_whole.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
     ci_whole.mean_rate = np.zeros(param_dict['detchans'], dtype=np.float64)
     ref_whole.mean_rate = 0
 
@@ -978,8 +977,8 @@ def fits_in(in_file, param_dict, test):
             num_seg += 1
             ci_whole.mean_rate += ci_seg.mean_rate
             ref_whole.mean_rate += ref_seg.mean_rate
-            ci_whole.raw.power += ci_seg.raw.power
-            ref_whole.raw.power += ref_seg.raw.power
+            ci_whole.power += ci_seg.power
+            ref_whole.power += ref_seg.power
             cs_sum += cs_seg
             sum_rate_ci += rate_ci
 
@@ -1097,8 +1096,8 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     cs_avg = cs_sum / float(param_dict['num_seg'])
     ci_whole.mean_rate /= float(param_dict['num_seg'])
     ref_whole.mean_rate /= float(param_dict['num_seg'])
-    ci_whole.raw.power /= float(param_dict['num_seg'])
-    ref_whole.raw.power /= float(param_dict['num_seg'])
+    ci_whole.power /= float(param_dict['num_seg'])
+    ref_whole.power /= float(param_dict['num_seg'])
 
     ################################################################
     ## Printing the cross spectrum to a file, for plotting/checking
@@ -1123,7 +1122,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ######################
 
     save_for_lags(out_file, in_file, param_dict, ci_whole.mean_rate,
-        ref_whole.mean_rate, cs_avg, ci_whole.raw.power, ref_whole.raw.power)
+        ref_whole.mean_rate, cs_avg, ci_whole.power, ref_whole.power)
 
     ##############################################
     ## Computing ccf from cs, and computing error
@@ -1131,15 +1130,17 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
 
     if filter:
         ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, param_dict,
-            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.raw.power,
-            ref_whole.raw.power, True)
+            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.power,
+            ref_whole.power, True)
     else:
         ccf_end, ccf_error = UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
-            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.raw.power,
-            ref_whole.raw.power, True)
+            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.power,
+            ref_whole.power, True)
 
     print "Number of segments:", param_dict['num_seg']
     print "Sum of mean rate for ci:", np.sum(ci_whole.mean_rate)
+    print "Mean rate for ci chan 6:", ci_whole.mean_rate[6]
+    print "Mean rate for ci chan 15:", ci_whole.mean_rate[15]
     print "Mean rate for ref:", np.mean(ref_whole.mean_rate)
 
     t = np.arange(0, param_dict['n_bins'])

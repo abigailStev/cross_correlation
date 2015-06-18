@@ -276,12 +276,12 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ref_total = xcor.Lightcurve()
     total_seg = 0
     cs_sum_total = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
-        dtype=np.complex128)
+            dtype=np.complex128)
     ci_total.mean_rate = np.zeros(param_dict['detchans'])
     ref_total.mean_rate = 0
-    ci_total.raw.power = np.zeros((param_dict['n_bins'], \
-        param_dict['detchans']), dtype=np.float64)
-    ref_total.raw.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
+    ci_total.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
+            dtype=np.float64)
+    ref_total.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
 
     print "\nDT = %.15f" % param_dict['dt']
     print "N_bins = %d" % param_dict['n_bins']
@@ -314,8 +314,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         cs_sum_total += cs_sum
         ci_total.mean_rate += ci_whole.mean_rate
         ref_total.mean_rate += ref_whole.mean_rate
-        ci_total.raw.power += ci_whole.raw.power
-        ref_total.raw.power += ref_whole.raw.power
+        ci_total.power += ci_whole.power
+        ref_total.power += ref_whole.power
 
     ## End of for-loop
     print " "
@@ -330,8 +330,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
     ci_total.mean_rate /= float(param_dict['num_seg'])
     ref_total.mean_rate /= float(param_dict['num_seg'])
-    ci_total.raw.power /= float(param_dict['num_seg'])
-    ref_total.raw.power /= float(param_dict['num_seg'])
+    ci_total.power /= float(param_dict['num_seg'])
+    ref_total.power /= float(param_dict['num_seg'])
 
     ## Printing the cross spectrum to a file, for plotting/checking
 # 	cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
@@ -341,19 +341,17 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ## Subtracting the background count rate from the mean count rate
     ##################################################################
 
-    # mean_rate_ci_total -= bkgd_rate
     ci_total.mean_rate -= bkgd_rate
 
     ## Need to use a background from ref pcu for the reference band...
-    # ref_bkgd_rate = np.mean(bkgd_rate[2:26])
-    # ref_total.mean_rate -= ref_bkgd_rate
+    # ref_total.mean_rate -= np.mean(bkgd_rate[2:26])
 
     ######################
     ## Making lag spectra
     ######################
 
     xcor.save_for_lags(out_file, in_file_list, param_dict, ci_total.mean_rate,
-        ref_total.mean_rate, cs_avg, ci_total.raw.power, ref_total.raw.power)
+        ref_total.mean_rate, cs_avg, ci_total.power, ref_total.power)
 
     ##############################################
     ## Computing ccf from cs, and computing error
@@ -361,19 +359,18 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
     if filtering:
         ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(cs_avg, param_dict,
-            ci_total.mean_rate, ref_total.mean_rate, ci_total.raw.power,
-            ref_total.raw.power, True)
+            ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
+            ref_total.power, True)
     else:
         ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
-            ci_total.mean_rate, ref_total.mean_rate, ci_total.raw.power,
-            ref_total.raw.power, True)
-        # ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
-        #     ci_total, ref_total, True)
+            ref_total, True)
 
     exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
     print "Total number of segments:", param_dict['num_seg']
     print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
+    print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
+    print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
     print "Mean rate for ref:", ref_total.mean_rate
 
     t = np.arange(0, param_dict['n_bins'])  ## gives the 'front of the bin'
