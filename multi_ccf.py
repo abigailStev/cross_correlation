@@ -271,12 +271,14 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     df = 1.0 / np.float64(num_seconds)
     param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
                  'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
-                 'detchans': detchans}
+                 'detchans': detchans, 'err_bin': 200}
     ci_total = xcor.Lightcurve()
     ref_total = xcor.Lightcurve()
     total_seg = 0
     cs_sum_total = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
             dtype=np.complex128)
+    ccf_sum_total = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
+            dtype=np.float64)
     ci_total.mean_rate = np.zeros(param_dict['detchans'])
     ref_total.mean_rate = 0
     ci_total.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
@@ -305,12 +307,13 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
     for in_file in input_files:
 
-        cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci = \
+        ccf_sum, cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci = \
                 xcor.fits_in(in_file, param_dict, test)
 
         print "Segments for this file: %d\n" % num_seg
 
         total_seg += num_seg
+        ccf_sum_total += ccf_sum
         cs_sum_total += cs_sum
         ci_total.mean_rate += ci_whole.mean_rate
         ref_total.mean_rate += ref_whole.mean_rate
@@ -327,7 +330,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     #########################################
 
     cs_avg = cs_sum_total / float(param_dict['num_seg'])
-
+    ccf_avg = ccf_sum_total / float(param_dict['num_seg'])
     ci_total.mean_rate /= float(param_dict['num_seg'])
     ref_total.mean_rate /= float(param_dict['num_seg'])
     ci_total.power /= float(param_dict['num_seg'])
@@ -362,8 +365,25 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
             ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
             ref_total.power, True)
     else:
-        ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
+        ccf_end = xcor.UNFILT_cs_to_ccf(cs_avg, param_dict,
             ref_total, True)
+        ccf_error = xcor.standard_ccf_err(param_dict)
+
+    print ccf_avg[2:7, 6]
+    print ccf_avg[2:7, 6] == ccf_end[2:7, 6]
+
+    print "CCF:", ccf_end[2:7, 6]
+    print "Err:", ccf_error[2:7, 6]
+
+    ccf_should_be = [6.42431753, 3.42944342, 4.89985092, 3.15374201, -6.34984769]
+    err_should_be = [3.09208798, 3.71701276, 2.23034766, 3.42450043, 1.84851443]
+
+    for (e1, e2) in zip(ccf_end[2:7, 6], ccf_should_be):
+        print "\t", round(e1, 8) == e2
+
+    # for (e1, e2) in zip(ccf_error[2:7, 6], err_should_be):
+    #     print "\t", round(e1, 8) == e2
+
 
     exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
