@@ -367,6 +367,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
             ci_total.mean_rate, ref_total.mean_rate, ci_total.raw.power,
             ref_total.raw.power, True)
+        # ccf_end, ccf_error = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
+        #     ci_total, ref_total, True)
 
     exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure

@@ -34,6 +34,149 @@ class Lightcurve(object):
 
 
 ################################################################################
+def raw_to_absrms(power, mean_rate, n_bins, dt, noisy):
+    """
+    Normalizes the power spectrum to absolute rms^2 normalization.
+
+    Parameters
+    ----------
+    power : np.array of floats
+        The raw power at each Fourier frequency.
+
+    mean_rate : float
+        The mean count rate for the light curve, in cts/s.
+
+    n_bins : int
+        Number of bins per segment of light curve.
+
+    dt : float
+        Timestep between bins in n_bins, in seconds.
+
+    noisy : boolean
+        True if there is Poisson noise in the power spectrum (i.e., from real
+        data), False if there is no noise in the power spectrum (i.e.,
+        simulations without Poisson noise).
+
+    Returns
+    -------
+    np.array of floats
+        The noise-subtracted power spectrum in absolute rms^2 units.
+
+    """
+    if noisy:
+        noise = 2.0 * mean_rate #*0.985
+    else:
+        noise = 0.0
+
+    return power * (2.0 * dt / float(n_bins)) - noise
+
+
+################################################################################
+def raw_to_fracrms(power, mean_rate, n_bins, dt, noisy):
+    """
+    Normalizes the power spectrum to fractional rms^2 normalization.
+
+    Parameters
+    ----------
+    power : np.array of floats
+        The raw power at each Fourier frequency.
+
+    mean_rate : float
+        The mean count rate for the light curve, in cts/s.
+
+    n_bins : int
+        Number of bins per segment of light curve.
+
+    dt : float
+        Timestep between bins in n_bins, in seconds.
+
+    noisy : boolean
+        True if there is Poisson noise in the power spectrum (i.e., from real
+        data), False if there is no noise in the power spectrum (i.e.,
+        simulations without Poisson noise).
+
+    Returns
+    -------
+    np.array of floats
+        The noise-subtracted power spectrum in fractional rms^2 units.
+
+    """
+    if noisy:
+        noise = 2.0 / mean_rate
+    else:
+        noise = 0.0
+
+    return power * (2.0 * dt / float(n_bins) / (mean_rate ** 2)) - noise
+
+
+################################################################################
+def raw_to_leahy(power, mean_rate, n_bins, dt, noisy):
+    """
+    Normalizes the power spectrum to Leahy normalization.
+
+    Parameters
+    ----------
+    power : np.array of floats
+        The raw power at each Fourier frequency.
+
+    mean_rate : float
+        The mean count rate for the light curve, in cts/s.
+
+    n_bins : int
+        Number of bins per segment of light curve.
+
+    dt : float
+        Timestep between bins in n_bins, in seconds.
+
+    noisy : boolean
+        True if there is Poisson noise in the power spectrum (i.e., from real
+        data), False if there is no noise in the power spectrum (i.e.,
+        simulations without Poisson noise).
+
+    Returns
+    -------
+    np.array of floats
+        The noise-subtracted power spectrum in Leahy units.
+
+    """
+    if noisy:
+        noise = 2.0
+    else:
+        noise = 0.0
+
+    return power * (2.0 * dt / float(n_bins) / mean_rate) - noise
+
+
+################################################################################
+def var_and_rms(power, df):
+    """
+    Computes the variance and RMS (root mean square) of a power spectrum.
+    Assumes the negative-frequency powers have been removed.
+
+    Parameters
+    ----------
+    power : np.array of floats
+        The raw power at each of the *positive* Fourier frequencies.
+
+    df : float
+        The step size between Fourier frequencies.
+
+    Returns
+    -------
+
+    float
+        The variance of the power spectrum.
+    float
+        The RMS of the power spectrum.
+
+    """
+    variance = np.sum(power * df)
+    rms = np.sqrt(variance)
+
+    return variance, rms
+
+
+################################################################################
 def fits_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci_whole, \
     mean_rate_ref_whole, t, ccf, ccf_error, filter):
     """
@@ -509,11 +652,6 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
         nyq_index = param_dict['n_bins'] / 2
         assert np.abs(freq[nyq_index]) == param_dict['nyquist']
         power_ref = power_ref[0:nyq_index+1]
-        power_ci = power_ci[0:nyq_index+1, ]
-
-# 	print num_seconds * num_seg
-# 	counts_ci = countrate_ci * (num_seconds * num_seg)
-# 	np.savetxt('GX339-BQPO_channel_counts.txt', counts_ci)
 
     ######################################################
     ## Take the IFFT of the cross spectrum to get the CCF
@@ -521,19 +659,12 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
 
     ccf = fftpack.ifft(cs_avg, axis=0).real
 
-    ## Absolute rms norms of Poisson noise
-    ## Was over-estimating the noise from the count rate; using mean power from
-    ## higher frequencies as the noise level
-
     if noisy:
-        absrms_noise_ci = 2.0 * countrate_ci #* 0.985
-        absrms_noise_ref = 2.0 * countrate_ref #* 0.985
+        absrms_noise_ref = 2.0 * countrate_ref
     else:
-        absrms_noise_ci = 0.0
         absrms_noise_ref = 0.0
 
     ## Putting powers into absolute rms2 normalization, subtracting noise
-    absrms_power_ci = power_ci * (2.0 * param_dict['dt'] / float(param_dict['n_bins'])) - absrms_noise_ci
     absrms_power_ref = power_ref * (2.0 * param_dict['dt'] / float(param_dict['n_bins'])) - absrms_noise_ref
 
 # 	## Getting rms of reference band, to normalize the ccf and acf
@@ -543,22 +674,6 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
     print "Ref band rms:", absrms_rms_ref, "(abs rms)"
     print "Ref band var:", absrms_var_ref / (countrate_ref ** 2), "(frac rms)"
     print "Ref band rms:", absrms_rms_ref / countrate_ref, "(frac rms)"
-#
-# 	## Computing the autocorrelation functions from the power spectra
-# 	acf_ci = fftpack.ifft(power_ci).real
-# 	acf_ref = fftpack.ifft(power_ref).real
-# 	acf_ci *= (2.0 / float(n_bins) / absrms_rms_ref)
-# 	acf_ref *= (2.0 / float(n_bins) / absrms_rms_ref)
-#
-# 	## Broadcasting acf_ref into same shape as acf_ci
-# 	acf_ref = np.resize(np.repeat(acf_ref, detchans), np.shape(acf_ci))
-# 	assert np.shape(acf_ref) == np.shape(acf_ci), "ERROR: Array broadcasting \
-# failed."
-#
-# 	## Bartlett formula for computing variance on unfilfered CCF
-# 	## Box & Jenkens 1976 eqn 11.1.9; Smith & Vaughan 2007 eqn 3
-# 	var_ccf = np.abs((acf_ci * acf_ref) / n_bins)
-# 	rms_ccf = np.sqrt(var_ccf)
 
     ## Dividing ccf by rms of signal in reference band
     ccf *= (2.0 / float(param_dict['n_bins']) / absrms_rms_ref)
@@ -569,12 +684,6 @@ def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref, \
     print "Err:", ccf_err[2:7, 6]
     print "Countrate ci chan 6:", countrate_ci[6]
     print "Countrate ref:", countrate_ref
-
-# 	out_file="./run_stats.dat"
-# 	with open(out_file, 'a') as out:
-# 		out.write("%.6e\t%.6e\t%.6e\t%.6e\t%.6e\n" % (countrate_ci[6], \
-# 			countrate_ref, np.sum(countrate_ci), absrms_var_ref, \
-# 			absrms_rms_ref / countrate_ref))
 
     return ccf, ccf_err
 
