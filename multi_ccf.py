@@ -277,6 +277,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     total_seg = 0
     cs_sum_total = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
             dtype=np.complex128)
+    total_cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], \
+            1), dtype=np.complex128)
     ccf_sum_total = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
             dtype=np.float64)
     ci_total.mean_rate = np.zeros(param_dict['detchans'])
@@ -307,11 +309,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
     for in_file in input_files:
 
-        ccf_sum, cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci = \
+        ccf_sum, cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci, cross_spec = \
                 xcor.fits_in(in_file, param_dict, test)
 
         print "Segments for this file: %d\n" % num_seg
-
+        total_cross_spec = np.dstack((total_cross_spec, cross_spec))
         total_seg += num_seg
         ccf_sum_total += ccf_sum
         cs_sum_total += cs_sum
@@ -328,12 +330,21 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     #########################################
     ## Turning sums over segments into means
     #########################################
+    total_cross_spec = total_cross_spec[:,:,1:]
 
     cs_avg = cs_sum_total / np.float(param_dict['num_seg'])
     ci_total.mean_rate /= np.float(param_dict['num_seg'])
     ref_total.mean_rate /= np.float(param_dict['num_seg'])
     ci_total.power /= np.float(param_dict['num_seg'])
     ref_total.power /= np.float(param_dict['num_seg'])
+
+
+    avg_cross_spec = np.mean(total_cross_spec, axis=2)
+    print np.shape(avg_cross_spec)
+    print cs_avg
+    print avg_cross_spec
+    total_ccf = fftpack.ifft(avg_cross_spec, axis=0).real
+    print np.shape(total_ccf)
 
     ## Printing the cross spectrum to a file, for plotting/checking
 # 	cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
@@ -375,6 +386,14 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
                 True)
         absrms_var, absrms_rms = xcor.var_and_rms(absrms_pow, param_dict['df'])
         ccf_avg /= absrms_rms
+        total_ccf *= (2.0 / np.float(param_dict['n_bins'])/ absrms_rms)
+
+        print "\n", ccf_avg[1:5, 1:5]
+        print "\n"
+        print total_ccf[1:5, 1:5]
+        print "\n"
+        print ccf_end[1:5, 1:5]
+
         ccf_error = xcor.standard_ccf_err(param_dict)
 
     print ccf_avg[2:7, 6]
@@ -386,6 +405,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
     ccf_should_be = [6.42431753, 3.42944342, 4.89985092, 3.15374201, -6.34984769]
     err_should_be = [3.09208798, 3.71701276, 2.23034766, 3.42450043, 1.84851443]
+    erro_should_be = [10.25228203, 8.59091733, 4.35719107, 4.24096029, 6.52679086]
 
     for (e1, e2) in zip(ccf_end[2:7, 6], ccf_should_be):
         print "\t", round(e1, 8) == e2

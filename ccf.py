@@ -891,6 +891,9 @@ def fits_in(in_file, param_dict, test):
     # sum_power_ref = np.zeros(param_dict['n_bins'], dtype=np.float64)
 
     cs_sum = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.complex128)
+    cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], 1), \
+            dtype=np.complex128)
+    # cross_spec = np.asarray([])
     sum_rate_ci = 0
     ccf_sum = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.float64)
 
@@ -969,6 +972,12 @@ def fits_in(in_file, param_dict, test):
             ccf_seg, cs_seg, ci_seg, ref_seg, rate_ci = each_segment(time_ci, \
                     time_ref, energy_ci, energy_ref, param_dict, start_time)
 
+            cross_spec = np.dstack((cross_spec, cs_seg))
+
+            # print cs_seg[0:3, 0:3]
+            # print cross_spec[0:3, 0:3, -1]
+
+
             ## Sums across segments -- arrays, so it adds by index
             num_seg += 1
             ci_whole.mean_rate += ci_seg.mean_rate
@@ -1000,7 +1009,11 @@ def fits_in(in_file, param_dict, test):
 
     ## End of while-loop
 
-    return ccf_sum, cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci
+    cross_spec = cross_spec[:,:,1:]
+
+    # print cross_spec[0:3, 0:3, 0]
+
+    return ccf_sum, cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci, cross_spec
 
 
 ################################################################################
@@ -1079,8 +1092,8 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Reading in data, computing the cross spectrum
     #################################################
 
-    ccf_sum, cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci = fits_in(in_file, \
-            param_dict, test)
+    ccf_sum, cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci, \
+            cross_spec = fits_in(in_file, param_dict, test)
 
     param_dict['num_seg'] = num_seg
 
