@@ -272,11 +272,10 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
                  'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
                  'detchans': detchans, 'filter': filtering, 'err_bin': 200}
+
     ci_total = xcor.Lightcurve()
     ref_total = xcor.Lightcurve()
     total_seg = 0
-    cs_sum_total = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
-            dtype=np.complex128)
     total_cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], \
             1), dtype=np.complex128)
     ci_total.mean_rate = np.zeros(param_dict['detchans'])
@@ -310,8 +309,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
     for in_file in input_files:
 
-        cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci, cross_spec = \
-                xcor.fits_in(in_file, param_dict, test)
+        cross_spec, ci_whole, ref_whole, num_seg  = xcor.fits_in(in_file, \
+                param_dict, test)
 
         print "Segments for this file: %d\n" % num_seg
         total_cross_spec = np.dstack((total_cross_spec, cross_spec))
@@ -319,7 +318,6 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
                 ref_whole.power_array))
         ref_total.mean_rate_array = np.append(ref_total.mean_rate_array, ref_whole.mean_rate_array)
         total_seg += num_seg
-        cs_sum_total += cs_sum
         ci_total.mean_rate += ci_whole.mean_rate
         ref_total.mean_rate += ref_whole.mean_rate
         ci_total.power += ci_whole.power
@@ -337,7 +335,6 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ref_total.power_array = ref_total.power_array[:,1:]
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
 
-    cs_avg = cs_sum_total / np.float(param_dict['num_seg'])
     ci_total.mean_rate /= np.float(param_dict['num_seg'])
     ref_total.mean_rate /= np.float(param_dict['num_seg'])
     ci_total.power /= np.float(param_dict['num_seg'])
@@ -351,7 +348,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     # print np.shape(total_ccf)
 
     ## Printing the cross spectrum to a file, for plotting/checking
-# 	cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
+# 	cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), avg_cross_spec))
 # 	np.savetxt('cs_avg.dat', cs_out)
 
 
@@ -369,14 +366,14 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ######################
 
     xcor.save_for_lags(out_file, in_file_list, param_dict, ci_total.mean_rate,
-        ref_total.mean_rate, cs_avg, ci_total.power, ref_total.power)
+        ref_total.mean_rate, avg_cross_spec, ci_total.power, ref_total.power)
 
     ##############################################
     ## Computing ccf from cs, and computing error
     ##############################################
 
     if filtering:
-        ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(cs_avg, param_dict,
+        ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(avg_cross_spec, param_dict,
             ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
             ref_total.power, True)
     else:
@@ -410,10 +407,10 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     err_should_be = [10.25228203, 8.59091733, 4.35719107, 4.24096029, 6.52679086]
 
     for (e1, e2) in zip(ccf_end[2:7, 6], ccf_should_be):
-        print "\t", round(e1, 8) == e2
+        print "\t", round(e1, 7) == round(e2, 7)
 
     for (e1, e2) in zip(ccf_error[2:7, 6], err_should_be):
-        print "\t", round(e1, 8) == e2
+        print "\t", round(e1, 7) == round(e2, 7)
 
     print np.mean(ref_total.mean_rate_array)
     exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used

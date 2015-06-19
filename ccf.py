@@ -802,11 +802,6 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
     assert len(time_ci) == len(energy_ci)
     assert len(time_ref) == len(energy_ref)
 
-    ## Initializations
-    mean_rate_ci_seg = np.zeros(param_dict['detchans'], dtype=np.float64)
-    mean_rate_ref_seg = np.zeros(param_dict['detchans'], dtype=np.float64)
-    cs_seg = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.complex128)
-
     ##############################################################
     ## Populate the light curves for interest and reference bands
     ##############################################################
@@ -882,14 +877,10 @@ def fits_in(in_file, param_dict, test):
     ###################
 
     num_seg = 0
-
-    cs_sum = np.zeros((param_dict['n_bins'], param_dict['detchans']), dtype=np.complex128)
-    cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], 1), \
-            dtype=np.complex128)
-    sum_rate_ci = 0
-
     ci_whole = Lightcurve()
     ref_whole = Lightcurve()
+    cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], 1), \
+            dtype=np.complex128)
     ci_whole.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
             dtype=np.float64)
     ref_whole.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
@@ -986,8 +977,6 @@ def fits_in(in_file, param_dict, test):
             ref_whole.mean_rate += ref_seg.mean_rate
             ci_whole.power += ci_seg.power
             ref_whole.power += ref_seg.power
-            cs_sum += cs_seg
-            sum_rate_ci += rate_ci
 
             if num_seg % print_iterator == 0:
                 print "\t", num_seg
@@ -1019,7 +1008,7 @@ def fits_in(in_file, param_dict, test):
 
     # print cross_spec[0:3, 0:3, 0]
 
-    return cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci, cross_spec
+    return  cross_spec, ci_whole, ref_whole, num_seg
 
 
 ################################################################################
@@ -1098,8 +1087,8 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Reading in data, computing the cross spectrum
     #################################################
 
-    cs_sum, ci_whole, ref_whole, num_seg, sum_rate_ci, \
-            cross_spec = fits_in(in_file, param_dict, test)
+    cross_spec, ci_whole, ref_whole, num_seg = fits_in(in_file, param_dict, \
+            test)
 
     param_dict['num_seg'] = num_seg
 
@@ -1118,7 +1107,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ################################################################
 
     cs_out = np.column_stack((fftpack.fftfreq(param_dict['n_bins'], \
-                                              d=param_dict['dt']), avg_cross_spec))
+            d=param_dict['dt']), avg_cross_spec))
     np.savetxt('cs_avg.dat', cs_out)
 
     ##################################################################
@@ -1136,35 +1125,28 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ######################
 
     save_for_lags(out_file, in_file, param_dict, ci_whole.mean_rate,
-        ref_whole.mean_rate, cs_avg, ci_whole.power, ref_whole.power)
+        ref_whole.mean_rate, avg_cross_spec, ci_whole.power, ref_whole.power)
 
     ##############################################
     ## Computing ccf from cs, and computing error
     ##############################################
 
     if filter:
-        ccf_end, ccf_error = FILT_cs_to_ccf_w_err(cs_avg, param_dict,
+        ccf_end, ccf_error = FILT_cs_to_ccf_w_err(avg_cross_spec, param_dict,
             ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.power,
             ref_whole.power, True)
     else:
-        ccf_end = UNFILT_cs_to_ccf(avg_cross_spec, param_dict, ref_whole, True)
-
-        # ccf_avg = ccf_sum / np.float(param_dict['num_seg'])
-        # ref_whole.pos_power = ref_whole.power[0:param_dict['n_bins']/2+1]
-        # absrms_pow = raw_to_absrms(ref_whole.pos_power, ref_whole.mean_rate, \
-        #         param_dict['n_bins'], param_dict['dt'], True)
-        # absrms_var, absrms_rms = var_and_rms(absrms_pow, param_dict['df'])
-        # ccf_avg /= absrms_rms
+        ccf_avg = UNFILT_cs_to_ccf(avg_cross_spec, param_dict, ref_whole, True)
         ccf_error = standard_ccf_err(param_dict)
 
 
-    print "CCF:", ccf_end[2:7, 6]
+    print "CCF:", ccf_avg[2:7, 6]
     print "Err:", ccf_error[2:7, 6]
 
     ccf_should_be = [6.42431753, 3.42944342, 4.89985092, 3.15374201, -6.34984769]
-    err_should_be = [3.09208798, 3.71701276, 2.23034766, 3.42450043, 1.84851443]
+    err_should_be = [10.25228203, 8.59091733, 4.35719107, 4.24096029, 6.52679086]
 
-    for (e1, e2) in zip(ccf_end[2:7, 6], ccf_should_be):
+    for (e1, e2) in zip(ccf_avg[2:7, 6], ccf_should_be):
         print "\t", round(e1, 8) == e2
 
     for (e1, e2) in zip(ccf_error[2:7, 6], err_should_be):
@@ -1183,7 +1165,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ##########
 
     fits_out(out_file, in_file, bkgd_file, param_dict, ci_whole.mean_rate, \
-        ref_whole.mean_rate, t, ccf_end, ccf_error, filter)
+        ref_whole.mean_rate, t, ccf_avg, ccf_error, filter)
 
 
 ################################################################################
