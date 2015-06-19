@@ -107,7 +107,7 @@ def dat_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total, \
 def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
     mean_rate_ref_total, t, ccf, ccf_error, filtering):
     """
-    Writes the cross-correlation function to a .fits output file.
+    Writes time bins and the cross-correlation function to a .fits output file.
 
     Parameters
     ----------
@@ -271,7 +271,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     df = 1.0 / np.float64(num_seconds)
     param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
                  'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
-                 'detchans': detchans, 'err_bin': 200}
+                 'detchans': detchans, 'filter': filtering, 'err_bin': 200}
     ci_total = xcor.Lightcurve()
     ref_total = xcor.Lightcurve()
     total_seg = 0
@@ -329,16 +329,16 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ## Turning sums over segments into means
     #########################################
 
-    cs_avg = cs_sum_total / float(param_dict['num_seg'])
-    ccf_avg = ccf_sum_total / float(param_dict['num_seg'])
-    ci_total.mean_rate /= float(param_dict['num_seg'])
-    ref_total.mean_rate /= float(param_dict['num_seg'])
-    ci_total.power /= float(param_dict['num_seg'])
-    ref_total.power /= float(param_dict['num_seg'])
+    cs_avg = cs_sum_total / np.float(param_dict['num_seg'])
+    ci_total.mean_rate /= np.float(param_dict['num_seg'])
+    ref_total.mean_rate /= np.float(param_dict['num_seg'])
+    ci_total.power /= np.float(param_dict['num_seg'])
+    ref_total.power /= np.float(param_dict['num_seg'])
 
     ## Printing the cross spectrum to a file, for plotting/checking
 # 	cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), cs_avg))
 # 	np.savetxt('cs_avg.dat', cs_out)
+
 
     ##################################################################
     ## Subtracting the background count rate from the mean count rate
@@ -365,12 +365,21 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
             ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
             ref_total.power, True)
     else:
-        ccf_end = xcor.UNFILT_cs_to_ccf(cs_avg, param_dict,
-            ref_total, True)
+        ccf_end = xcor.UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, ref_total, \
+                True)
+
+        ccf_avg = ccf_sum_total / np.float(param_dict['num_seg'])
+        ref_total.pos_power = ref_total.power[0:param_dict['n_bins']/2+1]
+        absrms_pow = xcor.raw_to_absrms(ref_total.pos_power, \
+                ref_total.mean_rate, param_dict['n_bins'], param_dict['dt'], \
+                True)
+        absrms_var, absrms_rms = xcor.var_and_rms(absrms_pow, param_dict['df'])
+        ccf_avg /= absrms_rms
         ccf_error = xcor.standard_ccf_err(param_dict)
 
     print ccf_avg[2:7, 6]
-    print ccf_avg[2:7, 6] == ccf_end[2:7, 6]
+    for (e1, e2) in zip (ccf_avg[2:7, 6], ccf_end[2:7, 6]):
+        print "\t", round(e1, 8) == round(e2, 8)
 
     print "CCF:", ccf_end[2:7, 6]
     print "Err:", ccf_error[2:7, 6]

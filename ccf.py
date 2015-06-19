@@ -67,7 +67,7 @@ def raw_to_absrms(power, mean_rate, n_bins, dt, noisy):
     else:
         noise = 0.0
 
-    return power * (2.0 * dt / float(n_bins)) - noise
+    return power * (2.0 * dt / np.float(n_bins)) - noise
 
 
 ################################################################################
@@ -105,7 +105,7 @@ def raw_to_fracrms(power, mean_rate, n_bins, dt, noisy):
     else:
         noise = 0.0
 
-    return power * (2.0 * dt / float(n_bins) / (mean_rate ** 2)) - noise
+    return power * (2.0 * dt / np.float(n_bins) / (mean_rate ** 2)) - noise
 
 
 ################################################################################
@@ -143,7 +143,7 @@ def raw_to_leahy(power, mean_rate, n_bins, dt, noisy):
     else:
         noise = 0.0
 
-    return power * (2.0 * dt / float(n_bins) / mean_rate) - noise
+    return power * (2.0 * dt / np.float(n_bins) / mean_rate) - noise
 
 
 ################################################################################
@@ -573,8 +573,8 @@ def FILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref,
     signal_ref_pow = np.float64(power_ref[j_min:j_max])
 
     ## Putting powers into absolute rms2 normalization, subtracting noise
-    signal_ci_pow = signal_ci_pow * (2.0 * param_dict['dt'] / float(param_dict['n_bins'])) - noise_ci
-    signal_ref_pow = signal_ref_pow * (2.0 * param_dict['dt'] / float(param_dict['n_bins'])) - noise_ref
+    signal_ci_pow = signal_ci_pow * (2.0 * param_dict['dt'] / np.float(param_dict['n_bins'])) - noise_ci
+    signal_ref_pow = signal_ref_pow * (2.0 * param_dict['dt'] / np.float(param_dict['n_bins'])) - noise_ref
 
     ## Getting rms of reference band, to normalize the ccf
     ref_variance = np.sum(signal_ref_pow * param_dict['df'])
@@ -591,9 +591,9 @@ def FILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref,
     temp = (noise_ci * signal_ref_pow) + \
         (noise_ref * signal_ci_pow) + \
         (noise_ci * noise_ref)
-    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / float(param_dict['num_seg']))
+    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / np.float(param_dict['num_seg']))
 
-    temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * param_dict['dt'] / float(param_dict['n_bins']))
+    temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * param_dict['dt'] / np.float(param_dict['n_bins']))
     cs_signal_amp = np.sum(temp1, axis=0)
 
     ## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
@@ -604,7 +604,7 @@ def FILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref,
     ccf_end = fftpack.ifft(filtered_cs_avg, axis=0)
 
     ## Dividing ccf by rms of signal in reference band
-    ccf_end *= (2.0 / float(param_dict['n_bins']) / rms_ref)
+    ccf_end *= (2.0 / np.float(param_dict['n_bins']) / rms_ref)
 
     ## Computing the error on the ccf
     ccf_rms_ci = np.sqrt(np.var(ccf_end, axis=0, ddof=1))
@@ -630,15 +630,15 @@ def standard_ccf_err(param_dict):
         table_i = np.loadtxt(in_file)
         mean_ccf_i = np.mean(table_i, axis=0)
         ccf_resid_i = table_i - mean_ccf_i
-        sample_var_i = np.sum(ccf_resid_i**2, axis=0) / float(param_dict['num_seg']-1)  ## eq 2.3
-        standard_err_i = np.sqrt(sample_var_i/float(param_dict['num_seg']))  ## eq 2.4
+        sample_var_i = np.sum(ccf_resid_i**2, axis=0) / np.float(param_dict['num_seg']-1)  ## eq 2.3
+        standard_err_i = np.sqrt(sample_var_i/np.float(param_dict['num_seg']))  ## eq 2.4
         standard_err[:,i] = standard_err_i
 
     return standard_err
 
 
 ################################################################################
-def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy):
+def UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, ref, noisy):
     """
     Takes the iFFT of the cross spectrum to get the cross-correlation function,
     and computes the error on the cross-correlation function.
@@ -676,11 +676,11 @@ def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy):
     print "Ref band rms:", fracrms.rms, "(frac rms)"
 
     ## Dividing ccf by rms of signal in reference band
-    ccf *= (2.0 / float(param_dict['n_bins']) / absrms.rms)
+    ccf *= (2.0 / np.float(param_dict['n_bins']) / absrms.rms)
 
     return ccf
-
     # ccf_err = standard_ccf_err(param_dict)
+
     # return ccf, ccf_err
 
 
@@ -762,15 +762,13 @@ def print_seg_ccf(param_dict, ref_seg, cs_seg):
     compute the standard error on the mean ccf.
 
     """
-    ccf = UNFILT_cs_to_ccf(cs_seg, param_dict, ref_seg, True)
+    ccf = fftpack.ifft(cs_seg, axis=0).real
 
     absrms_power = raw_to_absrms(ref_seg.power, ref_seg.mean_rate, \
             param_dict['n_bins'], param_dict['dt'], True)
     absrms_var, absrms_rms = var_and_rms(absrms_power, param_dict['df'])
 
-    # ccf = fftpack.ifft(cs_seg, axis=0).real
-    # # absrms_rms_ref = np.sqrt(absrms_var_ref)
-    # ccf *= (2.0 / float(param_dict['n_bins']) / absrms_rms)
+    ccf *= (2.0 / np.float(param_dict['n_bins']) / absrms_rms)
 
     if not np.isnan(absrms_rms):
         for i in range(0, param_dict['detchans']):
@@ -780,6 +778,8 @@ def print_seg_ccf(param_dict, ref_seg, cs_seg):
                 for element in ccf[0:param_dict['err_bin'],i]:
                     out.write("%.6e\t" % element)
                 out.write("\n")
+
+    ccf *=  absrms_rms
 
     return ccf
 
@@ -831,7 +831,10 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
     #####################################################
     ## Printing ccf to a file to later get error for ccf
     #####################################################
-    ccf_seg = print_seg_ccf(param_dict, ref_seg, cs_seg)
+    if not param_dict['filter']:
+        ccf_seg = print_seg_ccf(param_dict, ref_seg, cs_seg)
+    else:
+        ccf_seg = 0.0
 
     return ccf_seg, cs_seg, ci_seg, ref_seg, np.mean(rate_ci_2d)
 
@@ -1017,14 +1020,12 @@ def get_background(bkgd_file):
     data = fits_hdu[1].data
     fits_hdu.close()
 
-    exposure = float(header['EXPOSURE'])
+    exposure = np.float(header['EXPOSURE'])
     counts = data.field('COUNTS')
 
     rate = counts / exposure
 
     return rate
-
-## End of function 'get_background'
 
 
 ################################################################################
@@ -1049,15 +1050,15 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Initializations; 'whole' is over one data file
     ##################################################
 
-    t_res = float(tools.get_key_val(in_file, 0, 'TIMEDEL'))
+    t_res = np.float(tools.get_key_val(in_file, 0, 'TIMEDEL'))
     dt = dt_mult * t_res
     n_bins = num_seconds * int(1.0 / dt)
     nyquist_freq = 1.0 / (2.0 * dt)
     detchans = int(tools.get_key_val(in_file, 0, 'DETCHANS'))
-    df = 1.0 / float(num_seconds)
+    df = 1.0 / np.float(num_seconds)
     param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
                  'df': df, 'nyquist': nyquist_freq, 'n_bins': n_bins, \
-                 'detchans': detchans, 'err_bin': 200}
+                 'detchans': detchans, 'filter': filtering, 'err_bin': 200}
 
     print "\nDT = %f" % param_dict['dt']
     print "N_bins = %d" % param_dict['n_bins']
@@ -1087,12 +1088,11 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
     ## Turning sums over segments into means
     #########################################
 
-    cs_avg = cs_sum / float(param_dict['num_seg'])
-    ccf_avg = ccf_sum / float(param_dict['num_seg'])
-    ci_whole.mean_rate /= float(param_dict['num_seg'])
-    ref_whole.mean_rate /= float(param_dict['num_seg'])
-    ci_whole.power /= float(param_dict['num_seg'])
-    ref_whole.power /= float(param_dict['num_seg'])
+    cs_avg = cs_sum / np.float(param_dict['num_seg'])
+    ci_whole.mean_rate /= np.float(param_dict['num_seg'])
+    ref_whole.mean_rate /= np.float(param_dict['num_seg'])
+    ci_whole.power /= np.float(param_dict['num_seg'])
+    ref_whole.power /= np.float(param_dict['num_seg'])
 
     ################################################################
     ## Printing the cross spectrum to a file, for plotting/checking
@@ -1128,10 +1128,14 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter):
             ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.power,
             ref_whole.power, True)
     else:
-        ccf_end = UNFILT_cs_to_ccf_w_err(cs_avg, param_dict,
-            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.power,
-            ref_whole.power, True)
+        ccf_end = UNFILT_cs_to_ccf_w_err(cs_avg, param_dict, ref_whole, True)
 
+        ccf_avg = ccf_sum / np.float(param_dict['num_seg'])
+        ref_whole.pos_power = ref_whole.power[0:param_dict['n_bins']/2+1]
+        absrms_pow = raw_to_absrms(ref_whole.pos_power, ref_whole.mean_rate, \
+                param_dict['n_bins'], param_dict['dt'], True)
+        absrms_var, absrms_rms = var_and_rms(absrms_pow, param_dict['df'])
+        ccf_avg /= absrms_rms
         ccf_error = standard_ccf_err(param_dict)
 
     print ccf_avg[2:7, 6]
