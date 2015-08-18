@@ -8,7 +8,7 @@ from astropy.io import fits
 import tools  # at https://github.com/abigailStev/whizzy_scripts
 import ccf as xcor
 
-__author__ = "Abigail Stevens, A.L.Stevens at uva.nl"
+__author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 
 """
 Computes the cross-correlation function of narrow energy channels of interest
@@ -105,7 +105,7 @@ def dat_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total, \
 
 ################################################################################
 def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
-    mean_rate_ref_total, t, ccf, ccf_error, filtering):
+    mean_rate_ref_total, t, ccf, ccf_error, filtering, lo_freq, hi_freq):
     """
     Writes time bins and the cross-correlation function to a .fits output file.
 
@@ -144,6 +144,12 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
     filtering : boolean
         Description.
 
+    lo_freq : float
+        Low frequency bound of cross spectrum filter, in Hz.
+
+    hi_freq : float
+        High frequency bound of cross spectrum filter, in Hz.
+
 
     Returns
     -------
@@ -168,8 +174,10 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
     prihdr.set('EVTLIST', in_file_list)
     prihdr.set('BKGD', bkgd_file)
     prihdr.set('DT', param_dict['dt'], "seconds")
+    prihdr.set('DF', param_dict['df'], "Hz")
     prihdr.set('N_BINS', param_dict['n_bins'], "time bins per segment")
     prihdr.set('SEC_SEG', param_dict['num_seconds'], "seconds per segment")
+    prihdr.set('NYQUIST', param_dict['nyquist'], "Hz")
     prihdr.set('SEGMENTS', param_dict['num_seg'], "segments, of all data")
     prihdr.set('EXPOSURE', param_dict['num_seg'] * param_dict['num_seconds'], \
         "seconds, of all data")
@@ -178,6 +186,7 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
     prihdr.set('RATE_CI', str(mean_rate_ci_total.tolist()), "counts/second")
     prihdr.set('RATE_REF', mean_rate_ref_total, "counts/second")
     prihdr.set('FILTER', str(filtering))
+    prihdr.set('FILTFREQ', "%f:%f" % (lo_freq, hi_freq))
     prihdu = fits.PrimaryHDU(header=prihdr)
 
     ## Making FITS table (extension 1)
@@ -204,7 +213,7 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
 
 ################################################################################
 def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
-    filtering):
+    filtering, lo_freq, hi_freq):
     """
     Reads in multiple event lists, splits into two light curves, makes segments
     and populates them to give them length n_bins, computes the cross spectrum
@@ -215,7 +224,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     Parameters
     ----------
     in_file_list : string
-        Description.
+        Name of text file that contains a list of the input data files for
+        analysis. Must be full path names. One file per line.
 
     out_file : string
         Description.
@@ -263,15 +273,22 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ## 'whole' is over one data file (i.e., in ccf.py)
     ###########################################################
 
+    adjust_segs = [932, 216, 184, 570, 93, 346, 860, 533, -324]
+
     t_res = np.float64(tools.get_key_val(input_files[0], 0, 'TIMEDEL'))
     dt = dt_mult * t_res
     n_bins = num_seconds * np.int(1.0 / dt)
-    detchans = np.int(tools.get_key_val(input_files[0], 0, 'DETCHANS'))
+    try:
+        detchans = np.int(tools.get_key_val(input_files[0], 0, 'DETCHANS'))
+    except KeyError:
+        detchans = 64
+
     nyq_freq = 1.0 / (2.0 * dt)
     df = 1.0 / np.float64(num_seconds)
     param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
-                 'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
-                 'detchans': detchans, 'filter': filtering, 'err_bin': 200}
+                'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
+                'detchans': detchans, 'filter': filtering, 'err_bin': 200, \
+                'adjust_seg': 0}
 
     ci_total = xcor.Lightcurve()
     ref_total = xcor.Lightcurve()
@@ -306,8 +323,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ##################################
     ## Looping through all data files
     ##################################
-
+    i=0
     for in_file in input_files:
+
+        # param_dict['adjust_seg'] = adjust_segs[i]
+        param_dict['adjust_seg'] = 0
 
         cross_spec, ci_whole, ref_whole, num_seg  = xcor.fits_in(in_file, \
                 param_dict, test)
@@ -322,7 +342,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         ref_total.mean_rate += ref_whole.mean_rate
         ci_total.power += ci_whole.power
         ref_total.power += ref_whole.power
-
+        i += 1
     ## End of for-loop
     print " "
 
@@ -340,7 +360,6 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ci_total.power /= np.float(param_dict['num_seg'])
     ref_total.power /= np.float(param_dict['num_seg'])
 
-
     avg_cross_spec = np.mean(total_cross_spec, axis=2)
     print np.shape(avg_cross_spec)
     print avg_cross_spec[0:5,4]
@@ -348,8 +367,9 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     # print np.shape(total_ccf)
 
     ## Printing the cross spectrum to a file, for plotting/checking
-# 	cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), avg_cross_spec))
-# 	np.savetxt('cs_avg.dat', cs_out)
+    cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), avg_cross_spec.real))
+    np.savetxt('cs_avg_adjusted.dat', cs_out)
+    # np.savetxt('cs_avg.dat', cs_out)
 
 
     ##################################################################
@@ -375,7 +395,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     if filtering:
         ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(avg_cross_spec, param_dict,
             ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
-            ref_total.power, True)
+            ref_total.power, True, lo_freq, hi_freq)
     else:
         ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, param_dict, ref_total, \
                 True)
@@ -396,21 +416,21 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         # print ccf_end[1:5, 1:5]
 
         ccf_error = xcor.standard_ccf_err(total_cross_spec, param_dict, \
-                ref_total)
+                ref_total, True)
 
-    print "CCF:", ccf_end[2:7, 6]
-    # print total_ccf[2:7, 6]
-    print "Err:", ccf_error[2:7, 6]
+    # print "CCF:", ccf_end[2:7, 6]
+    # # print total_ccf[2:7, 6]
+    # print "Err:", ccf_error[2:7, 6]
+    #
+    # ccf_should_be = [6.42431753, 3.42944342, 4.89985092, 3.15374201, -6.34984769]
+    # # err_should_be = [3.09208798, 3.71701276, 2.23034766, 3.42450043, 1.84851443]
+    # err_should_be = [10.25228203, 8.59091733, 4.35719107, 4.24096029, 6.52679086]
 
-    ccf_should_be = [6.42431753, 3.42944342, 4.89985092, 3.15374201, -6.34984769]
-    # err_should_be = [3.09208798, 3.71701276, 2.23034766, 3.42450043, 1.84851443]
-    err_should_be = [10.25228203, 8.59091733, 4.35719107, 4.24096029, 6.52679086]
-
-    for (e1, e2) in zip(ccf_end[2:7, 6], ccf_should_be):
-        print "\t", round(e1, 7) == round(e2, 7)
-
-    for (e1, e2) in zip(ccf_error[2:7, 6], err_should_be):
-        print "\t", round(e1, 7) == round(e2, 7)
+    # for (e1, e2) in zip(ccf_end[2:7, 6], ccf_should_be):
+    #     print "\t", round(e1, 7) == round(e2, 7)
+    #
+    # for (e1, e2) in zip(ccf_error[2:7, 6], err_should_be):
+    #     print "\t", round(e1, 7) == round(e2, 7)
 
     print np.mean(ref_total.mean_rate_array)
     exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used
@@ -428,7 +448,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ##########
 
     fits_out(out_file, in_file_list, bkgd_file, param_dict, ci_total.mean_rate,\
-        ref_total.mean_rate, t, ccf_end, ccf_error, filtering)
+        ref_total.mean_rate, t, ccf_end, ccf_error, filtering, lo_freq, hi_freq)
 
 
 ################################################################################
@@ -470,9 +490,9 @@ if __name__ == "__main__":
         dest='test', help="Int flag: 0 if computing all segments, 1 if "\
         "computing only one segment for testing. [0]")
 
-    parser.add_argument('-f', '--filter', type=int, default=0, choices={0,1},
-        dest='filter', help="Int flag: 0 if NOT applying a filter in frequency"\
-        "-space, 1 if applying filter (around a coherent pulsation). [0]")
+    parser.add_argument('-f', '--filter', default="no", dest='filter',
+            help="Filtering the cross spectrum: 'no' for QPOs, or 'lofreq:"\
+            "hifreq' in Hz for coherent pulsations. [no]")
 
     args = parser.parse_args()
 
@@ -481,10 +501,20 @@ if __name__ == "__main__":
         test = True
 
     filtering = False
-    if args.filter == 1:
+    lo_freq = -1
+    hi_freq = -1
+    if args.filter.lower() != "no":
         filtering = True
+        if ':' in args.filter:
+            temp = args.filter.split(':')
+            lo_freq = float(temp[0])
+            hi_freq = float(temp[1])
+        else:
+            Exception("Filter keyword used incorrectly. Acceptable inputs are "\
+                      "'no' or 'low:high'.")
 
+    print filtering
     main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds,
-        args.dt_mult, test, filtering)
+        args.dt_mult, test, filtering, lo_freq, hi_freq)
 
 ################################################################################
