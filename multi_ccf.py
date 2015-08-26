@@ -245,7 +245,6 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     filtering : boolean
         Description.
 
-
     Returns
     -------
     nothing
@@ -295,12 +294,17 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     total_seg = 0
     total_cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], \
             1), dtype=np.complex128)
-    ci_total.mean_rate = np.zeros(param_dict['detchans'])
-    ref_total.mean_rate = 0
     ci_total.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
             dtype=np.float64)
+    ci_total.power_array = np.zeros((param_dict['n_bins'], \
+            param_dict['detchans'], 1), dtype=np.float64)
+    ci_total.mean_rate = np.zeros(param_dict['detchans'])
+    ci_total.mean_rate_array = np.zeros((param_dict['detchans'], 1), \
+            dtype=np.float64)
     ref_total.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
-    ref_total.power_array = np.zeros((param_dict['n_bins'], 1), dtype=np.float64)
+    ref_total.power_array = np.zeros((param_dict['n_bins'], 1), \
+            dtype=np.float64)
+    ref_total.mean_rate = 0
     ref_total.mean_rate_array = 0
 
 
@@ -334,9 +338,14 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
         print "Segments for this file: %d\n" % num_seg
         total_cross_spec = np.dstack((total_cross_spec, cross_spec))
+        ci_total.power_array = np.dstack((ci_total.power_array, \
+                ci_whole.power_array))
+        ci_total.mean_rate_array = np.hstack((ci_total.mean_rate_array, \
+                ci_whole.mean_rate_array))
         ref_total.power_array = np.hstack((ref_total.power_array, \
                 ref_whole.power_array))
-        ref_total.mean_rate_array = np.append(ref_total.mean_rate_array, ref_whole.mean_rate_array)
+        ref_total.mean_rate_array = np.append(ref_total.mean_rate_array, \
+                ref_whole.mean_rate_array)
         total_seg += num_seg
         ci_total.mean_rate += ci_whole.mean_rate
         ref_total.mean_rate += ref_whole.mean_rate
@@ -351,7 +360,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     #########################################
     ## Turning sums over segments into means
     #########################################
+
+    ## Removing the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
+    ci_total.power_array = ci_total.power_array[:,:,1:]
+    ci_total.mean_rate_array = ci_total.mean_rate_array[:,1:]
     ref_total.power_array = ref_total.power_array[:,1:]
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
 
@@ -368,7 +381,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
     ## Printing the cross spectrum to a file, for plotting/checking
     cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), avg_cross_spec.real))
-    np.savetxt('cs_avg_adjusted.dat', cs_out)
+    np.savetxt('cs_avg_adj.dat', cs_out)
     # np.savetxt('cs_avg.dat', cs_out)
 
 
@@ -513,7 +526,6 @@ if __name__ == "__main__":
             Exception("Filter keyword used incorrectly. Acceptable inputs are "\
                       "'no' or 'low:high'.")
 
-    print filtering
     main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds,
         args.dt_mult, test, filtering, lo_freq, hi_freq)
 
