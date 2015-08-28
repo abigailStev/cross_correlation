@@ -105,7 +105,7 @@ def dat_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total, \
 
 ################################################################################
 def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
-    mean_rate_ref_total, t, ccf, ccf_error, filtering, lo_freq, hi_freq):
+    mean_rate_ref_total, t, ccf, ccf_error, filtering, lo_freq, hi_freq, adjust):
     """
     Writes time bins and the cross-correlation function to a .fits output file.
 
@@ -187,6 +187,7 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
     prihdr.set('RATE_REF', mean_rate_ref_total, "counts/second")
     prihdr.set('FILTER', str(filtering))
     prihdr.set('FILTFREQ', "%f:%f" % (lo_freq, hi_freq))
+    prihdr.set('ADJUST', str(adjust))
     prihdu = fits.PrimaryHDU(header=prihdr)
 
     ## Making FITS table (extension 1)
@@ -213,7 +214,7 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
 
 ################################################################################
 def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
-    filtering, lo_freq, hi_freq):
+    filtering, lo_freq, hi_freq, adjust):
     """
     Reads in multiple event lists, splits into two light curves, makes segments
     and populates them to give them length n_bins, computes the cross spectrum
@@ -312,6 +313,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     print "N_bins = %d" % param_dict['n_bins']
     print "Nyquist freq = %f" % param_dict['nyquist']
     print "Filtering?", filtering
+    print "Adjusting QPO?", adjust
 
     ###################################################################
     ## Reading in the background count rate from a background spectrum
@@ -330,8 +332,10 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     i=0
     for in_file in input_files:
 
-        # param_dict['adjust_seg'] = adjust_segs[i]
-        param_dict['adjust_seg'] = 0
+        if adjust:
+            param_dict['adjust_seg'] = adjust_segs[i]
+        else:
+            param_dict['adjust_seg'] = 0
 
         cross_spec, ci_whole, ref_whole, num_seg  = xcor.fits_in(in_file, \
                 param_dict, test)
@@ -372,6 +376,18 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ref_total.mean_rate /= np.float(param_dict['num_seg'])
     ci_total.power /= np.float(param_dict['num_seg'])
     ref_total.power /= np.float(param_dict['num_seg'])
+
+    print np.shape(ci_total.mean_rate_array)
+    print ci_total.mean_rate_array[1:4,:]
+    print np.shape(ci_total.mean_rate)
+    print ci_total.mean_rate[1:4]
+
+    ci_total.mean_rate == xcor.seg_average(ci_total.mean_rate_array)
+    ci_total.power = xcor.seg_average(ci_total.power_array)
+    ref_total.power = xcor.seg_average(ref_total.power_array)
+    ref_total.mean_rate = xcor.seg_average(ref_total.mean_rate_array)
+
+    print ci_total.mean_rate[1:4]
 
     avg_cross_spec = np.mean(total_cross_spec, axis=2)
     print np.shape(avg_cross_spec)
@@ -445,6 +461,10 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     # for (e1, e2) in zip(ccf_error[2:7, 6], err_should_be):
     #     print "\t", round(e1, 7) == round(e2, 7)
 
+    print "ccf end:", ccf_end[1:3,1:3]
+
+
+
     print np.mean(ref_total.mean_rate_array)
     exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
@@ -461,7 +481,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ##########
 
     fits_out(out_file, in_file_list, bkgd_file, param_dict, ci_total.mean_rate,\
-        ref_total.mean_rate, t, ccf_end, ccf_error, filtering, lo_freq, hi_freq)
+            ref_total.mean_rate, t, ccf_end, ccf_error, filtering, lo_freq, \
+            hi_freq, adjust)
 
 
 ################################################################################
@@ -507,6 +528,10 @@ if __name__ == "__main__":
             help="Filtering the cross spectrum: 'no' for QPOs, or 'lofreq:"\
             "hifreq' in Hz for coherent pulsations. [no]")
 
+    parser.add_argument('-a', '--adjust', action='store_true', default=False,
+            dest='adjust', help="If present, adjust cross spectra to line up "\
+            "QPOs. Values are built-in as of 150828. [False]")
+
     args = parser.parse_args()
 
     test = False
@@ -527,6 +552,6 @@ if __name__ == "__main__":
                       "'no' or 'low:high'.")
 
     main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds,
-        args.dt_mult, test, filtering, lo_freq, hi_freq)
+        args.dt_mult, test, filtering, lo_freq, hi_freq, args.adjust)
 
 ################################################################################
