@@ -320,9 +320,10 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ####################################################################
 
     if bkgd_file:
-        print "Using background spectrum: %s" % bkgd_file
+        print "Background spectrum: %s" % bkgd_file
         bkgd_rate = xcor.get_background(bkgd_file)
     else:
+        print "No background spectrum."
         bkgd_rate = np.zeros(param_dict['detchans'])
     print " "
 
@@ -351,19 +352,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         ref_total.mean_rate_array = np.append(ref_total.mean_rate_array, \
                 ref_whole.mean_rate_array)
         total_seg += num_seg
-        ci_total.mean_rate += ci_whole.mean_rate
-        ref_total.mean_rate += ref_whole.mean_rate
-        ci_total.power += ci_whole.power
-        ref_total.power += ref_whole.power
         i += 1
     ## End of for-loop
     print " "
 
     param_dict['num_seg'] = total_seg
-
-    #########################################
-    ## Turning sums over segments into means
-    #########################################
 
     ## Removing the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
@@ -372,43 +365,15 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ref_total.power_array = ref_total.power_array[:,1:]
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
 
-    ci_total.mean_rate /= np.float(param_dict['num_seg'])
-    ref_total.mean_rate /= np.float(param_dict['num_seg'])
-    ci_total.power /= np.float(param_dict['num_seg'])
-    ref_total.power /= np.float(param_dict['num_seg'])
+    ###################################################
+    ## Array processing and making means from segments
+    ###################################################
 
-    print np.shape(ci_total.mean_rate_array)
-    print ci_total.mean_rate_array[1:4,:]
-    print np.shape(ci_total.mean_rate)
-    print ci_total.mean_rate[1:4]
+    avg_cross_spec, ci_total, ref_total, param_dict = \
+            xcor.alltogether_means(total_cross_spec, ci_total, ref_total, \
+            param_dict, bkgd_rate, False)
 
-    ci_total.mean_rate == xcor.seg_average(ci_total.mean_rate_array)
-    ci_total.power = xcor.seg_average(ci_total.power_array)
-    ref_total.power = xcor.seg_average(ref_total.power_array)
-    ref_total.mean_rate = xcor.seg_average(ref_total.mean_rate_array)
-
-    print ci_total.mean_rate[1:4]
-
-    avg_cross_spec = np.mean(total_cross_spec, axis=2)
-    print np.shape(avg_cross_spec)
-    print avg_cross_spec[0:5,4]
-    # total_ccf = fftpack.ifft(avg_cross_spec, axis=0).real
-    # print np.shape(total_ccf)
-
-    ## Printing the cross spectrum to a file, for plotting/checking
-    cs_out = np.column_stack((fftpack.fftfreq(n_bins, d=dt), avg_cross_spec.real))
-    np.savetxt('cs_avg_adj.dat', cs_out)
-    # np.savetxt('cs_avg.dat', cs_out)
-
-
-    ##################################################################
-    ## Subtracting the background count rate from the mean count rate
-    ##################################################################
-
-    ci_total.mean_rate -= bkgd_rate
-
-    ## Need to use a background from ref pcu for the reference band...
-    # ref_total.mean_rate -= np.mean(bkgd_rate[2:26])
+    # print ci_total.mean_rate[1:3]
 
     ######################
     ## Making lag spectra
@@ -429,43 +394,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, param_dict, ref_total, \
                 True)
 
-        # ccf_avg = ccf_sum_total / np.float(param_dict['num_seg'])
-        # ref_total.pos_power = ref_total.power[0:param_dict['n_bins']/2+1]
-        # absrms_pow = xcor.raw_to_absrms(ref_total.pos_power, \
-        #         ref_total.mean_rate, param_dict['n_bins'], param_dict['dt'], \
-        #         True)
-        # absrms_var, absrms_rms = xcor.var_and_rms(absrms_pow, param_dict['df'])
-        # ccf_avg /= absrms_rms
-        # total_ccf *= (2.0 / np.float(param_dict['n_bins'])/ absrms_rms)
-        #
-        # print "\n", ccf_avg[1:5, 1:5]
-        # print "\n"
-        # print total_ccf[1:5, 1:5]
-        # print "\n"
-        # print ccf_end[1:5, 1:5]
-
         ccf_error = xcor.standard_ccf_err(total_cross_spec, param_dict, \
                 ref_total, True)
 
-    # print "CCF:", ccf_end[2:7, 6]
-    # # print total_ccf[2:7, 6]
-    # print "Err:", ccf_error[2:7, 6]
-    #
-    # ccf_should_be = [6.42431753, 3.42944342, 4.89985092, 3.15374201, -6.34984769]
-    # # err_should_be = [3.09208798, 3.71701276, 2.23034766, 3.42450043, 1.84851443]
-    # err_should_be = [10.25228203, 8.59091733, 4.35719107, 4.24096029, 6.52679086]
-
-    # for (e1, e2) in zip(ccf_end[2:7, 6], ccf_should_be):
-    #     print "\t", round(e1, 7) == round(e2, 7)
-    #
-    # for (e1, e2) in zip(ccf_error[2:7, 6], err_should_be):
-    #     print "\t", round(e1, 7) == round(e2, 7)
-
     print "ccf end:", ccf_end[1:3,1:3]
 
-
-
-    print np.mean(ref_total.mean_rate_array)
     exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used
     print "Exposure_time = %.3f seconds" % exposure
     print "Total number of segments:", param_dict['num_seg']

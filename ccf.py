@@ -172,8 +172,13 @@ def var_and_rms(power, df):
 
     """
     variance = np.sum(power * df, axis=0)
-    rms = np.sqrt(variance)
-
+    # print "Variance:", variance
+    # if variance > 0:
+    #     rms = np.sqrt(variance)
+    # else:
+    #     rms = np.nan
+    rms = np.where(variance >= 0, np.sqrt(variance), np.nan)
+    # print "rms:", rms
     return variance, rms
 
 
@@ -660,6 +665,7 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy):
             noisy) for i in range(param_dict['num_seg'])])
     ## Note that here, the axes are weird, so it's size (num_seg, n_bins)
 
+    print "Shape of absrms_power:", np.shape(absrms_power.T)
     absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
 
     mask = np.isnan(absrms_rms)
@@ -671,8 +677,8 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy):
     # print "Shape CCF array after nan mask:", np.shape(ccf_array)
     absrms_rms = absrms_rms[~mask]
     num_nonnan = param_dict['num_seg'] - np.count_nonzero(mask)
-    print "Number non-nan:", num_nonnan
-    print "Number nan:", np.count_nonzero(mask)
+    # print "Number non-nan:", num_nonnan
+    # print "Number nan:", np.count_nonzero(mask)
     ccf_array *= (2.0 / np.float(param_dict['n_bins']) / absrms_rms)
 
     mean_ccf = np.mean(ccf_array, axis=2)
@@ -922,9 +928,14 @@ def fits_in(in_file, param_dict, test=False):
             dtype=np.complex128)
     ci_whole.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
             dtype=np.float64)
+    ci_whole.power_array = np.zeros((param_dict['n_bins'], \
+            param_dict['detchans'], 1), dtype=np.float64)
     ref_whole.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
-    ref_whole.power_array = np.zeros((param_dict['n_bins'], 1), dtype=np.float64)
+    ref_whole.power_array = np.zeros((param_dict['n_bins'], 1), \
+            dtype=np.float64)
     ci_whole.mean_rate = np.zeros(param_dict['detchans'], dtype=np.float64)
+    ci_whole.mean_rate_array = np.zeros((param_dict['detchans'], 1),
+            dtype=np.float64)
     ref_whole.mean_rate = 0
     ref_whole.mean_rate_array = 0
 
@@ -1002,6 +1013,11 @@ def fits_in(in_file, param_dict, test=False):
 
             cross_spec = np.dstack((cross_spec, cs_seg))
 
+            ci_whole.power_array = np.dstack((ci_whole.power_array, \
+                    ci_seg.power))
+            ci_whole.mean_rate_array = np.hstack((ci_whole.mean_rate_array, \
+                    np.reshape(ci_seg.mean_rate, (param_dict['detchans'],1)) ))
+            print ci_seg.mean_rate[1:4]
             # print np.shape(ref_whole.power_array)
             # print np.shape(ref_seg.power)
             ref_whole.power_array = np.hstack((ref_whole.power_array, \
@@ -1012,7 +1028,6 @@ def fits_in(in_file, param_dict, test=False):
 
             # print cs_seg[0:3, 0:3]
             # print cross_spec[0:3, 0:3, -1]
-
 
             ## Sums across segments -- arrays, so it adds by index
             num_seg += 1
@@ -1043,11 +1058,17 @@ def fits_in(in_file, param_dict, test=False):
     ## End of while-loop
 
     cross_spec = cross_spec[:,:,1:]
+    ci_whole.power_array = ci_whole.power_array[:,:,1:]
+    ci_whole.mean_rate_array = ci_whole.mean_rate_array[:,1:]
     ref_whole.power_array = ref_whole.power_array[:,1:]
     ref_whole.mean_rate_array = ref_whole.mean_rate_array[1:]
 
     return cross_spec, ci_whole, ref_whole, num_seg
 
+
+################################################################################
+def seg_average(array):
+    return np.mean(array, axis=-1)
 
 ################################################################################
 def get_background(bkgd_file):
@@ -1085,6 +1106,63 @@ def get_background(bkgd_file):
     rate = counts / exposure
 
     return rate
+
+################################################################################
+def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
+
+    # if not boot:
+    #     ## Already do this before selecting random segments for bootstrapped ccf
+    #
+    #     ##################################################
+    #     ## Removing the segments with a negative variance
+    #     ##################################################
+    #
+    #     absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
+    #             ref.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'], \
+    #             True) for i in range(param_dict['num_seg'])])
+    #     ## Note that here, the axes are weird, so it's size (num_seg, n_bins)
+    #     absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
+    #
+    #     mask = np.isnan(absrms_rms)
+    #
+    #     cross_spec = cross_spec[:,:,~mask]
+    #     ci.power_array = ci.power_array[:,:,~mask]
+    #     ci.mean_rate_array = ci.mean_rate_array[:,~mask]
+    #     ref.power_array = ref.power_array[:,~mask]
+    #     ref.mean_rate_array = ref.mean_rate_array[~mask]
+    #     param_dict['num_seg'] = param_dict['num_seg'] - np.count_nonzero(mask)
+
+    #########################################
+    ## Turning sums over segments into means
+    #########################################
+
+    # print ci.mean_rate_array[1:4]
+    # print np.shape(ci.mean_rate_array)
+
+    ci.mean_rate = seg_average(ci.mean_rate_array)
+    ci.power = seg_average(ci.power_array)
+    ref.power = seg_average(ref.power_array)
+    ref.mean_rate = seg_average(ref.mean_rate_array)
+    avg_cross_spec = seg_average(cross_spec)
+
+    # print ci.mean_rate[1:3]
+    # print bkgd_rate[1:3]
+
+    ## Printing the cross spectrum to a file, for plotting/checking
+    # cs_out = np.column_stack((fftpack.fftfreq(param_dict['n_bins'], d=dt), \
+    #         avg_cross_spec.real))
+    # np.savetxt('cs_avg.dat', cs_out)
+
+    ##################################################################
+    ## Subtracting the background count rate from the mean count rate
+    ##################################################################
+
+    ci.mean_rate -= bkgd_rate
+
+    ## Need to use a background from ref pcu for the reference band...
+    # ref_total.mean_rate -= np.mean(bkgd_rate[2:26])
+
+    return avg_cross_spec, ci, ref, param_dict
 
 
 ################################################################################
