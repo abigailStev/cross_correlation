@@ -4,6 +4,7 @@ import sys
 from scipy import fftpack
 from datetime import datetime
 import os.path
+import os
 import subprocess
 from astropy.io import fits
 import tools  # in https://github.com/abigailStev/whizzy_scripts
@@ -32,6 +33,70 @@ class NormPSD(object):
         self.noise = 0
         self.variance = 0
         self.rms = 0
+
+
+################################################################################
+def fits_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci_whole, \
+    mean_rate_ref_whole, t, ccf, ccf_error, filter, lo_freq, hi_freq):
+    """
+    Writes the cross-correlation function to a .fits output file.
+
+    """
+
+    ## Getting data into a good output structure
+    chan = np.arange(0, param_dict['detchans'])
+    energy_channels = np.tile(chan, len(t))
+    if filter:
+        ccf_error = np.tile(ccf_error, len(t))
+    else:
+        ccf_error = ccf_error.flatten('C')
+    time_bins = np.repeat(t, param_dict['detchans'])
+    assert len(energy_channels) == len(time_bins)
+
+    print "\nOutput sent to: %s" % out_file
+
+    ## Making FITS header (extension 0)
+    prihdr = fits.Header()
+    prihdr.set('TYPE', "Cross-correlation function")
+    prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
+    prihdr.set('EVTLIST', in_file)
+    prihdr.set('BKGD', bkgd_file)
+    prihdr.set('DT', np.mean(param_dict['dt']), "seconds")
+    prihdr.set('N_BINS', param_dict['n_bins'], "time bins per segment")
+    prihdr.set('SEGMENTS', param_dict['num_seg'], "segments in the whole light"\
+        " curve")
+    prihdr.set('SEC_SEG', param_dict['num_seconds'], "seconds per segment")
+    prihdr.set('EXPOSURE', param_dict['exposure'], "seconds of data used")
+    prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy"\
+        " channels")
+    prihdr.set('RATE_CI', str(mean_rate_ci_whole.tolist()), "counts/second")
+    prihdr.set('RATE_REF', mean_rate_ref_whole, "counts/second")
+    prihdr.set('FILTER', str(filter))
+    prihdr.set('FILTFREQ', "%f:%f" % (lo_freq, hi_freq))
+    prihdr.set('ADJUST', "%d" % param_dict['adjust_seg'])
+
+    prihdu = fits.PrimaryHDU(header=prihdr)
+
+    ## Making FITS table (extension 1)
+    col1 = fits.Column(name='TIME_BIN', format='K', array=time_bins)
+    col2 = fits.Column(name='CCF', unit='Counts/second', format='D',
+        array=ccf.flatten('C'))
+    col3 = fits.Column(name='ERROR', unit='', format='D',
+        array=ccf_error)
+    col4 = fits.Column(name='CHANNEL', unit='', format='I',
+        array=energy_channels)
+    cols = fits.ColDefs([col1, col2, col3, col4])
+    tbhdu = fits.BinTableHDU.from_columns(cols)
+
+    ## If the file already exists, remove it (still working on just updating it)
+    assert out_file[-4:].lower() == "fits", \
+        'ERROR: Output file must have extension ".fits".'
+    if os.path.isfile(out_file):
+        subprocess.call(['rm', out_file])
+
+    ## Writing to a FITS file
+    thdulist = fits.HDUList([prihdu, tbhdu])
+    thdulist.writeto(out_file)
 
 
 ################################################################################
@@ -171,7 +236,11 @@ def var_and_rms(power, df):
         The RMS of the power spectrum.
 
     """
+
+    print "Shape power:", np.shape(power)
+    # print "Nonzero power:", power[np.where(power<=0.0)]
     variance = np.sum(power * df, axis=0)
+
     # print "Variance:", variance
     # if variance > 0:
     #     rms = np.sqrt(variance)
@@ -180,70 +249,6 @@ def var_and_rms(power, df):
     rms = np.where(variance >= 0, np.sqrt(variance), np.nan)
     # print "rms:", rms
     return variance, rms
-
-
-################################################################################
-def fits_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci_whole, \
-    mean_rate_ref_whole, t, ccf, ccf_error, filter):
-    """
-    Writes the cross-correlation function to a .fits output file.
-
-    """
-
-    ## Getting data into a good output structure
-    chan = np.arange(0, param_dict['detchans'])
-    energy_channels = np.tile(chan, len(t))
-    if filter:
-        ccf_error = np.tile(ccf_error, len(t))
-    else:
-        ccf_error = ccf_error.flatten('C')
-    time_bins = np.repeat(t, param_dict['detchans'])
-    assert len(energy_channels) == len(time_bins)
-
-    print "\nOutput sent to: %s" % out_file
-
-    ## Making FITS header (extension 0)
-    prihdr = fits.Header()
-    prihdr.set('TYPE', "Cross-correlation function")
-    prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
-    prihdr.set('EVTLIST', in_file)
-    prihdr.set('BKGD', bkgd_file)
-    prihdr.set('DT', param_dict['dt'], "seconds")
-    prihdr.set('N_BINS', param_dict['n_bins'], "time bins per segment")
-    prihdr.set('SEGMENTS', param_dict['num_seg'], "segments in the whole light"\
-        " curve")
-    prihdr.set('SEC_SEG', param_dict['num_seconds'], "seconds per segment")
-    prihdr.set('EXPOSURE', param_dict['num_seg'] * param_dict['num_seconds'],
-        "seconds, of light curve")
-    prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy"\
-        " channels")
-    prihdr.set('RATE_CI', str(mean_rate_ci_whole.tolist()), "counts/second")
-    prihdr.set('RATE_REF', mean_rate_ref_whole, "counts/second")
-    prihdr.set('FILTER', str(filter))
-    prihdr.set('FILTFREQ', "%f:%f" % (lo_freq, hi_freq))
-
-    prihdu = fits.PrimaryHDU(header=prihdr)
-
-    ## Making FITS table (extension 1)
-    col1 = fits.Column(name='TIME_BIN', format='K', array=time_bins)
-    col2 = fits.Column(name='CCF', unit='Counts/second', format='D',
-        array=ccf.flatten('C'))
-    col3 = fits.Column(name='ERROR', unit='', format='D',
-        array=ccf_error)
-    col4 = fits.Column(name='CHANNEL', unit='', format='I',
-        array=energy_channels)
-    cols = fits.ColDefs([col1, col2, col3, col4])
-    tbhdu = fits.BinTableHDU.from_columns(cols)
-
-    ## If the file already exists, remove it (still working on just updating it)
-    assert out_file[-4:].lower() == "fits", \
-        'ERROR: Output file must have extension ".fits".'
-    if os.path.isfile(out_file):
-        subprocess.call(['rm', out_file])
-
-    ## Writing to a FITS file
-    thdulist = fits.HDUList([prihdu, tbhdu])
-    thdulist.writeto(out_file)
 
 
 ################################################################################
@@ -417,9 +422,13 @@ def save_for_lags(out_file, in_file, param_dict, mean_rate_ci, mean_rate_ref,
 
     """
     ## Getting the Fourier frequencies for the cross spectrum
-    freq = fftpack.fftfreq(param_dict['n_bins'], d=param_dict['dt'])
+    freq = fftpack.fftfreq(param_dict['n_bins'], d=np.mean(param_dict['dt']))
     nyq_index = param_dict['n_bins']/2
-    assert np.abs(freq[nyq_index]) == param_dict['nyquist']
+    print "Nyquist frequency:", freq[nyq_index]
+    print "One before nyquist:", freq[nyq_index-1]
+    print "One after nyquist:", freq[nyq_index+1]
+    print "Should be the nyquist frequency:", param_dict['nyquist']
+    # assert np.abs(freq[nyq_index]) == param_dict['nyquist']
 
     ## Only keeping the parts associated with positive Fourier frequencies
     freq = np.abs(freq[0:nyq_index + 1])  ## because it slices at end-1, and we
@@ -434,6 +443,8 @@ def save_for_lags(out_file, in_file, param_dict, mean_rate_ci, mean_rate_ref,
 
     out_file = out_file.replace("cross_correlation/out_ccf", "lags/out_lags")
     out_file = out_file.replace(".", "_cs.")
+    out_dir = out_file[0:out_file.rfind("/")+1]
+    subprocess.call(['mkdir', '-p', out_dir])
     print "Output sent to: %s" % out_file
 
     ## Making FITS header (extension 0)
@@ -442,12 +453,11 @@ def save_for_lags(out_file, in_file, param_dict, mean_rate_ci, mean_rate_ref,
             "ref.")
     prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
     prihdr.set('EVTLIST', in_file)
-    prihdr.set('DT', param_dict['dt'], "seconds")
+    prihdr.set('DT', np.mean(param_dict['dt']), "seconds")
     prihdr.set('N_BINS', param_dict['n_bins'], "time bins per segment")
     prihdr.set('SEGMENTS', param_dict['num_seg'], "segments in the whole light"\
             " curve")
-    prihdr.set('EXPOSURE', param_dict['num_seg'] * param_dict['num_seconds'],
-            "seconds, of light curve")
+    prihdr.set('EXPOSURE', param_dict['exposure'], "seconds of data used")
     prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy"\
             " channels")
     prihdr.set('RATE_CI', str(mean_rate_ci.tolist()), "counts/second")
@@ -571,8 +581,6 @@ def FILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref,
             param_dict['n_bins'], param_dict['detchans'], lo_freq, hi_freq, \
             power_ref)
 
-
-
     ## Absolute rms norms of poisson noise
     noise_ci = 2.0 * countrate_ci
     noise_ref = 2.0 * countrate_ref
@@ -658,38 +666,45 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy):
         The standard error on the CCF from the segment-to-segment variations.
 
     """
-    # print "Shape mean rate array:", np.shape(ref.mean_rate_array)
-    # print "Shape power array:", np.shape(ref.power_array)
+    print "Shape mean rate array:", np.shape(ref.mean_rate_array)
+    print "Shape power array:", np.shape(ref.power_array)
+
     absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
-            ref.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'], \
+            ref.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
             noisy) for i in range(param_dict['num_seg'])])
     ## Note that here, the axes are weird, so it's size (num_seg, n_bins)
 
-    print "Shape of absrms_power:", np.shape(absrms_power.T)
+    # print "Shape absrms power:", np.shape(absrms_power)
+    # print "Num seg:", param_dict['num_seg']
+
     absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
 
-    mask = np.isnan(absrms_rms)
-    # print mask
+    # mask = np.isnan(absrms_rms)
+    # print "Mask:", mask
+    # print "Shape absrms var:", np.shape(absrms_var)
+    # print "Shape absrms rms:", np.shape(absrms_rms)
+    # print "Shape cs:", np.shape(cs_array)
 
     ccf_array = fftpack.ifft(cs_array, axis=0).real
+    # print "Shape ccf array:", np.shape(ccf_array)
     # print "Shape CCF array before nan mask:", np.shape(ccf_array)
-    ccf_array = ccf_array[:,:,~mask]
+    # ccf_array = ccf_array[:,:,~mask]
     # print "Shape CCF array after nan mask:", np.shape(ccf_array)
-    absrms_rms = absrms_rms[~mask]
-    num_nonnan = param_dict['num_seg'] - np.count_nonzero(mask)
+    # absrms_rms = absrms_rms[~mask]
+    # num_nonnan = param_dict['num_seg'] - np.count_nonzero(mask)
     # print "Number non-nan:", num_nonnan
     # print "Number nan:", np.count_nonzero(mask)
     ccf_array *= (2.0 / np.float(param_dict['n_bins']) / absrms_rms)
 
     mean_ccf = np.mean(ccf_array, axis=2)
-    mean_ccf_b = np.resize(np.repeat(mean_ccf, num_nonnan), \
+    mean_ccf_b = np.resize(np.repeat(mean_ccf, param_dict['num_seg']), \
             np.shape(ccf_array))
     ccf_resid = ccf_array - mean_ccf_b
 
     sample_var = np.sum(ccf_resid**2, axis=2) / \
-            np.float(num_nonnan-1)  ## eq 2.3
+            np.float(param_dict['num_seg']-1)  ## eq 2.3
     standard_error = np.sqrt(sample_var / \
-            np.float(num_nonnan))  ## eq 2.4
+            np.float(param_dict['num_seg']))  ## eq 2.4
 
     return standard_error
 
@@ -703,9 +718,7 @@ def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy):
     """
 
     if len(ref.power) == param_dict['n_bins']:
-        freq = fftpack.fftfreq(param_dict['n_bins'], d=param_dict['dt'])
         nyq_index = param_dict['n_bins'] / 2
-        assert np.abs(freq[nyq_index]) == param_dict['nyquist']
         ref.pos_power = ref.power[0:nyq_index+1]
 
     ######################################################
@@ -719,18 +732,18 @@ def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy):
     fracrms = NormPSD()
 
     absrms.power = raw_to_absrms(ref.pos_power, ref.mean_rate, \
-            param_dict['n_bins'], param_dict['dt'], noisy)
+            param_dict['n_bins'], np.mean(param_dict['dt']), noisy)
     fracrms.power = raw_to_fracrms(ref.pos_power, ref.mean_rate, \
-            param_dict['n_bins'], param_dict['dt'], noisy)
+            param_dict['n_bins'], np.mean(param_dict['dt']), noisy)
 
 # 	## Getting rms of reference band, to normalize the ccf
-    absrms.var, absrms.rms = var_and_rms(absrms.power, param_dict['df'])
-    fracrms.var, fracrms.rms = var_and_rms(fracrms.power, param_dict['df'])
+    absrms.var, absrms.rms = var_and_rms(absrms.power, np.mean(param_dict['df']))
+    fracrms.var, fracrms.rms = var_and_rms(fracrms.power, np.mean(param_dict['df']))
 
-    print "Ref band var:", absrms.var, "(abs rms)"
-    print "Ref band rms:", absrms.rms, "(abs rms)"
-    print "Ref band var:", fracrms.var, "(frac rms)"
-    print "Ref band rms:", fracrms.rms, "(frac rms)"
+    # print "Ref band var:", absrms.var, "(abs rms)"
+    # print "Ref band rms:", absrms.rms, "(abs rms)"
+    # print "Ref band var:", fracrms.var, "(frac rms)"
+    # print "Ref band rms:", fracrms.rms, "(frac rms)"
 
     ## Dividing ccf by rms of signal in reference band
     ccf *= (2.0 / np.float(param_dict['n_bins']) / absrms.rms)
@@ -938,6 +951,9 @@ def fits_in(in_file, param_dict, test=False):
             dtype=np.float64)
     ref_whole.mean_rate = 0
     ref_whole.mean_rate_array = 0
+    dt = np.array([])
+    df = np.array([])
+    exposure = 0
 
     start_time = data.field('TIME')[0]
     final_time = data.field('TIME')[-1]
@@ -1011,13 +1027,20 @@ def fits_in(in_file, param_dict, test=False):
                     time_ref, energy_ci, energy_ref, param_dict, start_time, \
                     seg_end_time)
 
+            dt_seg = (seg_end_time - start_time) / float(param_dict['n_bins'])
+            df_seg = 1.0 / (param_dict['n_bins'] * dt_seg)
+            # print dt_seg, " s"
+            # print df_seg, " Hz"
+            dt = np.append(dt, dt_seg)
+            df = np.append(df, df_seg)
+
             cross_spec = np.dstack((cross_spec, cs_seg))
 
             ci_whole.power_array = np.dstack((ci_whole.power_array, \
                     ci_seg.power))
             ci_whole.mean_rate_array = np.hstack((ci_whole.mean_rate_array, \
                     np.reshape(ci_seg.mean_rate, (param_dict['detchans'],1)) ))
-            print ci_seg.mean_rate[1:4]
+            # print ci_seg.mean_rate[1:4]
             # print np.shape(ref_whole.power_array)
             # print np.shape(ref_seg.power)
             ref_whole.power_array = np.hstack((ref_whole.power_array, \
@@ -1030,6 +1053,7 @@ def fits_in(in_file, param_dict, test=False):
             # print cross_spec[0:3, 0:3, -1]
 
             ## Sums across segments -- arrays, so it adds by index
+            exposure += (seg_end_time - start_time)
             num_seg += 1
             ci_whole.mean_rate += ci_seg.mean_rate
             ref_whole.mean_rate += ref_seg.mean_rate
@@ -1062,8 +1086,10 @@ def fits_in(in_file, param_dict, test=False):
     ci_whole.mean_rate_array = ci_whole.mean_rate_array[:,1:]
     ref_whole.power_array = ref_whole.power_array[:,1:]
     ref_whole.mean_rate_array = ref_whole.mean_rate_array[1:]
+    print dt
+    print df
 
-    return cross_spec, ci_whole, ref_whole, num_seg
+    return cross_spec, ci_whole, ref_whole, num_seg, dt, df, exposure
 
 
 ################################################################################
@@ -1110,27 +1136,41 @@ def get_background(bkgd_file):
 ################################################################################
 def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
 
-    # if not boot:
-    #     ## Already do this before selecting random segments for bootstrapped ccf
-    #
-    #     ##################################################
-    #     ## Removing the segments with a negative variance
-    #     ##################################################
-    #
-    #     absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
-    #             ref.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'], \
-    #             True) for i in range(param_dict['num_seg'])])
-    #     ## Note that here, the axes are weird, so it's size (num_seg, n_bins)
-    #     absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
-    #
-    #     mask = np.isnan(absrms_rms)
-    #
-    #     cross_spec = cross_spec[:,:,~mask]
-    #     ci.power_array = ci.power_array[:,:,~mask]
-    #     ci.mean_rate_array = ci.mean_rate_array[:,~mask]
-    #     ref.power_array = ref.power_array[:,~mask]
-    #     ref.mean_rate_array = ref.mean_rate_array[~mask]
-    #     param_dict['num_seg'] = param_dict['num_seg'] - np.count_nonzero(mask)
+    if not boot:
+        ## Already do this before selecting random segments for bootstrapped ccf
+
+        ##################################################
+        ## Removing the segments with a negative variance
+        ##################################################
+        print "Alltogether means:"
+        absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
+                ref.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
+                True) for i in range(param_dict['num_seg'])])
+        ## Note that here, the axes are weird, so it's size (num_seg, n_bins)
+        absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
+
+        print "Absrms var:", absrms_var
+        print "Absrms rms:", absrms_rms
+
+        print "Shape of power:", np.shape(absrms_power)
+        print "Shape absrms var:", np.shape(absrms_var)
+        print "Shape absrms rms:", np.shape(absrms_rms)
+
+        mask = np.isnan(absrms_rms)
+
+        print "Not nan in mask:", np.count_nonzero(mask)
+
+        cross_spec = cross_spec[:,:,~mask]
+        ci.power_array = ci.power_array[:,:,~mask]
+        ci.mean_rate_array = ci.mean_rate_array[:,~mask]
+        ref.power_array = ref.power_array[:,~mask]
+        ref.mean_rate_array = ref.mean_rate_array[~mask]
+        param_dict['dt'] = param_dict['dt'][~mask]
+        param_dict['df'] = param_dict['df'][~mask]
+        print "Total num seg:", param_dict['num_seg']
+        param_dict['num_seg'] = param_dict['num_seg'] - np.count_nonzero(mask)
+
+        print "Non-nan num seg:", param_dict['num_seg']
 
     #########################################
     ## Turning sums over segments into means
@@ -1162,12 +1202,12 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
     ## Need to use a background from ref pcu for the reference band...
     # ref_total.mean_rate -= np.mean(bkgd_rate[2:26])
 
-    return avg_cross_spec, ci, ref, param_dict
+    return avg_cross_spec, cross_spec, ci, ref, param_dict
 
 
 ################################################################################
-def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter, \
-        lo_freq, hi_freq):
+def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filtering, \
+        lo_freq, hi_freq, adjust_seg):
     """
     Reads in one event list, splits into reference band and channels of
     interest (CoI), makes segments and populates them to give them length
@@ -1196,12 +1236,15 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter, \
     df = 1.0 / np.float(num_seconds)
     param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
                  'df': df, 'nyquist': nyquist_freq, 'n_bins': n_bins, \
-                 'detchans': detchans, 'filter': filtering, 'err_bin': 200}
+                 'detchans': detchans, 'filter': filtering, \
+                 'adjust_seg': adjust_seg, 'exposure': 0}
 
     print "\nDT = %f" % param_dict['dt']
     print "N_bins = %d" % param_dict['n_bins']
     print "Nyquist freq =", param_dict['nyquist']
-    print "Filtering?", filter
+    print "Testing?", test
+    print "Filtering?", param_dict['filter']
+    print "Adjust seg by: %d" % param_dict['adjust_seg']
 
     ###################################################################
     ## Reading in the background count rate from a background spectrum
@@ -1217,27 +1260,34 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter, \
     ## Reading in data, computing the cross spectrum
     #################################################
 
-    cross_spec, ci_whole, ref_whole, num_seg = fits_in(in_file, param_dict, \
-            test)
+    cross_spec, ci_whole, ref_whole, num_seg, dt, df, exposure = \
+            fits_in(in_file, param_dict, test)
 
     param_dict['num_seg'] = num_seg
+    param_dict['exposure'] = exposure
+    param_dict['dt'] = dt
+    param_dict['df'] = df
+
+    avg_cross_spec, cross_spec, ci_whole, ref_whole, param_dict = \
+            alltogether_means(cross_spec, ci_whole, ref_whole, param_dict, \
+            bkgd_rate, False)
 
     #########################################
     ## Turning sums over segments into means
     #########################################
 
-    avg_cross_spec = np.mean(cross_spec, axis=2)
-    ci_whole.mean_rate /= np.float(param_dict['num_seg'])
-    ref_whole.mean_rate /= np.float(param_dict['num_seg'])
-    ci_whole.power /= np.float(param_dict['num_seg'])
-    ref_whole.power /= np.float(param_dict['num_seg'])
+    # avg_cross_spec = np.mean(cross_spec, axis=2)
+    # ci_whole.mean_rate /= np.float(param_dict['num_seg'])
+    # ref_whole.mean_rate /= np.float(param_dict['num_seg'])
+    # ci_whole.power /= np.float(param_dict['num_seg'])
+    # ref_whole.power /= np.float(param_dict['num_seg'])
 
     ################################################################
     ## Printing the cross spectrum to a file, for plotting/checking
     ################################################################
 
     cs_out = np.column_stack((fftpack.fftfreq(param_dict['n_bins'], \
-            d=param_dict['dt']), avg_cross_spec))
+            d=np.mean(param_dict['dt'])), avg_cross_spec))
     np.savetxt('cs_avg.dat', cs_out)
 
     ##################################################################
@@ -1261,13 +1311,13 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter, \
     ## Computing ccf from cs, and computing error
     ##############################################
 
-    if filter:
+    if filtering:
         ccf_end, ccf_error = FILT_cs_to_ccf_w_err(avg_cross_spec, param_dict,
             ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.power,
             ref_whole.power, True, lo_freq, hi_freq)
     else:
         ccf_avg = UNFILT_cs_to_ccf(avg_cross_spec, param_dict, ref_whole, True)
-        ccf_error = standard_ccf_err(avg_cross_spec, param_dict, ref_whole, True)
+        ccf_error = standard_ccf_err(cross_spec, param_dict, ref_whole, True)
 
     # print "CCF:", ccf_avg[2:7, 6]
     # print "Err:", ccf_error[2:7, 6]
@@ -1294,7 +1344,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filter, \
     ##########
 
     fits_out(out_file, in_file, bkgd_file, param_dict, ci_whole.mean_rate, \
-        ref_whole.mean_rate, t, ccf_avg, ccf_error, filter, lo_freq, hi_freq)
+        ref_whole.mean_rate, t, ccf_avg, ccf_error, filtering, lo_freq, hi_freq)
 
 
 ################################################################################
@@ -1337,6 +1387,10 @@ if __name__ == "__main__":
             help="Filtering the cross spectrum: 'no' for QPOs, or 'lofreq:"\
             "hifreq' in Hz for coherent pulsations. [no]")
 
+    parser.add_argument('-a', '--adjust', default=0, type=int, dest='adjust',
+            help="How much to adjust each n_bin by to artificially shift the "\
+            "QPO in frequency. [0]")
+
     args = parser.parse_args()
 
     test = False
@@ -1357,6 +1411,6 @@ if __name__ == "__main__":
                       "'no' or 'low:high'.")
 
     main(args.infile, args.outfile, args.bkgd_file, args.num_seconds,
-        args.dt_mult, test, filtering, lo_freq, hi_freq)
+        args.dt_mult, test, filtering, lo_freq, hi_freq, args.adjust)
 
 ################################################################################
