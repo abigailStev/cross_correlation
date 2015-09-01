@@ -30,18 +30,24 @@ fi
 
 ################################################################################
 
-home_dir=$(ls -d ~) 
-day=$(date +%y%m%d)
-exe_dir="$home_dir/Dropbox/Research/cross_correlation"
-out_dir="$exe_dir/out_ccf"
-xte_exe_dir="$home_dir/Dropbox/Research/rxte_reduce"
-lag_exe_dir="$home_dir/Dropbox/Research/lags"
-lag_out_dir="$lag_exe_dir/out_lags"
-
 #prefix="j1808-1HzQPO"
 #obsID="70080-03-11-00"
 prefix="GX339-BQPO"
-obsID="95335-01-01-06"
+obsID="95335-01-01-05"
+
+dt=64
+numsec=64
+testing=0  # 0 for no, 1 for yes
+tlen=70
+obs_epoch=5
+
+home_dir=$(ls -d ~) 
+day=$(date +%y%m%d)
+exe_dir="$home_dir/Dropbox/Research/cross_correlation"
+out_dir="$exe_dir/out_ccf/${prefix}"
+xte_exe_dir="$home_dir/Dropbox/Research/rxte_reduce"
+lag_exe_dir="$home_dir/Dropbox/Research/lags"
+lag_out_dir="$lag_exe_dir/out_lags/${prefix}"
 
 red_dir="$home_dir/Reduced_data/${prefix}/$obsID"
 # red_dir="$home_dur/Dropbox/Research/sample_data"
@@ -51,14 +57,9 @@ ec_table_file="$xte_exe_dir/e-c_table.txt"
 chan_bin_file="$home_dir/Reduced_data/${prefix}/chan.txt"
 energies_file="$home_dir/Reduced_data/${prefix}/energies.txt"
 
-#filename="${obsID}_${day}_t${dt}_${numsec}sec_adj"
-filename="${obsID}_${day}_t${dt}_${numsec}sec"
+filename="${obsID}_${day}_t${dt}_${numsec}sec_adj"
+#filename="${obsID}_${day}_t${dt}_${numsec}sec"
 
-dt=64
-numsec=64
-testing=0  # 0 for no, 1 for yes
-tlen=70
-obs_epoch=5
 
 #filtfreq="401:401"
 filtfreq="no"
@@ -89,10 +90,11 @@ done
 
 if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
 	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
-		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq"
+		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" \
+		-a 932
 elif [ -e "$in_file" ]; then
 	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
-		-n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq"
+		-n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" -a 932
 else
 	echo -e "\tERROR: ccf.py was not run. Eventlist and/or background energy \
 spectrum doesn't exist."
