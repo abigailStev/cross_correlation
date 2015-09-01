@@ -1,10 +1,7 @@
+#!/usr/bin/env
+
 import argparse
 import numpy as np
-import os.path
-import subprocess
-from scipy import fftpack
-from datetime import datetime
-from astropy.io import fits
 import tools  # at https://github.com/abigailStev/whizzy_scripts
 import ccf as xcor
 import multi_ccf as mxcor
@@ -21,7 +18,7 @@ Use with run_multi_ccf_bootstrap.sh and ccf_bootstrap.sh.
 
 
 ################################################################################
-def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
+def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
     filtering, lo_freq, hi_freq, boot_num, adjust):
     """
     Reads in multiple event lists, splits into two light curves, makes segments
@@ -36,7 +33,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         Name of text file that contains a list of the input data files for
         analysis. Must be full path names. One file per line.
 
-    out_file : string
+    out_root : string
         Description.
 
     bkgd_file : string
@@ -84,7 +81,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ## 'whole' is over one data file (i.e., in ccf.py)
     ###########################################################
 
-    adjust_segs = [932, 216, 184, 570, 93, 346, 860, 533, -324]
+    adjust_segments = [932, 216, 184, 570, 93, 346, 860, 533, -324]
 
     t_res = np.float64(tools.get_key_val(input_files[0], 0, 'TIMEDEL'))
     dt = dt_mult * t_res
@@ -118,6 +115,9 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
             dtype=np.float64)
     ref_total.mean_rate = 0
     ref_total.mean_rate_array = 0
+    dt_total = np.array([])
+    df_total = np.array([])
+    total_exposure = 0
 
     print "\nDT = %.15f" % param_dict['dt']
     print "N_bins = %d" % param_dict['n_bins']
@@ -144,12 +144,12 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     for in_file in input_files:
 
         if adjust:
-            param_dict['adjust_seg'] = adjust_segs[i]
+            param_dict['adjust_seg'] = adjust_segments[i]
         else:
             param_dict['adjust_seg'] = 0
 
-        cross_spec, ci_whole, ref_whole, num_seg  = xcor.fits_in(in_file, \
-                param_dict, test)
+        cross_spec, ci_whole, ref_whole, num_seg, dt_whole, df_whole, exposure \
+                = xcor.fits_in(in_file, param_dict, test)
 
         print "Segments for this file: %d\n" % num_seg
         total_cross_spec = np.dstack((total_cross_spec, cross_spec))
@@ -162,6 +162,9 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         ref_total.mean_rate_array = np.append(ref_total.mean_rate_array, \
                 ref_whole.mean_rate_array)
         total_seg += num_seg
+        dt_total = np.append(dt_total, dt_whole)
+        df_total = np.append(df_total, df_whole)
+        total_exposure += exposure
         ci_total.mean_rate += ci_whole.mean_rate
         ref_total.mean_rate += ref_whole.mean_rate
         ci_total.power += ci_whole.power
@@ -171,6 +174,15 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     print " "
 
     param_dict['num_seg'] = total_seg
+    param_dict['exposure'] = total_exposure
+    param_dict['adjust_seg'] = adjust_segments
+    # print "DT array:", dt_total
+    # print "df array:", df_total
+    param_dict['dt'] = dt_total
+    param_dict['df'] = df_total
+
+    print "Mean dt:", np.mean(dt_total)
+    print "Mean df:", np.mean(df_total)
 
     ## Removing the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
@@ -184,7 +196,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ##################################################
 
     absrms_power = np.asarray([xcor.raw_to_absrms(ref_power_array[:,i], \
-            ref_mean_rate_array[i], param_dict['n_bins'], param_dict['dt'], \
+            ref_mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
             True) for i in range(param_dict['num_seg'])])
     ## Note that here, the axes are weird, so it's size (num_seg, n_bins)
     absrms_var, absrms_rms = xcor.var_and_rms(absrms_power.T, param_dict['df'])
@@ -196,14 +208,20 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ci_mean_rate_array = ci_mean_rate_array[:,~mask]
     ref_power_array = ref_power_array[:,~mask]
     ref_mean_rate_array = ref_mean_rate_array[~mask]
+    param_dict['dt'] = param_dict['dt'][~mask]
+    param_dict['df'] = param_dict['df'][~mask]
     param_dict['num_seg'] = param_dict['num_seg'] - np.count_nonzero(mask)
 
     ######################################################################
     ## Bootstrapping the data to get errors changes which segments we use
     ## Doing boot_num realizations of this
     ######################################################################
+    print "Bootstrap realization:"
     if boot_num >= 1:
         for b in range(1, boot_num+1):
+
+            if b % 20 == 0:
+                print "\t%d" % b
 
             random_segs = np.random.randint(0, total_cross_spec.shape[2], \
                     param_dict['num_seg'])  ## Draw with replacement
@@ -228,7 +246,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
             ## Making means from segments
             ##############################
 
-            avg_cross_spec, ci_total, ref_total, param_dict = \
+            avg_cross_spec, cross_spec, ci_total, ref_total, param_dict = \
                     xcor.alltogether_means(random_cross_spec, ci_total, \
                     ref_total, param_dict, bkgd_rate, True)
 
@@ -252,18 +270,17 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
                 ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, param_dict, \
                         ref_total, True)
 
-                ccf_error = xcor.standard_ccf_err(random_cross_spec, \
-                        param_dict, ref_total, True)
+                ccf_error = xcor.standard_ccf_err(cross_spec, param_dict, \
+                        ref_total, True)
 
-            print "ccf end:", ccf_end[1:3,1:3]
+            # print "ccf end:", ccf_end[1:3,1:3]
 
-            exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used
-            print "Exposure_time = %.3f seconds" % exposure
-            print "Total number of segments:", param_dict['num_seg']
-            print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
-            print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
-            print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
-            print "Mean rate for ref:", ref_total.mean_rate
+            # print "Exposure_time = %.3f seconds" % exposure
+            # print "Total number of segments:", param_dict['num_seg']
+            # print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
+            # print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
+            # print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
+            # print "Mean rate for ref:", ref_total.mean_rate
 
             t = np.arange(0, param_dict['n_bins'])  ## gives the 'front of the bin'
 
@@ -271,12 +288,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
             ## Output
             ##########
 
-            out_file = out_file.replace("boot", "boot-%d" % b)
-            print out_file
+            out_file = out_root.replace("boot", "boot-%d" % b)
 
             mxcor.fits_out(out_file, in_file_list, bkgd_file, param_dict, \
                     ci_total.mean_rate, ref_total.mean_rate, t, ccf_end, \
-                    ccf_error, filtering, lo_freq, hi_freq, adjust)
+                    ccf_error, filtering, lo_freq, hi_freq)
     else:
 
         random_cross_spec = total_cross_spec
@@ -289,7 +305,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         ## Making means from segments
         ##############################
 
-        avg_cross_spec, ci_total, ref_total, param_dict = \
+        avg_cross_spec, cross_spec, ci_total, ref_total, param_dict = \
                 xcor.alltogether_means(random_cross_spec, ci_total, \
                 ref_total, param_dict, bkgd_rate, True)
 
@@ -310,8 +326,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
         print "ccf end:", ccf_end[1:3,1:3]
 
-        exposure = param_dict['num_seg'] * param_dict['num_seconds']  ## Exposure time of data used
-        print "Exposure_time = %.3f seconds" % exposure
+        print "Exposure_time = %.3f seconds" % param_dict['exposure']
         print "Total number of segments:", param_dict['num_seg']
         print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
         print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
@@ -324,12 +339,11 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         ## Output
         ##########
 
-        out_file = out_file.replace("boot", "boot-%d" % b)
-        print out_file
+        out_file = out_root.replace("boot", "")
 
         mxcor.fits_out(out_file, in_file_list, bkgd_file, param_dict, \
                 ci_total.mean_rate, ref_total.mean_rate, t, ccf_end, \
-                ccf_error, filtering, lo_freq, hi_freq, adjust)
+                ccf_error, filtering, lo_freq, hi_freq)
 
 ################################################################################
 if __name__ == "__main__":
@@ -378,7 +392,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--bootstrap', dest='boot_num', default=1,
             type=tools.type_positive_int, help="Number of realizations for "\
-            "bootstrapping. Must be a positive integer. [1]")
+            "bootstrapping. Must be a positive integer. If boot_num=0, doesn't"\
+            " bootstrap and just does regular CCF. [1]")
 
     parser.add_argument('-a', '--adjust', action='store_true', default=False,
             dest='adjust', help="If present, adjust cross spectra to line up "\
@@ -404,6 +419,7 @@ if __name__ == "__main__":
                       "'no' or 'low:high'.")
 
     main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds,
-        args.dt_mult, test, filtering, lo_freq, hi_freq, args.boot_num, args.adjust)
+            args.dt_mult, test, filtering, lo_freq, hi_freq, args.boot_num, \
+            args.adjust)
 
 ################################################################################

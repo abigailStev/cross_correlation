@@ -3,7 +3,6 @@ import numpy as np
 import sys
 from scipy import fftpack
 from datetime import datetime
-import os.path
 import os
 import subprocess
 from astropy.io import fits
@@ -237,7 +236,7 @@ def var_and_rms(power, df):
 
     """
 
-    print "Shape power:", np.shape(power)
+    # print "Shape power:", np.shape(power)
     # print "Nonzero power:", power[np.where(power<=0.0)]
     variance = np.sum(power * df, axis=0)
 
@@ -666,8 +665,8 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy):
         The standard error on the CCF from the segment-to-segment variations.
 
     """
-    print "Shape mean rate array:", np.shape(ref.mean_rate_array)
-    print "Shape power array:", np.shape(ref.power_array)
+    # print "Shape mean rate array:", np.shape(ref.mean_rate_array)
+    # print "Shape power array:", np.shape(ref.power_array)
 
     absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
             ref.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
@@ -1086,8 +1085,8 @@ def fits_in(in_file, param_dict, test=False):
     ci_whole.mean_rate_array = ci_whole.mean_rate_array[:,1:]
     ref_whole.power_array = ref_whole.power_array[:,1:]
     ref_whole.mean_rate_array = ref_whole.mean_rate_array[1:]
-    print dt
-    print df
+    # print dt
+    # print df
 
     return cross_spec, ci_whole, ref_whole, num_seg, dt, df, exposure
 
@@ -1142,23 +1141,23 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
         ##################################################
         ## Removing the segments with a negative variance
         ##################################################
-        print "Alltogether means:"
+        # print "Alltogether means:"
         absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
-                ref.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
-                True) for i in range(param_dict['num_seg'])])
+                ref.mean_rate_array[i], param_dict['n_bins'], \
+                param_dict['dt'][i], True) for i in range(param_dict['num_seg'])])
         ## Note that here, the axes are weird, so it's size (num_seg, n_bins)
         absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
 
-        print "Absrms var:", absrms_var
-        print "Absrms rms:", absrms_rms
+        # print "Absrms var:", absrms_var
+        # print "Absrms rms:", absrms_rms
 
-        print "Shape of power:", np.shape(absrms_power)
-        print "Shape absrms var:", np.shape(absrms_var)
-        print "Shape absrms rms:", np.shape(absrms_rms)
+        # print "Shape of power:", np.shape(absrms_power)
+        # print "Shape absrms var:", np.shape(absrms_var)
+        # print "Shape absrms rms:", np.shape(absrms_rms)
 
         mask = np.isnan(absrms_rms)
 
-        print "Not nan in mask:", np.count_nonzero(mask)
+        # print "Not nan in mask:", np.count_nonzero(mask)
 
         cross_spec = cross_spec[:,:,~mask]
         ci.power_array = ci.power_array[:,:,~mask]
@@ -1167,10 +1166,10 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
         ref.mean_rate_array = ref.mean_rate_array[~mask]
         param_dict['dt'] = param_dict['dt'][~mask]
         param_dict['df'] = param_dict['df'][~mask]
-        print "Total num seg:", param_dict['num_seg']
+        # print "Total num seg:", param_dict['num_seg']
         param_dict['num_seg'] = param_dict['num_seg'] - np.count_nonzero(mask)
 
-        print "Non-nan num seg:", param_dict['num_seg']
+        # print "Non-nan num seg:", param_dict['num_seg']
 
     #########################################
     ## Turning sums over segments into means

@@ -1,8 +1,9 @@
+#!/usr/bin/env
+
 import argparse
 import numpy as np
 import os.path
 import subprocess
-from scipy import fftpack
 from datetime import datetime
 from astropy.io import fits
 import tools  # at https://github.com/abigailStev/whizzy_scripts
@@ -186,7 +187,7 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
     prihdr.set('RATE_REF', mean_rate_ref_total, "counts/second")
     prihdr.set('FILTER', str(filtering))
     prihdr.set('FILTFREQ', "%f:%f" % (lo_freq, hi_freq))
-    prihdr.set('ADJUST', str(param_dict['adjust_seg'].tolist()))
+    prihdr.set('ADJUST', str(param_dict['adjust_seg']))
     prihdu = fits.PrimaryHDU(header=prihdr)
 
     ## Making FITS table (extension 1)
@@ -364,8 +365,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
     param_dict['num_seg'] = total_seg
     param_dict['exposure'] = total_exposure
-    print "DT array:", dt_total
-    print "df array:", df_total
+    # print "DT array:", dt_total
+    # print "df array:", df_total
     param_dict['dt'] = dt_total
     param_dict['df'] = df_total
     param_dict['adjust_seg'] = adjust_segments
@@ -430,7 +431,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
 
     fits_out(out_file, in_file_list, bkgd_file, param_dict, ci_total.mean_rate,\
             ref_total.mean_rate, t, ccf_end, ccf_error, filtering, lo_freq, \
-            hi_freq, adjust)
+            hi_freq)
 
 
 ################################################################################
