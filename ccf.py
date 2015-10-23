@@ -62,9 +62,9 @@ def fits_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci_whole, \
     prihdr.set('BKGD', bkgd_file)
     prihdr.set('DT', np.mean(param_dict['dt']), "seconds")
     prihdr.set('N_BINS', param_dict['n_bins'], "time bins per segment")
-    prihdr.set('SEGMENTS', param_dict['num_seg'], "segments in the whole light"\
+    prihdr.set('SEGMENTS', param_dict['n_seg'], "segments in the whole light"\
         " curve")
-    prihdr.set('SEC_SEG', param_dict['num_seconds'], "seconds per segment")
+    prihdr.set('SEC_SEG', param_dict['n_seconds'], "seconds per segment")
     prihdr.set('EXPOSURE', param_dict['exposure'], "seconds of data used")
     prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy"\
         " channels")
@@ -215,24 +215,24 @@ def raw_to_leahy(power, mean_rate, n_bins, dt, noisy):
 ################################################################################
 def var_and_rms(power, df):
     """
-    Computes the variance and RMS (root mean square) of a power spectrum.
+    Computes the variance and rms (root mean square) of a power spectrum.
     Assumes the negative-frequency powers have been removed.
 
     Parameters
     ----------
     power : np.array of floats
-        The raw power at each of the *positive* Fourier frequencies.
+        2-D array of the raw power at each of the *positive* Fourier
+        frequencies.
 
     df : float
         The step size between Fourier frequencies.
 
     Returns
     -------
-
     float
         The variance of the power spectrum.
     float
-        The RMS of the power spectrum.
+        The rms of the power spectrum.
 
     """
 
@@ -251,18 +251,41 @@ def var_and_rms(power, df):
 
 
 ################################################################################
-def get_phase_err(cs_avg, power_ci, power_ref, n, M):
+def get_phase_err(cs_avg, power_ci, power_ref, n, m):
     """
     Computes the error on the complex phase (in radians). Power should not be
     noise-subtracted.
 
+    Parameters
+    ----------
+    cs_avg : np.array of complex numbers
+        2-D array of the averaged cross spectrum.
+
+    power_ci : np.array of floats
+        2-D array of the averaged power spectrum in the channels of interest.
+
+    power_ref : np.array of floats
+        1-D array of the averaged power spectrum in the reference band.
+
+    n : int
+        The number of neighbouring frequency bins averaged together to compute
+        the lag.
+
+    m : int
+        The number of segments averaged over to make the cross spectra and power
+        spectra.
+
+    Returns
+    -------
+    np.array of floats
+        2-D array of the error on the phase of the lags.
     """
     with np.errstate(all='ignore'):
         a = power_ci * power_ref
         coherence = np.where(a != 0, np.abs(cs_avg)**2 / a, 0)
         print np.shape(coherence)
         phase_err = np.sqrt(np.where(coherence != 0, (1 - coherence) / \
-            (2 * coherence * n * M), 0))
+                (2 * coherence * n * m), 0))
 
     return phase_err
 
@@ -272,9 +295,24 @@ def phase_to_tlags(phase, f, detchans):
     """
     Converts a complex phase (in radians) to a time lag (in seconds).
 
+    Parameters
+    ----------
+    phase : np.array of floats
+        The complex-plane cross-spectral phase lags.
+
+    f : np.array of floats
+        Array of the Fourier frequencies for the cross-spectrum.
+
+    detchans : int
+        Number of detector energy channels for the data mode.
+
+    Returns
+    -------
+    np.array of floats
+        The lags converted to time (in seconds).
     """
-    assert np.shape(phase) == np.shape(f), "ERROR: Phase must have same \
-dimensions as f."
+    assert np.shape(phase) == np.shape(f), "ERROR: Phase must have same "\
+            "dimensions as f."
 
     with np.errstate(all='ignore'):
         tlags =  np.where(f != 0, phase / (2.0 * np.pi * f), 0)
@@ -283,12 +321,59 @@ dimensions as f."
 
 
 ################################################################################
-def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
-    num_seg, mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, power_ci,
+def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
+    n_seg, mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, power_ci,
     power_ref):
     """
     Computes the phase lag and time lag from the average cross spectrum, and
     writes the lag information to a .fits output file.
+
+    Parameters
+    ----------
+    out_file : str
+        Full path name of the output file for the cross spectrum and power
+        spectra.
+
+    in_file : str
+        The input file / event list, for writing into the header.
+
+    dt : float
+        The timestep between bins in the light curve.
+
+    n_bins : int
+        The number of time bins in one Fourier segment of the data.
+
+    detchans : int
+        The number of detector energy channels for the data mode used.
+
+    n_seconds : int
+        The number of seconds in one Fourier segment of the data.
+
+    n_seg : int
+        The number of Fourier segments in all the data used.
+
+    mean_rate_ci_whole : np.array of floats
+        1-D array (size=detchans) of the mean count rate of the channels of
+        interest over all the data used.
+
+    mean_rate_ref_whole : float
+        Mean count rate of the reference band over all the data used.
+
+    cs_avg : np.array of complex numbers
+        2-D array (size = n_bins x detchans) of the cross-spectrum averaged over
+        segments of the light curve.
+
+    power_ci : np.array of floats
+        2-D array (size = n_bins x detchans) of the power in each energy
+        channel. Includes both positive and negative Fourier frequencies.
+
+    power_ref : np.array of floats
+        1-D array (size = n_bins) of the power in the reference band. Includes
+        both positive and negative Fourier frequencies.
+
+    Returns
+    -------
+    nothing, but writes to the output file
 
     """
     assert np.shape(power_ci) == (n_bins, detchans)
@@ -318,7 +403,7 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
     ## Getting lag and error for lag-frequency plot
     phase = -np.arctan2(cs_avg.imag, cs_avg.real) ## Negative sign is so that a positive lag is a hard energy lag?
     err_phase = get_phase_err(cs_avg, power_ci, np.resize(np.repeat(power_ref, \
-        detchans), np.shape(power_ci)), 1, num_seg)
+            detchans), np.shape(power_ci)), 1, n_seg)
     print np.shape(err_phase)
     f = np.resize(np.repeat(freq, detchans), (len(freq), detchans))
     tlag = phase_to_tlags(phase, f, detchans)
@@ -334,10 +419,12 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
     frange_freq = freq[f_span_low:f_span_hi+1]
     frange_cs = np.mean(cs_avg[f_span_low:f_span_hi+1, ], axis=0)
     frange_pow_ci = np.mean(power_ci[f_span_low:f_span_hi+1, ], axis=0)
-    frange_pow_ref = np.repeat(np.mean(power_ref[f_span_low:f_span_hi+1]), detchans)
+    frange_pow_ref = np.repeat(np.mean(power_ref[f_span_low:f_span_hi+1]), \
+            detchans)
     print "Shape cs:", np.shape(frange_cs)
-    e_phase = -np.arctan2(frange_cs.imag, frange_cs.real) ## Negative sign is so that a positive lag is a hard energy lag?
-    e_err_phase = get_phase_err(frange_cs, frange_pow_ci, frange_pow_ref, f_span, num_seg)
+    e_phase = -np.arctan2(frange_cs.imag, frange_cs.real)
+    e_err_phase = get_phase_err(frange_cs, frange_pow_ci, frange_pow_ref, \
+            f_span, n_seg)
     print "Shape err phase:", np.shape(e_err_phase)
     f = np.repeat(np.mean(frange_freq), detchans)
     print "Shape phase:", np.shape(e_phase)
@@ -362,9 +449,9 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
     prihdr.set('EVTLIST', in_file)
     prihdr.set('DT', dt, "seconds")
     prihdr.set('N_BINS', n_bins, "time bins per segment")
-    prihdr.set('SEGMENTS', num_seg, "segments in the whole light curve")
-    prihdr.set('EXPOSURE', num_seg * n_bins * dt,
-        "seconds, of light curve")
+    prihdr.set('SEGMENTS', n_seg, "segments in the whole light curve")
+    prihdr.set('EXPOSURE', n_seg * n_bins * dt,
+            "seconds, of light curve")
     prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
     prihdr.set('LOWFREQ', low_freq)
     prihdr.set('HIGHFREQ', hi_freq)
@@ -376,33 +463,33 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, num_seconds,
     ## Making FITS table for lag-frequency plot (extension 1)
     col1 = fits.Column(name='FREQUENCY', format='D', array=bins)
     col2 = fits.Column(name='PHASE', unit='radians', format='D',
-        array=phase.flatten('C'))
+            array=phase.flatten('C'))
     col3 = fits.Column(name='PHASE_ERR', unit='radians', format='D',
-        array=err_phase.flatten('C'))
+            array=err_phase.flatten('C'))
     col4 = fits.Column(name='TIME_LAG', unit='s', format='D',
-        array=tlag.flatten('C'))
+            array=tlag.flatten('C'))
     col5 = fits.Column(name='TIME_LAG_ERR', unit='s', format='D',
-        array=err_tlag.flatten('C'))
+            array=err_tlag.flatten('C'))
     col6 = fits.Column(name='CHANNEL', unit='', format='I',
-        array=energy_channels)
+            array=energy_channels)
     cols = fits.ColDefs([col1, col2, col3, col4, col5, col6])
     tbhdu1 = fits.BinTableHDU.from_columns(cols)
 
     ## Making FITS table for lag-energy plot (extension 2)
     col1 = fits.Column(name='PHASE', unit='radians', format='D', array=e_phase)
     col2 = fits.Column(name='PHASE_ERR', unit='radians', format='D', \
-        array=e_err_phase)
+            array=e_err_phase)
     col3 = fits.Column(name='TIME_LAG', unit='s', format='D', array=e_tlag)
     col4 = fits.Column(name='TIME_LAG_ERR', unit='s', format='D', \
-        array=e_err_tlag)
+            array=e_err_tlag)
     col5 = fits.Column(name='CHANNEL', unit='', format='I', \
-        array=chan)
+            array=chan)
     cols = fits.ColDefs([col1, col2, col3, col4, col5])
     tbhdu2 = fits.BinTableHDU.from_columns(cols)
 
     ## If the file already exists, remove it
     assert out_file[-4:].lower() == "fits", \
-        'ERROR: Output file must have extension ".fits".'
+            'ERROR: Output file must have extension ".fits".'
     if os.path.isfile(out_file):
         subprocess.call(["rm", out_file])
 
@@ -454,7 +541,7 @@ def save_for_lags(out_file, in_file, param_dict, mean_rate_ci, mean_rate_ref,
     prihdr.set('EVTLIST', in_file)
     prihdr.set('DT', np.mean(param_dict['dt']), "seconds")
     prihdr.set('N_BINS', param_dict['n_bins'], "time bins per segment")
-    prihdr.set('SEGMENTS', param_dict['num_seg'], "segments in the whole light"\
+    prihdr.set('SEGMENTS', param_dict['n_seg'], "segments in the whole light"\
             " curve")
     prihdr.set('EXPOSURE', param_dict['exposure'], "seconds of data used")
     prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy"\
@@ -504,6 +591,20 @@ def find_pulse_freq(freq, power_ref):
     """
     Determines the frequency of a coherent pulse above 100 Hz (to not confuse
     with broadband noise).
+
+    Parameters
+    ----------
+    freq : np.array of floats
+        1-D array (size = n_bins) of Fourier frequencies.
+
+    power_ref : np.array of floats
+        1-D array (size = n_bins) of power in the reference band.
+
+    Returns
+    -------
+    float
+        The frequency at which there's a periodic pulsation. Assumes that the
+        pulse frequency has the maximum power above 100 Hz.
 
     """
 
@@ -613,7 +714,7 @@ def FILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref,
 
     temp = (noise_ci * signal_ref_pow) + (noise_ref * signal_ci_pow) + \
             (noise_ci * noise_ref)
-    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / np.float(param_dict['num_seg']))
+    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / np.float(param_dict['n_seg']))
 
     temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * param_dict['dt'] / \
             np.float(param_dict['n_bins']))
@@ -670,11 +771,11 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy):
 
     absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
             ref.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
-            noisy) for i in range(param_dict['num_seg'])])
-    ## Note that here, the axes are weird, so it's size (num_seg, n_bins)
+            noisy) for i in range(param_dict['n_seg'])])
+    ## Note that here, the axes are weird, so it's size (n_seg, n_bins)
 
     # print "Shape absrms power:", np.shape(absrms_power)
-    # print "Num seg:", param_dict['num_seg']
+    # print "Num seg:", param_dict['n_seg']
 
     absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
 
@@ -690,20 +791,20 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy):
     # ccf_array = ccf_array[:,:,~mask]
     # print "Shape CCF array after nan mask:", np.shape(ccf_array)
     # absrms_rms = absrms_rms[~mask]
-    # num_nonnan = param_dict['num_seg'] - np.count_nonzero(mask)
-    # print "Number non-nan:", num_nonnan
+    # n_nonnan = param_dict['n_seg'] - np.count_nonzero(mask)
+    # print "Number non-nan:", n_nonnan
     # print "Number nan:", np.count_nonzero(mask)
     ccf_array *= (2.0 / np.float(param_dict['n_bins']) / absrms_rms)
 
     mean_ccf = np.mean(ccf_array, axis=2)
-    mean_ccf_b = np.resize(np.repeat(mean_ccf, param_dict['num_seg']), \
+    mean_ccf_b = np.resize(np.repeat(mean_ccf, param_dict['n_seg']), \
             np.shape(ccf_array))
     ccf_resid = ccf_array - mean_ccf_b
 
     sample_var = np.sum(ccf_resid**2, axis=2) / \
-            np.float(param_dict['num_seg']-1)  ## eq 2.3
+            np.float(param_dict['n_seg'] - 1)  ## eq 2.3
     standard_error = np.sqrt(sample_var / \
-            np.float(param_dict['num_seg']))  ## eq 2.4
+            np.float(param_dict['n_seg']))  ## eq 2.4
 
     return standard_error
 
@@ -713,6 +814,27 @@ def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy):
     """
     Takes the iFFT of the cross spectrum to get the cross-correlation function,
     and computes the error on the cross-correlation function.
+
+    Parameters
+    ----------
+    cs_avg : np.array of complex numbers
+        2-D array (size = n_bins x detchans) of the averaged cross-spectrum.
+
+    param_dict : dict
+        Dictionary of necessary meta-parameters for data analysis.
+
+    ref : Lightcurve object
+        The reference band light curve and power.
+
+    noisy : bool
+        True if there is noise in the light curve (i.e., using real data) --
+        will subtract the Poisson noise level from the power spectrum.
+
+    Returns
+    -------
+    np.array of floats
+        2-D array (size = n_bins x detchans) of the cross-correlation function
+        of the channels of interest with the reference band.
 
     """
 
@@ -767,8 +889,9 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
 
     """
     if obs_epoch == 5:
-        rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
+        # rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
         # channel 2 to 25 inclusive
+        rate_ref = np.sum(rate_ref_2d[:, 5:100], axis=1)  # EPOCH 5
     elif obs_epoch == 3:
         rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
         # channel 3 to 28 inclusive
@@ -888,7 +1011,7 @@ def fits_in(in_file, param_dict, test=False):
     -------
     3-D np.array of floats
         The raw cross spectrum, per segment.
-        Dimensions: [n_bins, DETCHAN, num_seg]
+        Dimensions: [n_bins, DETCHAN, n_seg]
 
     Lightcurve object
         Channel of interest for this data file.
@@ -911,7 +1034,7 @@ def fits_in(in_file, param_dict, test=False):
     if param_dict['n_bins'] == 32768:
         print_iterator = int(10)
     elif param_dict['n_bins'] < 32768:
-        print_iterator = int(10)
+        print_iterator = int(20)
     else:
         print_iterator = int(1)
 
@@ -933,7 +1056,7 @@ def fits_in(in_file, param_dict, test=False):
     ## Initializations
     ###################
 
-    num_seg = 0
+    n_seg = 0
     ci_whole = Lightcurve()
     ref_whole = Lightcurve()
     cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], 1), \
@@ -950,13 +1073,13 @@ def fits_in(in_file, param_dict, test=False):
             dtype=np.float64)
     ref_whole.mean_rate = 0
     ref_whole.mean_rate_array = 0
-    dt = np.array([])
-    df = np.array([])
+    dt_whole = np.array([])
+    df_whole = np.array([])
     exposure = 0
 
     start_time = data.field('TIME')[0]
     final_time = data.field('TIME')[-1]
-    seg_end_time = start_time + param_dict['num_seconds']
+    seg_end_time = start_time + param_dict['n_seconds']
 
     ###################################
     ## Selecting PCU for interest band
@@ -1030,8 +1153,8 @@ def fits_in(in_file, param_dict, test=False):
             df_seg = 1.0 / (param_dict['n_bins'] * dt_seg)
             # print dt_seg, " s"
             # print df_seg, " Hz"
-            dt = np.append(dt, dt_seg)
-            df = np.append(df, df_seg)
+            dt_whole = np.append(dt_whole, dt_seg)
+            df_whole = np.append(df_whole, df_seg)
 
             cross_spec = np.dstack((cross_spec, cs_seg))
 
@@ -1053,28 +1176,28 @@ def fits_in(in_file, param_dict, test=False):
 
             ## Sums across segments -- arrays, so it adds by index
             exposure += (seg_end_time - start_time)
-            num_seg += 1
+            n_seg += 1
             ci_whole.mean_rate += ci_seg.mean_rate
             ref_whole.mean_rate += ref_seg.mean_rate
             ci_whole.power += ci_seg.power
             ref_whole.power += ref_seg.power
 
-            if num_seg % print_iterator == 0:
-                print "\t", num_seg
-            if test is True and num_seg == 1:  # For testing
+            if n_seg % print_iterator == 0:
+                print "\t", n_seg
+            if test is True and n_seg == 1:  # For testing
                 break
 
             start_time = seg_end_time
-            seg_end_time += param_dict['num_seconds']
+            seg_end_time += param_dict['n_seconds']
 
         ## This next bit deals with gappy data
         elif len(time_ci) == 0 and len(time_ref) == 0:
             start_time = min(all_time_ci[0], all_time_ref[0])
-            seg_end_time = start_time + param_dict['num_seconds']
+            seg_end_time = start_time + param_dict['n_seconds']
 
         else:
             start_time = seg_end_time
-            seg_end_time += param_dict['num_seconds']
+            seg_end_time += param_dict['n_seconds']
 
         ## End of 'if there are counts in this segment'
 
@@ -1085,10 +1208,11 @@ def fits_in(in_file, param_dict, test=False):
     ci_whole.mean_rate_array = ci_whole.mean_rate_array[:,1:]
     ref_whole.power_array = ref_whole.power_array[:,1:]
     ref_whole.mean_rate_array = ref_whole.mean_rate_array[1:]
-    # print dt
-    # print df
+    # print dt_whole
+    # print df_whole
 
-    return cross_spec, ci_whole, ref_whole, num_seg, dt, df, exposure
+    return cross_spec, ci_whole, ref_whole, n_seg, dt_whole, df_whole, \
+            exposure
 
 
 ################################################################################
@@ -1142,10 +1266,10 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
         ## Removing the segments with a negative variance
         ##################################################
         # print "Alltogether means:"
-        absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
+        absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i],
                 ref.mean_rate_array[i], param_dict['n_bins'], \
-                param_dict['dt'][i], True) for i in range(param_dict['num_seg'])])
-        ## Note that here, the axes are weird, so it's size (num_seg, n_bins)
+                param_dict['dt'][i], True) for i in range(param_dict['n_seg'])])
+        ## Note that here, the axes are weird, so it's size (n_seg, n_bins)
         absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
 
         # print "Absrms var:", absrms_var
@@ -1156,6 +1280,11 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
         # print "Shape absrms rms:", np.shape(absrms_rms)
 
         mask = np.isnan(absrms_rms)
+        print type(mask)
+        print np.shape(mask)
+        # with open("mask.txt", 'w') as out:
+        #     for element in mask:
+        #         out.write("%s \n" % str(element))
 
         # print "Not nan in mask:", np.count_nonzero(mask)
 
@@ -1164,12 +1293,16 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
         ci.mean_rate_array = ci.mean_rate_array[:,~mask]
         ref.power_array = ref.power_array[:,~mask]
         ref.mean_rate_array = ref.mean_rate_array[~mask]
+        print param_dict['exposure']
+        for element in param_dict['dt'][mask]:
+            param_dict['exposure'] -= element * param_dict['n_bins']
+        print param_dict['exposure']
         param_dict['dt'] = param_dict['dt'][~mask]
         param_dict['df'] = param_dict['df'][~mask]
-        # print "Total num seg:", param_dict['num_seg']
-        param_dict['num_seg'] = param_dict['num_seg'] - np.count_nonzero(mask)
+        # print "Total num seg:", param_dict['n_seg']
+        param_dict['n_seg'] = param_dict['n_seg'] - np.count_nonzero(mask)
 
-        # print "Non-nan num seg:", param_dict['num_seg']
+        # print "Non-nan num seg:", param_dict['n_seg']
 
     #########################################
     ## Turning sums over segments into means
@@ -1205,7 +1338,7 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
 
 
 ################################################################################
-def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filtering, \
+def main(in_file, out_file, bkgd_file, n_seconds, dt_mult, test, filtering, \
         lo_freq, hi_freq, adjust_seg):
     """
     Reads in one event list, splits into reference band and channels of
@@ -1220,7 +1353,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filtering, \
     ## Idiot checks, to ensure that our assumptions hold
     #####################################################
 
-    assert num_seconds > 0, "ERROR: num_seconds must be a positive integer."
+    assert n_seconds > 0, "ERROR: n_seconds must be a positive integer."
     assert dt_mult >= 1, "ERROR: dt_mult must be a positive integer."
 
     ##################################################
@@ -1229,11 +1362,11 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filtering, \
 
     t_res = np.float(tools.get_key_val(in_file, 0, 'TIMEDEL'))
     dt = dt_mult * t_res
-    n_bins = num_seconds * int(1.0 / dt)
+    n_bins = n_seconds * int(1.0 / dt)
     nyquist_freq = 1.0 / (2.0 * dt)
     detchans = int(tools.get_key_val(in_file, 0, 'DETCHANS'))
-    df = 1.0 / np.float(num_seconds)
-    param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
+    df = 1.0 / np.float(n_seconds)
+    param_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
                  'df': df, 'nyquist': nyquist_freq, 'n_bins': n_bins, \
                  'detchans': detchans, 'filter': filtering, \
                  'adjust_seg': adjust_seg, 'exposure': 0}
@@ -1259,10 +1392,10 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filtering, \
     ## Reading in data, computing the cross spectrum
     #################################################
 
-    cross_spec, ci_whole, ref_whole, num_seg, dt, df, exposure = \
+    cross_spec, ci_whole, ref_whole, n_seg, dt, df, exposure = \
             fits_in(in_file, param_dict, test)
 
-    param_dict['num_seg'] = num_seg
+    param_dict['n_seg'] = n_seg
     param_dict['exposure'] = exposure
     param_dict['dt'] = dt
     param_dict['df'] = df
@@ -1276,10 +1409,10 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filtering, \
     #########################################
 
     # avg_cross_spec = np.mean(cross_spec, axis=2)
-    # ci_whole.mean_rate /= np.float(param_dict['num_seg'])
-    # ref_whole.mean_rate /= np.float(param_dict['num_seg'])
-    # ci_whole.power /= np.float(param_dict['num_seg'])
-    # ref_whole.power /= np.float(param_dict['num_seg'])
+    # ci_whole.mean_rate /= np.float(param_dict['n_seg'])
+    # ref_whole.mean_rate /= np.float(param_dict['n_seg'])
+    # ci_whole.power /= np.float(param_dict['n_seg'])
+    # ref_whole.power /= np.float(param_dict['n_seg'])
 
     ################################################################
     ## Printing the cross spectrum to a file, for plotting/checking
@@ -1330,7 +1463,7 @@ def main(in_file, out_file, bkgd_file, num_seconds, dt_mult, test, filtering, \
     # for (e1, e2) in zip(ccf_error[2:7, 6], err_should_be):
     #     print "\t", round(e1, 8) == e2
 
-    print "Number of segments:", param_dict['num_seg']
+    print "Number of segments:", param_dict['n_seg']
     print "Sum of mean rate for ci:", np.sum(ci_whole.mean_rate)
     print "Mean rate for ci chan 6:", ci_whole.mean_rate[6]
     print "Mean rate for ci chan 15:", ci_whole.mean_rate[15]
@@ -1369,8 +1502,8 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
         help="Name of the background spectrum (in pha/fits format).")
 
-    parser.add_argument('-n', '--num_seconds', type=tools.type_power_of_two,
-        default=1, dest='num_seconds', help="Number of seconds in each Fourier"\
+    parser.add_argument('-n', '--n_seconds', type=tools.type_power_of_two,
+        default=1, dest='n_seconds', help="Number of seconds in each Fourier"\
         " segment. Must be a power of 2, positive, integer. [1]")
 
     parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two,
@@ -1409,7 +1542,7 @@ if __name__ == "__main__":
             Exception("Filter keyword used incorrectly. Acceptable inputs are "\
                       "'no' or 'low:high'.")
 
-    main(args.infile, args.outfile, args.bkgd_file, args.num_seconds,
+    main(args.infile, args.outfile, args.bkgd_file, args.n_seconds,
         args.dt_mult, test, filtering, lo_freq, hi_freq, args.adjust)
 
 ################################################################################
