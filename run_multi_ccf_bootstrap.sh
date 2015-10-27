@@ -40,7 +40,7 @@ fi
 home_dir=$(ls -d ~)
 
 exe_dir="$home_dir/Dropbox/Research/cross_correlation"
-out_dir="$exe_dir/out_ccf"
+out_dir="$exe_dir/out_ccf/${prefix}"
 lag_exe_dir="$home_dir/Dropbox/Research/lags"
 lag_out_dir="$lag_exe_dir/out_lags"
 xte_exe_dir="$home_dir/Dropbox/Research/rxte_reduce"
@@ -84,33 +84,33 @@ cp "$file_list" "$saved_file_list"
 ## Running multi_ccf.py
 ########################
 
-if [ -e "$saved_file_list" ] && [ -e "$bkgd_spec" ]; then
-	python "$exe_dir"/multi_ccf_bootstrap.py "$saved_file_list" \
-	        "${out_file}.${t_ext}" -b "$bkgd_spec" -n "$numsec" -m "$dt" \
-	        -t "$testing" -f "$filtering" --bootstrap "$boot_num" -a
-elif [ -e "$saved_file_list" ]; then
-	python "$exe_dir"/multi_ccf_bootstrap.py "$saved_file_list" \
-	        "${out_file}.${t_ext}" -n "$numsec" -m "$dt" -t "$testing" \
-	        -f "$filtering" --bootstrap "$boot_num" -a
-else
-	echo -e "\tERROR: multi_ccf.py was not run. List of eventlists and/or "\
-            "background energy spectrum doesn't exist."
-fi
-
-################################
-## Plotting the individual ccfs
-################################
-
-if [ -e "${out_file}-1.${t_ext}" ]; then
-	python "$exe_dir"/plot_CCF.py "${out_file}-1.${t_ext}" -o "${plot_root}" \
-		-p "$prefix" --ext "$p_ext"
-	if [ -e "${plot_root}-1_chan_15.${p_ext}" ]; then open "${plot_root}-1_chan_15.${p_ext}"; fi
-
-	multi_plot="${plot_root}-1_multiccfs.${p_ext}"
-	python "$exe_dir"/plot_multi.py "${out_file}-1.${t_ext}" "$multi_plot" \
-		-p "$prefix"
-	if [ -e "$multi_plot" ]; then open "$multi_plot"; fi
-fi
+#if [ -e "$saved_file_list" ] && [ -e "$bkgd_spec" ]; then
+#	python "$exe_dir"/multi_ccf_bootstrap.py "$saved_file_list" \
+#	        "${out_file}.${t_ext}" -b "$bkgd_spec" -n "$numsec" -m "$dt" \
+#	        -t "$testing" -f "$filtering" --bootstrap "$boot_num" -a
+#elif [ -e "$saved_file_list" ]; then
+#	python "$exe_dir"/multi_ccf_bootstrap.py "$saved_file_list" \
+#	        "${out_file}.${t_ext}" -n "$numsec" -m "$dt" -t "$testing" \
+#	        -f "$filtering" --bootstrap "$boot_num" -a
+#else
+#	echo -e "\tERROR: multi_ccf.py was not run. List of eventlists and/or "\
+#            "background energy spectrum doesn't exist."
+#fi
+#
+#################################
+### Plotting the individual ccfs
+#################################
+#
+#if [ -e "${out_file}-1.${t_ext}" ]; then
+#	python "$exe_dir"/plot_CCF.py "${out_file}-1.${t_ext}" -o "${plot_root}" \
+#		-p "$prefix" --ext "$p_ext"
+#	if [ -e "${plot_root}-1_chan_15.${p_ext}" ]; then open "${plot_root}-1_chan_15.${p_ext}"; fi
+#
+#	multi_plot="${plot_root}-1_multiccfs.${p_ext}"
+#	python "$exe_dir"/plot_multi.py "${out_file}-1.${t_ext}" "$multi_plot" \
+#		-p "$prefix"
+#	if [ -e "$multi_plot" ]; then open "$multi_plot"; fi
+#fi
 
 ###############################################
 ## Getting the energy list from a channel list
