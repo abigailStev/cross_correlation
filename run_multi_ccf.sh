@@ -44,7 +44,7 @@ home_dir=$(ls -d ~)
 exe_dir="$home_dir/Dropbox/Research/cross_correlation"
 out_dir="$exe_dir/out_ccf/${prefix}"
 lag_exe_dir="$home_dir/Dropbox/Research/lags"
-lag_out_dir="$lag_exe_dir/out_lags"
+lag_out_dir="$lag_exe_dir/out_lags/${prefix}"
 xte_exe_dir="$home_dir/Dropbox/Research/rxte_reduce"
 red_dir="$home_dir/Reduced_data/${prefix}"
 
@@ -109,16 +109,16 @@ fi
 ## Plotting the individual ccfs
 ################################
 
-#if [ -e "${out_file}.${t_ext}" ]; then
-#	python "$exe_dir"/plot_CCF.py "${out_file}.${t_ext}" -o "${plot_root}" \
-#		-p "$prefix" --ext "$p_ext"
-##	if [ -e "${plot_root}_chan_15.${p_ext}" ]; then open "${plot_root}_chan_15.${p_ext}"; fi
-#
-#	multi_plot="${plot_root}_multiccfs.${p_ext}"
-#	python "$exe_dir"/plot_multi.py "${out_file}.${t_ext}" "$multi_plot" \
-#		-p "$prefix"
-##	if [ -e "$multi_plot" ]; then open "$multi_plot"; fi
-#fi
+if [ -e "${out_file}.${t_ext}" ]; then
+	python "$exe_dir"/plot_CCF.py "${out_file}.${t_ext}" -o "${plot_root}" \
+		-p "$prefix" --ext "$p_ext"
+	if [ -e "${plot_root}_chan_15.${p_ext}" ]; then open "${plot_root}_chan_15.${p_ext}"; fi
+
+	multi_plot="${plot_root}_multiccfs.${p_ext}"
+	python "$exe_dir"/plot_multi.py "${out_file}.${t_ext}" "$multi_plot" \
+		-p "$prefix"
+#	if [ -e "$multi_plot" ]; then open "$multi_plot"; fi
+fi
 
 ###############################################
 ## Getting the energy list from a channel list
@@ -139,71 +139,71 @@ fi
 ## Plotting the 2D ccf
 #######################
 
-#plot_file="${plot_root}_2Dccf.${p_ext}"
-#if [ -e "${out_file}.${t_ext}" ]; then
-#	python "$exe_dir"/plot_2d.py "${out_file}.${t_ext}" -o "${plot_file}" \
-#		-p "$prefix" -l "$tlen" -e "$energies_file"
-#	if [ -e "${plot_file}" ]; then
-#		open "${plot_file}"
-#        cp "$plot_file" "$home_dir/Dropbox/Research/CCF_paper1/"
-#    fi
-#fi
-#
-#plot_file="${plot_root}_2Dccf.fits"
-#detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fits', 0, 'DETCHANS'))")
-#tlen2=$(( 2*tlen ))
-#
-#if [ -e "$out_dir/temp.dat" ]; then
-#	fimgcreate bitpix=-32 \
-#		naxes="${tlen2},${detchans}" \
-#		datafile="$exe_dir/temp.dat" \
-#		outfile="${plot_root}_2Dccf.fits" \
-#		nskip=1 \
-#		history=true \
-#		clobber=yes
-#else
-#	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
-#fi
-#
-#if [ -e "${plot_root}_2Dccf.fits" ]; then
-#	echo "FITS 2D ccf ratio image: ${plot_root}_2Dccf.fits"
-#else
-#	echo -e "\tERROR: FIMGCREATE was not successful."
-#fi
+plot_file="${plot_root}_2Dccf.${p_ext}"
+if [ -e "${out_file}.${t_ext}" ]; then
+	python "$exe_dir"/plot_2d.py "${out_file}.${t_ext}" -o "${plot_file}" \
+		-p "$prefix" -l "$tlen" -e "$energies_file"
+	if [ -e "${plot_file}" ]; then
+		open "${plot_file}"
+        cp "$plot_file" "$home_dir/Dropbox/Research/CCF_paper1/"
+    fi
+fi
+
+plot_file="${plot_root}_2Dccf.fits"
+detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fits', 0, 'DETCHANS'))")
+tlen2=$(( 2*tlen ))
+
+if [ -e "$exe_dir/temp.dat" ]; then
+	fimgcreate bitpix=-32 \
+		naxes="${tlen2},${detchans}" \
+		datafile="$exe_dir/temp.dat" \
+		outfile="${plot_root}_2Dccf.fits" \
+		nskip=1 \
+		history=true \
+		clobber=yes
+else
+	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
+fi
+
+if [ -e "${plot_root}_2Dccf.fits" ]; then
+	echo "FITS 2D ccf ratio image: ${plot_root}_2Dccf.fits"
+else
+	echo -e "\tERROR: FIMGCREATE was not successful."
+fi
 
 #####################
 ## Plotting the lags
 #####################
 
-#cd "$lag_exe_dir"
-#
-#if (( $testing == 0 )); then
-#	out_file="$lag_out_dir/$filename"
-#	plot_root="$lag_out_dir/$filename"
-#elif (( $testing == 1 )); then
-#	out_file="$lag_out_dir/test_$filename"
-#	plot_root="$lag_out_dir/test_$filename"
-#fi
-#
-#if [ -e "${out_file}_cs.${t_ext}" ]; then
-#
-#	python "$lag_exe_dir"/get_lags.py "${out_file}_cs.${t_ext}" \
-#			"${out_file}_lag.${t_ext}" -o "${plot_root}" -p "$prefix" \
-#			-e "${p_ext}" --lf "${lag_lf}" --uf "${lag_uf}" --le "${lag_le}" \
-#			--ue "${lag_ue}"
-#
-#	if [ -e "$plot_root"_lag-energy."${p_ext}" ]; then
-#	    open "$plot_root"_lag-energy."${p_ext}"
-#	    cp "$plot_root"_lag-energy."${p_ext}" "$home_dir/Dropbox/Research/CCF_paper1/"
-#
-#	fi
-##	if [ -e "$plot_root"_lag-freq."${p_ext}" ]; then
-##       open "$plot_root"_lag-freq."${p_ext}"
-##   fi
-#
-#else
-#	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
-#fi
+cd "$lag_exe_dir"
+
+if (( $testing == 0 )); then
+	out_file="$lag_out_dir/$filename"
+	plot_root="$lag_out_dir/$filename"
+elif (( $testing == 1 )); then
+	out_file="$lag_out_dir/test_$filename"
+	plot_root="$lag_out_dir/test_$filename"
+fi
+
+if [ -e "${out_file}_cs.${t_ext}" ]; then
+
+	python "$lag_exe_dir"/get_lags.py "${out_file}_cs.${t_ext}" \
+			"${out_file}_lag.${t_ext}" -o "${plot_root}" -p "$prefix" \
+			-e "${p_ext}" --lf "${lag_lf}" --uf "${lag_uf}" --le "${lag_le}" \
+			--ue "${lag_ue}"
+
+	if [ -e "$plot_root"_lag-energy."${p_ext}" ]; then
+	    open "$plot_root"_lag-energy."${p_ext}"
+	    cp "$plot_root"_lag-energy."${p_ext}" "$home_dir/Dropbox/Research/CCF_paper1/"
+
+	fi
+#	if [ -e "$plot_root"_lag-freq."${p_ext}" ]; then
+#       open "$plot_root"_lag-freq."${p_ext}"
+#   fi
+
+else
+	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
+fi
 
 ################################################################################
 ## All done!
