@@ -83,11 +83,6 @@ fi
 ## Running ccf.py
 ##################
 
-for (( i=0; i<64; i++ )); do
-	tmp_file="$out_dir/ccf_segs_${i}.dat"
-	if [ -e "$tmp_file" ]; then rm "$tmp_file"; fi; touch "$tmp_file"
-done
-
 if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
 	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
 		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" \
@@ -138,54 +133,54 @@ fi
 ## Plotting the 2D ccf with colours
 ####################################
 
-#plot_file="${out_file}_2Dccf.${p_ext}"
-#if [ -e "${out_file}.${t_ext}" ]; then
-#	python "$exe_dir"/plot_2d.py "${out_file}.${t_ext}" -o "${plot_file}" \
-#		-p "${prefix}/${obsID}" -l "$tlen" -e "$energies_file"
-#	if [ -e "${plot_file}" ]; then open "${plot_file}"; fi
-#fi
-#
-#plot_file="${out_file}_2Dccf.fits"
-#detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fits', 0, 'DETCHANS'))")
-#
-#if [ -e "$out_dir/temp.dat" ]; then
-#	fimgcreate bitpix=-32 \
-#		naxes="${tlen},${detchans}" \
-#		datafile="$exe_dir/temp.dat" \
-#		outfile="${plot_file}" \
-#		nskip=1 \
-#		history=true \
-#		clobber=yes
-#else
-#	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
-#fi
-#
-#if [ -e "${plot_file}" ]; then
-#	echo "FITS 2D ccf ratio image: ${plot_file}"
-#else
-#	echo -e "\tERROR: FIMGCREATE was not successful."
-#fi
+plot_file="${out_file}_2Dccf.${p_ext}"
+if [ -e "${out_file}.${t_ext}" ]; then
+	python "$exe_dir"/plot_2d.py "${out_file}.${t_ext}" -o "${plot_file}" \
+		-p "${prefix}/${obsID}" -l "$tlen" -e "$energies_file"
+	if [ -e "${plot_file}" ]; then open "${plot_file}"; fi
+fi
+
+plot_file="${out_file}_2Dccf.fits"
+detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fits', 0, 'DETCHANS'))")
+
+if [ -e "$out_dir/temp.dat" ]; then
+	fimgcreate bitpix=-32 \
+		naxes="${tlen},${detchans}" \
+		datafile="$exe_dir/temp.dat" \
+		outfile="${plot_file}" \
+		nskip=1 \
+		history=true \
+		clobber=yes
+else
+	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
+fi
+
+if [ -e "${plot_file}" ]; then
+	echo "FITS 2D ccf ratio image: ${plot_file}"
+else
+	echo -e "\tERROR: FIMGCREATE was not successful."
+fi
 
 #####################
 ## Plotting the lags
 #####################
 
-#cd "$lag_exe_dir"
-#
-#if (( $testing == 0 )); then
-#	out_file="$lag_out_dir/$filename"
-#elif (( $testing == 1 )); then
-#	out_file="$lag_out_dir/test_$filename"
-#fi
-#
-#if [ -e "${out_file}.${t_ext}" ]; then
-#	python "$lag_exe_dir"/plot_lags.py "${out_file}.${t_ext}" -o "${out_file}" \
-#		-p "${prefix}/${obsID}"
-#	if [ -e "$out_file"_lag-energy.png ]; then open "$out_file"_lag-energy.png; fi
-#	if [ -e "$out_file"_lag-freq_15.png ]; then open "$out_file"_lag-freq_15.png; fi
-#else
-#	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
-#fi
+cd "$lag_exe_dir"
+
+if (( $testing == 0 )); then
+	out_file="$lag_out_dir/$filename"
+elif (( $testing == 1 )); then
+	out_file="$lag_out_dir/test_$filename"
+fi
+
+if [ -e "${out_file}.${t_ext}" ]; then
+	python "$lag_exe_dir"/plot_lags.py "${out_file}.${t_ext}" -o "${out_file}" \
+		-p "${prefix}/${obsID}"
+	if [ -e "$out_file"_lag-energy.png ]; then open "$out_file"_lag-energy.png; fi
+	if [ -e "$out_file"_lag-freq_15.png ]; then open "$out_file"_lag-freq_15.png; fi
+else
+	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
+fi
 
 ################################################################################
 ## All done!
