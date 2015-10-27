@@ -889,9 +889,9 @@ def stack_reference_band(rate_ref_2d, obs_epoch):
 
     """
     if obs_epoch == 5:
-        # rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
+        rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
         # channel 2 to 25 inclusive
-        rate_ref = np.sum(rate_ref_2d[:, 5:100], axis=1)  # EPOCH 5
+        # rate_ref = np.sum(rate_ref_2d[:, 5:100], axis=1)  # EPOCH 5
     elif obs_epoch == 3:
         rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
         # channel 3 to 28 inclusive
