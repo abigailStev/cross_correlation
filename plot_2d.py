@@ -2,19 +2,116 @@ import argparse
 import numpy as np
 from astropy.io import fits
 import os.path
+import subprocess
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.collections import PatchCollection
 import matplotlib.font_manager as font_manager
 from matplotlib.ticker import MultipleLocator
 import tools  # at https://github.com/abigailStev/whizzy_scripts
 
-__author__ = "Abigail Stevens, A.L.Stevens at uva.nl"
+__author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
+__year__ = "2014-2015"
+"""
+Plots the ccf in a 2D colour plot, as time bins vs either energy channel or keV
+energy.
 
 """
-Plots the ccf of multiple energy channels in a 2D colour plot.
 
-2014-2015
+################################################################################
+def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time, plot_file,
+        energies=None, prefix="", tab_file=None):
 
-"""
+    ###################################################################
+    ## Make a ratio of ccf to the mean count rate in the interest band
+    ###################################################################
+
+    mean_ccf = np.mean(ccf, axis=0)
+    ccf_resid = ccf - mean_ccf
+    print "CCF shape:", np.shape(ccf)
+    a = np.array([mean_rate_ci, ] * 2*t_length).T
+    print "A shape:", np.shape(a)
+    with np.errstate(all='ignore'):
+        ratio = np.where(a != 0, ccf / a, 0)
+
+    # print "\tMinimum value:", np.min(ratio)
+    # 	print "\tMaximum value:", np.max(ratio)
+
+    ######################################################
+    ## Saving to a dat file so that we can use fimgcreate
+    ######################################################
+
+# #     ratio[27:, ] = 0
+    ratio[28:,] = 0
+    out_file = "./temp.dat"
+    R = ratio.flatten('C')
+    comment_str = "From %s" % tab_file
+    np.savetxt(out_file, R, comments=comment_str)
+
+    #############
+    ## Plotting!
+    #############
+    print("Plotting 2D CCF: %s" % plot_file)
+
+    font_prop = font_manager.FontProperties(size=18)
+    fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
+
+    if energies[0] != None:  ## If energies exists as a variable
+        plt.pcolor(t_bins, energies, ratio, cmap='hot')
+        # plt.pcolor(t_bins, energies, ratio, cmap='hot', vmin=-0.26, vmax=0.42)
+#         plt.pcolor(t_bins, energies, ratio, cmap='spring', vmin=-0.04, vmax=0.04)
+    else:
+# 		plt.pcolor(ratio, cmap='hot', vmin=-4.0, vmax=4.0)
+        plt.pcolor(ratio, cmap='hot')
+    # ax.vlines(0.0, 2, 31, linestyle='solid', color='black', lw=1.0)
+
+    cbar = plt.colorbar()
+    cbar.set_label('Ratio of CCF to mean count rate', \
+            fontproperties=font_prop)
+    # cbar.set_ticks([-0.04, -0.03, -0.02, -0.01, 0.00, 0.01, 0.02, 0.03, 0.04])
+    # ax.set_xlabel(r'Time ( $\times\,\frac{1}{%d}\,$s)' % frac_time, \
+    ax.set_xlabel(r'Time ( $\times\,1/%d\,$s)' % frac_time, \
+            fontproperties=font_prop)
+
+    if energies[0] != None:  ## If energies exists as a variable
+        ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
+        # ax.set_ylim(3, 20)
+        ax.set_ylim(3, 20)
+        rect = patches.Rectangle((-t_length,energies[10]), 2*t_length, 0.41, \
+                ec="none")
+    else:
+        ax.set_ylabel('Energy channel', fontproperties=font_prop)
+        # ax.set_ylim(2, 31)
+        ax.set_yscale('log')
+        rect = patches.Rectangle((-t_length,10), 2*t_length, 1, ec="none")
+
+    ax.add_patch(rect)
+    zero_outline = patches.Rectangle((0, 2), 1, 26, edgecolor="black",
+            facecolor="none")
+    ax.add_patch(zero_outline)
+
+    ax.set_xlim(-t_length, t_length)
+    ## Setting the axes' minor ticks. It's complicated.
+    x_maj_loc = ax.get_xticks()
+    y_maj_loc = ax.get_yticks()
+    # y_maj_loc = [5, 10, 15, 20]
+    # ax.set_yticks(y_maj_loc)
+    x_min_mult = 0.1 * (x_maj_loc[1] - x_maj_loc[0])
+    y_min_mult = 0.2 * (y_maj_loc[1] - y_maj_loc[0])
+    xLocator = MultipleLocator(x_min_mult)  ## loc of minor ticks on x-axis
+    yLocator = MultipleLocator(y_min_mult)  ## loc of minor ticks on y-axis
+    ax.xaxis.set_minor_locator(xLocator)
+    ax.yaxis.set_minor_locator(yLocator)
+
+    ax.tick_params(axis='x', labelsize=18)
+    ax.tick_params(axis='y', labelsize=18)
+    # ax.set_title(prefix)
+
+    # plt.show()
+    plt.savefig(plot_file)
+    plt.close()
+    # subprocess.call(['cp', plot_file, "/Users/abigailstevens/Dropbox/Research/CCF_paper1/"])
+
 
 ################################################################################
 def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
@@ -47,8 +144,6 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
 
     """
 
-    print "Plotting the 2D CCF: %s" % plot_file
-
     ##########################################
     ## Load data from FITS table and txt file
     ##########################################
@@ -66,98 +161,30 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
     means_str = file_hdu[0].header["RATE_CI"]
     detchans = int(file_hdu[0].header["DETCHANS"])
     dt = float(file_hdu[0].header["DT"])
+    frac_time = int(1.0 / dt)  ## Each time bin represents 1/frac_time sec
+
     table = file_hdu[1].data
     file_hdu.close()
 
     mean_rate_ci = [float(num.strip()) for num in means_str[1:-1].split(',')]
     ccf = np.reshape(table.field('CCF'), (n_bins, detchans), order='C')
+    ccf = ccf.T  ## Transpose it to get the axes we want
 
-    ccf = ccf[0:t_length, ].T  ## Transpose it to get the axes we want
+    pos_time_ccf = ccf[:,0:n_bins/2]
+    neg_time_ccf = ccf[:,n_bins/2:]
+
+    ccf = np.hstack((neg_time_ccf, pos_time_ccf))
+
     time_bins = np.arange(n_bins)
-    frac_time = int(1.0 / dt)  ## Each time bin represents 1/frac_time sec
+    pos_time_bins = time_bins[0:n_bins/2]
+    neg_time_bins = time_bins[n_bins/2:] - n_bins
+    time_bins = np.append(neg_time_bins, pos_time_bins)
 
-    ###################################################################
-    ## Make a ratio of ccf to the mean count rate in the interest band
-    ###################################################################
+    ccf = ccf[:, n_bins/2-t_length:n_bins/2+t_length]
+    t_bins = time_bins[n_bins/2-t_length:n_bins/2+t_length]
 
-    mean_ccf = np.mean(ccf, axis=0)
-    ccf_resid = ccf - mean_ccf
-
-    a = np.array([mean_rate_ci, ] * t_length).T
-    with np.errstate(all='ignore'):
-        ratio = np.where(a != 0, ccf / a, 0)
-
-    # print "\tMinimum value:", np.min(ratio)
-    # 	print "\tMaximum value:", np.max(ratio)
-
-    ######################################################
-    ## Saving to a dat file so that we can use fimgcreate
-    ######################################################
-
-# 	ratio[np.where(np.abs(ratio) > 4.0)] = 0
-#     ratio[27:, ] = 0
-    ratio[32:,] = 0
-    out_file = "./temp.dat"
-    R = ratio.flatten('C')
-    comment_str = "From %s" % tab_file
-    np.savetxt(out_file, R, comments=comment_str)
-
-    #############
-    ## Plotting!
-    #############
-
-    t_bins = np.arange(t_length + 1)
-    font_prop = font_manager.FontProperties(size=16)
-    fig, ax = plt.subplots(1, 1)
-
-    if energies[0] != None:  ## If energies exists as a variable
-# 		plt.pcolor(t_bins, energies, ratio, cmap='hot')
-#         plt.pcolor(t_bins, energies, ratio, cmap='hot', vmin=-1, vmax=1.5)
-        plt.pcolor(t_bins, energies, ratio, cmap='spring', vmin=-0.04, vmax=0.04)
-    else:
-# 		plt.pcolor(ratio, cmap='hot', vmin=-4.0, vmax=4.0)
-        plt.pcolor(ratio, cmap='hot')
-
-    cbar = plt.colorbar()
-    cbar.set_label('Ratio of CCF to mean count rate', \
-        fontproperties=font_prop)
-    cbar.set_ticks([-0.04, -0.03, -0.02, -0.01, 0.00, 0.01, 0.02, 0.03, 0.04])
-    ax.set_xlabel(r'Time ( $\times\,\frac{1}{%d}\,$s)' % frac_time, \
-        fontproperties=font_prop)
-
-    if energies[0] != None:  ## If energies exists as a variable
-        ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
-        ax.set_ylim(3, 25)
-        # ax.set_ylim(3, 20)
-    else:
-        ax.set_ylabel('Energy channel', fontproperties=font_prop)
-        ax.set_ylim(2, 31)
-        ax.set_yscale('log')
-
-    ## Setting the axes' minor ticks. It's complicated.
-    x_maj_loc = ax.get_xticks()
-    y_maj_loc = ax.get_yticks()
-
-    # print x_maj_loc
-    # print y_maj_loc
-    # y_maj_loc = [5, 10, 15, 20, 25]
-    # ax.set_yticks(y_maj_loc)
-    x_min_mult = 0.1 * (x_maj_loc[1] - x_maj_loc[0])
-    y_min_mult = 0.2 * (y_maj_loc[1] - y_maj_loc[0])
-    xLocator = MultipleLocator(x_min_mult)  ## loc of minor ticks on x-axis
-    yLocator = MultipleLocator(y_min_mult)  ## loc of minor ticks on y-axis
-    ax.xaxis.set_minor_locator(xLocator)
-    ax.yaxis.set_minor_locator(yLocator)
-
-    ax.tick_params(axis='x', labelsize=14)
-    ax.tick_params(axis='y', labelsize=14)
-    # ax.set_title(prefix)
-
-    fig.set_tight_layout(True)
-    plt.savefig(plot_file, dpi=200)
-    # 	plt.show()
-    plt.close()
-
+    make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time, plot_file,
+            energies=energies, prefix=prefix, tab_file=tab_file)
 
 ################################################################################
 if __name__ == "__main__":
