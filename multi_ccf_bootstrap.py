@@ -7,18 +7,17 @@ import ccf as xcor
 import multi_ccf as mxcor
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
+__year__ = "2015"
 
 """
 Bootstraps the ccf to get errors for phase-resolved energy spectra.
 Use with run_multi_ccf_bootstrap.sh and ccf_bootstrap.sh.
 
-2015
-
 """
 
 
 ################################################################################
-def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
+def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     filtering, lo_freq, hi_freq, boot_num, adjust):
     """
     Reads in multiple event lists, splits into two light curves, makes segments
@@ -29,17 +28,17 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
 
     Parameters
     ----------
-    in_file_list : string
+    in_file_list : str
         Name of text file that contains a list of the input data files for
         analysis. Must be full path names. One file per line.
 
-    out_root : string
+    out_root : str
         Description.
 
-    bkgd_file : string
+    bkgd_file : str
         Description.
 
-    num_seconds : int
+    n_seconds : int
         Description.
 
     dt_mult : int
@@ -54,6 +53,9 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
     boot_num : int
         Number of realizations to iterate for bootstrapping.
 
+    adjust : bool
+        True if artificially adjusting QPO centroid frequency.
+
     Returns
     -------
     nothing
@@ -64,7 +66,7 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
     ## Idiot checks, to ensure that our assumptions hold
     #####################################################
 
-    assert num_seconds > 0, "ERROR: num_seconds must be a positive integer."
+    assert n_seconds > 0, "ERROR: n_seconds must be a positive integer."
     assert dt_mult >= 1, "ERROR: dt_mult must be a positive integer."
 
     ##############################################################
@@ -80,20 +82,22 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
     ## 'total' is over all data files (i.e., in multi_ccf.py)
     ## 'whole' is over one data file (i.e., in ccf.py)
     ###########################################################
-
-    adjust_segments = [932, 216, 184, 570, 93, 346, 860, 533, -324]
+    if adjust:
+        adjust_segments = [932, 216, 184, 570, 93, 346, 860, 533, -324]
+    else:
+        adjust_segments = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     t_res = np.float64(tools.get_key_val(input_files[0], 0, 'TIMEDEL'))
     dt = dt_mult * t_res
-    n_bins = num_seconds * np.int(1.0 / dt)
+    n_bins = n_seconds * np.int(1.0 / dt)
     try:
         detchans = np.int(tools.get_key_val(input_files[0], 0, 'DETCHANS'))
     except KeyError:
         detchans = 64
 
     nyq_freq = 1.0 / (2.0 * dt)
-    df = 1.0 / np.float64(num_seconds)
-    param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
+    df = 1.0 / np.float64(n_seconds)
+    param_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
                 'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
                 'detchans': detchans, 'filter': filtering, 'err_bin': 200, \
                 'adjust_seg': 0}
@@ -148,10 +152,10 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
         else:
             param_dict['adjust_seg'] = 0
 
-        cross_spec, ci_whole, ref_whole, num_seg, dt_whole, df_whole, exposure \
+        cross_spec, ci_whole, ref_whole, n_seg, dt_whole, df_whole, exposure \
                 = xcor.fits_in(in_file, param_dict, test)
 
-        print "Segments for this file: %d\n" % num_seg
+        print "Segments for this file: %d\n" % n_seg
         total_cross_spec = np.dstack((total_cross_spec, cross_spec))
         ci_total.power_array = np.dstack((ci_total.power_array, \
                 ci_whole.power_array))
@@ -161,7 +165,7 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
                 ref_whole.power_array))
         ref_total.mean_rate_array = np.append(ref_total.mean_rate_array, \
                 ref_whole.mean_rate_array)
-        total_seg += num_seg
+        total_seg += n_seg
         dt_total = np.append(dt_total, dt_whole)
         df_total = np.append(df_total, df_whole)
         total_exposure += exposure
@@ -173,7 +177,7 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
     ## End of for-loop
     print " "
 
-    param_dict['num_seg'] = total_seg
+    param_dict['n_seg'] = total_seg
     param_dict['exposure'] = total_exposure
     param_dict['adjust_seg'] = adjust_segments
     # print "DT array:", dt_total
@@ -181,8 +185,8 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
     param_dict['dt'] = dt_total
     param_dict['df'] = df_total
 
-    print "Mean dt:", np.mean(dt_total)
-    print "Mean df:", np.mean(df_total)
+    # print "Mean dt:", np.mean(dt_total)
+    # print "Mean df:", np.mean(df_total)
 
     ## Removing the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
@@ -197,8 +201,8 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
 
     absrms_power = np.asarray([xcor.raw_to_absrms(ref_power_array[:,i], \
             ref_mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
-            True) for i in range(param_dict['num_seg'])])
-    ## Note that here, the axes are weird, so it's size (num_seg, n_bins)
+            True) for i in range(param_dict['n_seg'])])
+    ## Note that here, the axes are weird, so it's size (n_seg, n_bins)
     absrms_var, absrms_rms = xcor.var_and_rms(absrms_power.T, param_dict['df'])
 
     mask = np.isnan(absrms_rms)
@@ -208,9 +212,11 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
     ci_mean_rate_array = ci_mean_rate_array[:,~mask]
     ref_power_array = ref_power_array[:,~mask]
     ref_mean_rate_array = ref_mean_rate_array[~mask]
+    for element in param_dict['dt'][mask]:
+            param_dict['exposure'] -= element * param_dict['n_bins']
     param_dict['dt'] = param_dict['dt'][~mask]
     param_dict['df'] = param_dict['df'][~mask]
-    param_dict['num_seg'] = param_dict['num_seg'] - np.count_nonzero(mask)
+    param_dict['n_seg'] = param_dict['n_seg'] - np.count_nonzero(mask)
 
     ######################################################################
     ## Bootstrapping the data to get errors changes which segments we use
@@ -222,9 +228,9 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
 
             if b % 20 == 0:
                 print "\t%d" % b
-
+            print "Getting random segs"
             random_segs = np.random.randint(0, total_cross_spec.shape[2], \
-                    param_dict['num_seg'])  ## Draw with replacement
+                    param_dict['n_seg'])  ## Draw with replacement
             if test:
                 print random_segs
 
@@ -233,6 +239,7 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
             ci_total.mean_rate_array = ci_mean_rate_array[:,random_segs]
             ref_total.power_array = ref_power_array[:,random_segs]
             ref_total.mean_rate_array = ref_mean_rate_array[random_segs]
+            print "masked arrays"
 
             ## Making sure it worked correctly
             assert random_cross_spec[0:3,0:3,1].all() == total_cross_spec[0:3,0:3,random_segs[1]].all(), \
@@ -249,7 +256,7 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
             avg_cross_spec, cross_spec, ci_total, ref_total, param_dict = \
                     xcor.alltogether_means(random_cross_spec, ci_total, \
                     ref_total, param_dict, bkgd_rate, True)
-
+            print "made means from segments."
             ######################
             ## Making lag spectra
             ######################
@@ -276,7 +283,7 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
             # print "ccf end:", ccf_end[1:3,1:3]
 
             # print "Exposure_time = %.3f seconds" % exposure
-            # print "Total number of segments:", param_dict['num_seg']
+            # print "Total number of segments:", param_dict['n_seg']
             # print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
             # print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
             # print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
@@ -327,7 +334,7 @@ def main(in_file_list, out_root, bkgd_file, num_seconds, dt_mult, test,
         print "ccf end:", ccf_end[1:3,1:3]
 
         print "Exposure_time = %.3f seconds" % param_dict['exposure']
-        print "Total number of segments:", param_dict['num_seg']
+        print "Total number of segments:", param_dict['n_seg']
         print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
         print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
         print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
@@ -373,8 +380,8 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
             help="Name of the (pha/fits) background spectrum. [none]")
 
-    parser.add_argument('-n', '--num_seconds', type=tools.type_power_of_two,
-            default=1, dest='num_seconds', help="Number of seconds in each "\
+    parser.add_argument('-n', '--n_seconds', type=tools.type_power_of_two,
+            default=1, dest='n_seconds', help="Number of seconds in each "\
             "Fourier segment. Must be a power of 2, positive, integer. [1]")
 
     parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two,
@@ -418,7 +425,7 @@ if __name__ == "__main__":
             Exception("Filter keyword used incorrectly. Acceptable inputs are "\
                       "'no' or 'low:high'.")
 
-    main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds,
+    main(args.infile_list, args.outfile, args.bkgd_file, args.n_seconds,
             args.dt_mult, test, filtering, lo_freq, hi_freq, args.boot_num, \
             args.adjust)
 
