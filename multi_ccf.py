@@ -79,8 +79,8 @@ def dat_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total, \
         out.write("\n# Number of bins per segment = %d" % param_dict['n_bins'])
         out.write("\n# DETCHANS = %d" % param_dict['detchans'])
         out.write("\n# Total exposure time = %d seconds" % \
-            (param_dict['num_seg'] * param_dict['num_seconds']))
-        out.write("\n# Total number of segments = %d " % param_dict['num_seg'])
+            (param_dict['n_seg'] * param_dict['n_seconds']))
+        out.write("\n# Total number of segments = %d " % param_dict['n_seg'])
         out.write("\n# Mean count rate of ci = %s" % \
             str(list(mean_rate_ci_total)))
         out.write("\n# Mean count rate of ref band = %.5f" % \
@@ -177,9 +177,9 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
     prihdr.set('DT', np.mean(param_dict['dt']), "seconds")
     prihdr.set('DF', np.mean(param_dict['df']), "Hz")
     prihdr.set('N_BINS', param_dict['n_bins'], "time bins per segment")
-    prihdr.set('SEC_SEG', param_dict['num_seconds'], "seconds per segment")
+    prihdr.set('SEC_SEG', param_dict['n_seconds'], "seconds per segment")
     prihdr.set('NYQUIST', param_dict['nyquist'], "Hz")
-    prihdr.set('SEGMENTS', param_dict['num_seg'], "segments, of all data")
+    prihdr.set('SEGMENTS', param_dict['n_seg'], "segments, of all data")
     prihdr.set('EXPOSURE', param_dict['exposure'], "seconds of data used")
     prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy "\
         "channels")
@@ -213,7 +213,7 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
 
 
 ################################################################################
-def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
+def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     filtering, lo_freq, hi_freq, adjust):
     """
     Reads in multiple event lists, splits into two light curves, makes segments
@@ -234,7 +234,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     bkgd_file : string
         Description.
 
-    num_seconds : int
+    n_seconds : int
         Description.
 
     dt_mult : int
@@ -256,7 +256,7 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ## Idiot checks, to ensure that our assumptions hold
     #####################################################
 
-    assert num_seconds > 0, "ERROR: num_seconds must be a positive integer."
+    assert n_seconds > 0, "ERROR: n_seconds must be a positive integer."
     assert dt_mult >= 1, "ERROR: dt_mult must be a positive integer."
 
     ##############################################################
@@ -274,18 +274,20 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ###########################################################
 
     adjust_segments = [932, 216, 184, 570, 93, 346, 860, 533, -324]
+    if not adjust:
+        adjust_segments = [0,0,0,0,0,0,0,0,0]
 
     t_res = np.float64(tools.get_key_val(input_files[0], 0, 'TIMEDEL'))
     dt = dt_mult * t_res
-    n_bins = num_seconds * np.int(1.0 / dt)
+    n_bins = n_seconds * np.int(1.0 / dt)
     try:
         detchans = np.int(tools.get_key_val(input_files[0], 0, 'DETCHANS'))
     except KeyError:
-        detchans = 64
+        detchans = 238
 
     nyq_freq = 1.0 / (2.0 * dt)
-    df = 1.0 / np.float64(num_seconds)
-    param_dict = {'dt': dt, 't_res': t_res, 'num_seconds': num_seconds, \
+    df = 1.0 / np.float64(n_seconds)
+    param_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
                 'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
                 'detchans': detchans, 'filter': filtering, \
                 'adjust_seg': 0, 'exposure': 0}
@@ -342,10 +344,10 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         else:
             param_dict['adjust_seg'] = 0
 
-        cross_spec, ci_whole, ref_whole, num_seg, dt_whole, df_whole, exposure = \
+        cross_spec, ci_whole, ref_whole, n_seg, dt_whole, df_whole, exposure = \
                 xcor.fits_in(in_file, param_dict, test)
 
-        print "Segments for this file: %d\n" % num_seg
+        print "Segments for this file: %d\n" % n_seg
         total_cross_spec = np.dstack((total_cross_spec, cross_spec))
         ci_total.power_array = np.dstack((ci_total.power_array, \
                 ci_whole.power_array))
@@ -358,12 +360,12 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
         dt_total = np.append(dt_total, dt_whole)
         df_total = np.append(df_total, df_whole)
         total_exposure += exposure
-        total_seg += num_seg
+        total_seg += n_seg
         i += 1
     ## End of for-loop
     print " "
 
-    param_dict['num_seg'] = total_seg
+    param_dict['n_seg'] = total_seg
     param_dict['exposure'] = total_exposure
     # print "DT array:", dt_total
     # print "df array:", df_total
@@ -402,6 +404,8 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     ## Computing ccf from cs, and computing error
     ##############################################
 
+    print "Done saving lags"
+
     if filtering:
         ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(avg_cross_spec, param_dict,
             ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
@@ -409,15 +413,15 @@ def main(in_file_list, out_file, bkgd_file, num_seconds, dt_mult, test,
     else:
         ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, param_dict, ref_total, \
                 True)
-
+        print "Done with cs to ccf, going to compute error."
         ccf_error = xcor.standard_ccf_err(cross_spec, param_dict, \
                 ref_total, True)
 
     print "ccf end:", ccf_end[1:3,1:3]
 
-    print "e = ", param_dict['num_seconds'] * param_dict['num_seg']
-    print "Exposure_time = %.3f seconds" % total_exposure
-    print "Total number of segments:", param_dict['num_seg']
+    print "e = ", param_dict['n_seconds'] * param_dict['n_seg']
+    print "Exposure_time = %.3f seconds" % param_dict['exposure']
+    print "Total number of segments:", param_dict['n_seg']
     print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
     print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
     print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
@@ -460,8 +464,8 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
         help="Name of the (pha/fits) background spectrum. [none]")
 
-    parser.add_argument('-n', '--num_seconds', type=tools.type_power_of_two,
-        default=1, dest='num_seconds', help="Number of seconds in each Fourier"\
+    parser.add_argument('-n', '--n_seconds', type=tools.type_power_of_two,
+        default=1, dest='n_seconds', help="Number of seconds in each Fourier"\
         " segment. Must be a power of 2, positive, integer. [1]")
 
     parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two,
@@ -500,7 +504,7 @@ if __name__ == "__main__":
             Exception("Filter keyword used incorrectly. Acceptable inputs are "\
                       "'no' or 'low:high'.")
 
-    main(args.infile_list, args.outfile, args.bkgd_file, args.num_seconds,
+    main(args.infile_list, args.outfile, args.bkgd_file, args.n_seconds,
         args.dt_mult, test, filtering, lo_freq, hi_freq, args.adjust)
 
 ################################################################################
