@@ -1,10 +1,11 @@
-#!/usr/bin/env
+#!/usr/bin/env python
 
 import argparse
 import numpy as np
 import tools  # at https://github.com/abigailStev/whizzy_scripts
 import ccf as xcor
 import multi_ccf as mxcor
+import datetime
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2015"
@@ -77,11 +78,10 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     if not input_files:  ## If data_files is an empty list
         raise Exception("ERROR: No files in the eventlist list.")
 
-    ###########################################################
+    ###################
     ## Initializations
-    ## 'total' is over all data files (i.e., in multi_ccf.py)
-    ## 'whole' is over one data file (i.e., in ccf.py)
-    ###########################################################
+    ###################
+
     if adjust:
         adjust_segments = [932, 216, 184, 570, 93, 346, 860, 533, -324]
     else:
@@ -101,6 +101,9 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
                 'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
                 'detchans': detchans, 'filter': filtering, 'err_bin': 200, \
                 'adjust_seg': 0}
+
+    ## 'total' is over all data files (i.e., in multi_ccf.py)
+    ## 'whole' is over one data file (i.e., in ccf.py)
 
     ci_total = xcor.Lightcurve()
     ref_total = xcor.Lightcurve()
@@ -155,7 +158,7 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
         cross_spec, ci_whole, ref_whole, n_seg, dt_whole, df_whole, exposure \
                 = xcor.fits_in(in_file, param_dict, test)
 
-        print "Segments for this file: %d\n" % n_seg
+        print "Segments for this file: %d\n" % (n_seg)
         total_cross_spec = np.dstack((total_cross_spec, cross_spec))
         ci_total.power_array = np.dstack((ci_total.power_array, \
                 ci_whole.power_array))
@@ -175,7 +178,7 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
         ref_total.power += ref_whole.power
         i += 1
     ## End of for-loop
-    print " "
+    # print "\tFinished cross-spec:", datetime.datetime.now()
 
     param_dict['n_seg'] = total_seg
     param_dict['exposure'] = total_exposure
@@ -188,32 +191,49 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     # print "Mean dt:", np.mean(dt_total)
     # print "Mean df:", np.mean(df_total)
 
-    ## Removing the first zeros from stacked arrays
+    ## Removing the first zeros from stacked arrays, and selecting the positive
+    ## Fourier frequencies in the powers.
+    ## Using temporary arrays here. Selecting from them to get random segs
+    ## down the line.
     total_cross_spec = total_cross_spec[:,:,1:]
-    ci_power_array = ci_total.power_array[:,:,1:]
+    ci_power_array = ci_total.power_array[0:param_dict['n_bins']/2+1,:,1:]
     ci_mean_rate_array = ci_total.mean_rate_array[:,1:]
-    ref_power_array = ref_total.power_array[:,1:]
+    ref_power_array = ref_total.power_array[0:param_dict['n_bins']/2+1,1:]
     ref_mean_rate_array = ref_total.mean_rate_array[1:]
 
     ##################################################
     ## Removing the segments with a negative variance
     ##################################################
 
-    absrms_power = np.asarray([xcor.raw_to_absrms(ref_power_array[:,i], \
-            ref_mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
-            True) for i in range(param_dict['n_seg'])])
-    ## Note that here, the axes are weird, so it's size (n_seg, n_bins)
-    absrms_var, absrms_rms = xcor.var_and_rms(absrms_power.T, param_dict['df'])
+    absrms_power = xcor.raw_to_absrms(ref_power_array, \
+            ref_mean_rate_array, param_dict['n_bins'], param_dict['dt'], \
+            True)
+    print np.shape(absrms_power)
 
+    absrms_var, absrms_rms = xcor.var_and_rms(absrms_power, param_dict['df'])
+    # print var
+    print "\n\nPre:", absrms_rms
     mask = np.isnan(absrms_rms)
-
+    absrms_rms = absrms_rms[~mask]
+    print "RMSs:", absrms_rms
+    # print absrms_rms
+    # print mask
+    # print np.shape(total_cross_spec)
     total_cross_spec = total_cross_spec[:,:,~mask]
+    # print total_cross_spec[1,1,0]
+    # print np.shape(total_cross_spec)
     ci_power_array = ci_power_array[:,:,~mask]
     ci_mean_rate_array = ci_mean_rate_array[:,~mask]
     ref_power_array = ref_power_array[:,~mask]
+    print np.shape(ref_power_array)
     ref_mean_rate_array = ref_mean_rate_array[~mask]
-    for element in param_dict['dt'][mask]:
-            param_dict['exposure'] -= element * param_dict['n_bins']
+
+    temp = absrms_power[:,~mask]
+    print "Temp:", temp[4,:]
+
+    if param_dict['dt'] is not np.array([]):
+        for element in param_dict['dt'][mask]:
+                param_dict['exposure'] -= element * param_dict['n_bins']
     param_dict['dt'] = param_dict['dt'][~mask]
     param_dict['df'] = param_dict['df'][~mask]
     param_dict['n_seg'] = param_dict['n_seg'] - np.count_nonzero(mask)
@@ -222,24 +242,66 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     ## Bootstrapping the data to get errors changes which segments we use
     ## Doing boot_num realizations of this
     ######################################################################
-    print "Bootstrap realization:"
+
+    print "\nBootstrap realization:"
     if boot_num >= 1:
         for b in range(1, boot_num+1):
 
             if b % 20 == 0:
                 print "\t%d" % b
-            print "Getting random segs"
+
+            out_file = out_root.replace("_b-", "_b-%d" % b)
+
+            # print "\n\tGetting random segs:", datetime.datetime.now()
             random_segs = np.random.randint(0, total_cross_spec.shape[2], \
                     param_dict['n_seg'])  ## Draw with replacement
             if test:
-                print random_segs
+                print "Segments:", random_segs
 
+            # print "\tMasking arrays:", datetime.datetime.now()
             random_cross_spec = total_cross_spec[:,:,random_segs]
             ci_total.power_array = ci_power_array[:,:,random_segs]
             ci_total.mean_rate_array = ci_mean_rate_array[:,random_segs]
             ref_total.power_array = ref_power_array[:,random_segs]
+            # print ref_power_array[5,:]
+            # print ref_power_array[5,random_segs]
+            # print "Thisone:", thisone[5,:]
+            ## I can confirm that it's selecting random_segs correctly.
             ref_total.mean_rate_array = ref_mean_rate_array[random_segs]
-            print "masked arrays"
+            # print "\tMasked arrays:", datetime.datetime.now()
+            print "Temp1:", temp[4,random_segs]
+            # print "Rand:", absrms_rms[random_segs]
+
+            absrms_pow = np.zeros(param_dict['n_bins']/2+1)
+            var_here = 0
+            rms_here = 0
+            print np.shape(absrms_pow)
+            for i in range(param_dict['n_seg']):
+                # print i
+                t1 = xcor.raw_to_absrms(thisone[:,i], \
+                    ref_total.mean_rate_array[i], param_dict['n_bins'],
+                    param_dict['dt'][i])
+                # print "t1 shape:", np.shape(t1)
+                absrms_pow = np.column_stack((absrms_pow, t1))
+                v1, r1 = xcor.var_and_rms(t1, param_dict['df'][i])
+                # print np.shape(v1)
+                # print np.shape(r1)
+                var_here = np.vstack((var_here, v1))
+                rms_here = np.vstack((rms_here, r1))
+
+            # print np.shape(absrms_pow)
+            absrms_pow = absrms_pow[:,1:]
+            var_here = np.array(var_here[1:])
+            rms_here = np.array(rms_here[1:])
+            print "Rmspow:", absrms_pow[4,:]  # this should be the same as temp[4, random_segs] but it isn't!!!
+            print rms_here
+            # var, rms = xcor.var_and_rms(absrms_pow.T, param_dict['df'].T)
+            # var, rms = np.apply_along_axis(xcor.var_and_rms, 0, absrms_pow.T, param_dict['df'])
+
+            # print np.shape(var)
+            # print np.shape(rms)
+            # print var
+            # print "RMSs again:", rms
 
             ## Making sure it worked correctly
             assert random_cross_spec[0:3,0:3,1].all() == total_cross_spec[0:3,0:3,random_segs[1]].all(), \
@@ -248,6 +310,11 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
             assert np.shape(random_cross_spec) == np.shape(total_cross_spec), \
                     "ERROR: Random draw-with-replacement of segments was not "\
                     "successful. Arrays are not the same size."
+            assert ref_total.mean_rate_array.all() == ref_mean_rate_array[random_segs].all(), \
+                    "ERROR: Random draw-with-replacement of segments was not "\
+                    "successful."
+
+            exit()
 
             ##############################
             ## Making means from segments
@@ -256,14 +323,15 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
             avg_cross_spec, cross_spec, ci_total, ref_total, param_dict = \
                     xcor.alltogether_means(random_cross_spec, ci_total, \
                     ref_total, param_dict, bkgd_rate, True)
-            print "made means from segments."
+            # print "\tMade means from segments:", datetime.datetime.now()
+
             ######################
             ## Making lag spectra
             ######################
 
-            # xcor.save_for_lags(out_file, in_file_list, param_dict, \
-            #         ci_total.mean_rate, ref_total.mean_rate, avg_cross_spec, \
-            #         ci_total.power, ref_total.power)
+            xcor.save_for_lags(out_file, in_file_list, param_dict, \
+                    ci_total.mean_rate, ref_total.mean_rate, avg_cross_spec, \
+                    ci_total.power, ref_total.power)
 
             ##############################################
             ## Computing ccf from cs, and computing error
@@ -280,8 +348,9 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
                 ccf_error = xcor.standard_ccf_err(cross_spec, param_dict, \
                         ref_total, True)
 
+            print ccf_error
             # print "ccf end:", ccf_end[1:3,1:3]
-
+            # print "\tGoing to output:", datetime.datetime.now()
             # print "Exposure_time = %.3f seconds" % exposure
             # print "Total number of segments:", param_dict['n_seg']
             # print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
@@ -289,17 +358,16 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
             # print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
             # print "Mean rate for ref:", ref_total.mean_rate
 
-            t = np.arange(0, param_dict['n_bins'])  ## gives the 'front of the bin'
-
             ##########
             ## Output
             ##########
 
-            out_file = out_root.replace("boot", "boot-%d" % b)
+            t = np.arange(0, param_dict['n_bins'])  ## gives the 'front of the bin'
 
             mxcor.fits_out(out_file, in_file_list, bkgd_file, param_dict, \
-                    ci_total.mean_rate, ref_total.mean_rate, t, ccf_end, \
-                    ccf_error, filtering, lo_freq, hi_freq)
+                        ci_total.mean_rate, ref_total.mean_rate, t, ccf_end, \
+                        ccf_error, filtering, lo_freq, hi_freq)
+
     else:
 
         random_cross_spec = total_cross_spec
@@ -331,26 +399,27 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
             ccf_error = xcor.standard_ccf_err(random_cross_spec, param_dict, \
                     ref_total, True)
 
-        print "ccf end:", ccf_end[1:3,1:3]
-
-        print "Exposure_time = %.3f seconds" % param_dict['exposure']
-        print "Total number of segments:", param_dict['n_seg']
-        print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
-        print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
-        print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
-        print "Mean rate for ref:", ref_total.mean_rate
-
-        t = np.arange(0, param_dict['n_bins'])  ## gives the 'front of the bin'
+        # print "ccf end:", ccf_end[1:3,1:3]
+        # print "Exposure_time = %.3f seconds" % param_dict['exposure']
+        # print "Total number of segments:", param_dict['n_seg']
+        # print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
+        # print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
+        # print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
+        # print "Mean rate for ref:", ref_total.mean_rate
 
         ##########
         ## Output
         ##########
 
-        out_file = out_root.replace("boot", "")
+        out_file = out_root.replace("_b-", "")
+        t = np.arange(0, param_dict['n_bins'])  ## gives the 'front of the bin'
 
         mxcor.fits_out(out_file, in_file_list, bkgd_file, param_dict, \
-                ci_total.mean_rate, ref_total.mean_rate, t, ccf_end, \
-                ccf_error, filtering, lo_freq, hi_freq)
+                    ci_total.mean_rate, ref_total.mean_rate, t, ccf_end, \
+                    ccf_error, filtering, lo_freq, hi_freq)
+
+
+
 
 ################################################################################
 if __name__ == "__main__":
