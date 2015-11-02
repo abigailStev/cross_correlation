@@ -17,6 +17,29 @@ Use with run_multi_ccf_bootstrap.sh and ccf_bootstrap.sh.
 """
 
 
+class Lightcurves(object):
+    def __init__(self, n_bins=8192, detchans=64, type='ci'):
+        self.type = type
+
+        if type.ascii_lowercase() == "ci":
+            self.power = np.zeros((n_bins, detchans), dtype=np.float64)
+            self.power_array = np.zeros((n_bins, detchans, 1), dtype=np.float64)
+            self.mean_rate = np.zeros(detchans)
+            self.mean_rate_array = np.zeros((detchans, 1), dtype=np.float64)
+        elif type.ascii_lowercase() == "ref":
+            self.power = np.zeros(n_bins, dtype=np.float64)
+            self.power_array = np.zeros((n_bins, 1), dtype=np.float64)
+            self.mean_rate = 0
+            self.mean_rate_array = 0
+        else:
+            self.mean_rate = 0
+            self.mean_rate_array = 0
+            self.power = 0
+            self.power_array = 0
+            self.pos_power = 0
+
+
+
 ################################################################################
 def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     filtering, lo_freq, hi_freq, boot_num, adjust):
@@ -105,23 +128,13 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     ## 'total' is over all data files (i.e., in multi_ccf.py)
     ## 'whole' is over one data file (i.e., in ccf.py)
 
-    ci_total = xcor.Lightcurve()
-    ref_total = xcor.Lightcurve()
+    ci_total = Lightcurves(n_bins=param_dict['n_bins'], \
+            detchans=param_dict['detchans'], type='ci')
+    ref_total = Lightcurves(n_bins=param_dict['n_bins'], \
+            detchans=param_dict['detchans'], type='ref')
     total_seg = 0
     total_cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], \
             1), dtype=np.complex128)
-    ci_total.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
-            dtype=np.float64)
-    ci_total.power_array = np.zeros((param_dict['n_bins'], \
-            param_dict['detchans'], 1), dtype=np.float64)
-    ci_total.mean_rate = np.zeros(param_dict['detchans'])
-    ci_total.mean_rate_array = np.zeros((param_dict['detchans'], 1), \
-            dtype=np.float64)
-    ref_total.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
-    ref_total.power_array = np.zeros((param_dict['n_bins'], 1), \
-            dtype=np.float64)
-    ref_total.mean_rate = 0
-    ref_total.mean_rate_array = 0
     dt_total = np.array([])
     df_total = np.array([])
     total_exposure = 0
@@ -196,9 +209,9 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     ## Using temporary arrays here. Selecting from them to get random segs
     ## down the line.
     total_cross_spec = total_cross_spec[:,:,1:]
-    ci_power_array = ci_total.power_array[0:param_dict['n_bins']/2+1,:,1:]
+    ci_power_array = ci_total.power_array[:,:,1:]
     ci_mean_rate_array = ci_total.mean_rate_array[:,1:]
-    ref_power_array = ref_total.power_array[0:param_dict['n_bins']/2+1,1:]
+    ref_power_array = ref_total.power_array[:,1:]
     ref_mean_rate_array = ref_total.mean_rate_array[1:]
 
     ##################################################
@@ -257,6 +270,20 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
                     param_dict['n_seg'])  ## Draw with replacement
             if test:
                 print "Segments:", random_segs
+            ci_boot = Lightcurves(n_bins=param_dict['n_bins'], \
+                    detchans=param_dict['detchans'], type='ci')
+            ref_boot = Lightcurves(n_bins=param_dict['n_bins'], \
+                    detchans=param_dict['detchans'], type='ref')
+            random_cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], \
+                    1), dtype=np.complex128)
+
+            for i in random_segs:
+
+
+
+
+
+
 
             # print "\tMasking arrays:", datetime.datetime.now()
             random_cross_spec = total_cross_spec[:,:,random_segs]
