@@ -85,11 +85,11 @@ cp "$file_list" "$saved_file_list"
 ########################
 
 if [ -e "$saved_file_list" ] && [ -e "$bkgd_spec" ]; then
-	python "$exe_dir"/multi_ccf_bootstrap.py "$saved_file_list" \
+	python "$exe_dir"/bootstrap_multi_ccf.py "$saved_file_list" \
 	        "${out_file}.${t_ext}" -b "$bkgd_spec" -n "$numsec" -m "$dt" \
 	        -t "$testing" -f "$filtering" --bootstrap "$boot_num" -a
 elif [ -e "$saved_file_list" ]; then
-	python "$exe_dir"/multi_ccf_bootstrap.py "$saved_file_list" \
+	python "$exe_dir"/bootstrap_multi_ccf.py "$saved_file_list" \
 	        "${out_file}.${t_ext}" -n "$numsec" -m "$dt" -t "$testing" \
 	        -f "$filtering" --bootstrap "$boot_num" -a
 else
