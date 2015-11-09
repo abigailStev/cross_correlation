@@ -120,20 +120,20 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
 
     nyq_freq = 1.0 / (2.0 * dt)
     df = 1.0 / np.float64(n_seconds)
-    meta_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
-                'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
-                'detchans': detchans, 'filter': filtering, 'err_bin': 200, \
+    meta_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds,
+                'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins,
+                'detchans': detchans, 'filter': filtering, 'err_bin': 200,
                 'adjust_seg': 0}
 
     ## 'total' is over all data files (i.e., in multi_ccf.py)
     ## 'whole' is over one data file (i.e., in ccf.py)
 
-    ci_total = Lightcurves(n_bins=meta_dict['n_bins'], \
+    ci_total = Lightcurves(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ci')
-    ref_total = Lightcurves(n_bins=meta_dict['n_bins'], \
+    ref_total = Lightcurves(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ref')
     total_seg = 0
-    total_cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], \
+    total_cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'],
             1), dtype=np.complex128)
     dt_total = np.array([])
     df_total = np.array([])
@@ -173,13 +173,13 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
 
         print "Segments for this file: %d\n" % (n_seg)
         total_cross_spec = np.dstack((total_cross_spec, cross_spec))
-        ci_total.power_array = np.dstack((ci_total.power_array, \
+        ci_total.power_array = np.dstack((ci_total.power_array,
                 ci_whole.power_array))
-        ci_total.mean_rate_array = np.hstack((ci_total.mean_rate_array, \
+        ci_total.mean_rate_array = np.hstack((ci_total.mean_rate_array,
                 ci_whole.mean_rate_array))
-        ref_total.power_array = np.hstack((ref_total.power_array, \
+        ref_total.power_array = np.hstack((ref_total.power_array,
                 ref_whole.power_array))
-        ref_total.mean_rate_array = np.append(ref_total.mean_rate_array, \
+        ref_total.mean_rate_array = np.append(ref_total.mean_rate_array,
                 ref_whole.mean_rate_array)
         total_seg += n_seg
         dt_total = np.append(dt_total, dt_whole)
@@ -223,10 +223,10 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
 
     absrms_var, absrms_rms = xcor.var_and_rms(absrms_power, meta_dict['df'])
     # print var
-    print "\n\nPre:", absrms_rms
+    # print "\n\nPre:", absrms_rms
     mask = np.isnan(absrms_rms)
     absrms_rms = absrms_rms[~mask]
-    print "RMSs:", absrms_rms
+    # print "RMSs:", absrms_rms
     # print absrms_rms
     # print mask
     # print mask.shape
@@ -240,7 +240,7 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     ref_total.mean_rate_array = ref_total.mean_rate_array[~mask]
 
     temp = absrms_power[:,~mask]
-    print "Temp:", temp[4,:]
+    # print "Temp:", temp[4,:]
 
     if meta_dict['dt'] is not np.array([]):
         for element in meta_dict['dt'][mask]:
