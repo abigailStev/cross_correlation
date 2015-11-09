@@ -1,14 +1,16 @@
+# Tex files and byproducts
+*.tex
 *.aux
-*.txt
 *.synctex.gz
 *.pdf
 *.out
 *.xml
 
-# Whatever this is
+# Directories
 .idea/*
 OLD/*
 out_ccf/*
+.ipynb_checkpoints/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -67,5 +69,7 @@ coverage.xml
 *.dat
 *.eps
 *.png
+*.txt
+
 
 
