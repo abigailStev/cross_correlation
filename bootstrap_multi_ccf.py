@@ -5,15 +5,15 @@ import numpy as np
 import tools  # at https://github.com/abigailStev/whizzy_scripts
 import ccf as xcor
 import multi_ccf as mxcor
-import datetime
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2015"
 
 """
-Bootstraps the ccf to get errors for phase-resolved energy spectra.
-Use with run_multi_ccf_bootstrap.sh and ccf_bootstrap.sh.
-
+Bootstraps the cross-correlation function for a set of RXTE event lists to
+compute the errors on the phase-resolved energy spectra.
+Use with run_multi_ccf_bootstrap.sh and ccf_bootstrap.sh. See multi_ccf.py and
+ccf.py for more details.
 """
 
 
@@ -463,11 +463,8 @@ if __name__ == "__main__":
     ##############################################
 
     parser = argparse.ArgumentParser(usage="python multi_ccf_bootstrap.py "\
-            "infile outfile [-b BKGD_SPECTRUM] [-n NUM_SECONDS] [-m DT_MULT] "\
-            "[-t {0,1}] [-f {0,1}] [--bootstrap BOOT_NUM]",
-            description="Bootstraps the cross-correlation function for a set "\
-            "of RXTE eventlists to compute the error on the phase-resolved "\
-            "energy spectra. See multi_ccf.py and ccf.py for more details.",
+            "infile outfile [OPTIONAL ARGUMENTS]",
+            description=__doc__,
             epilog="For optional arguments, default values are given in "\
             "brackets at end of description.")
 
