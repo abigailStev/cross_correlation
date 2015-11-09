@@ -120,7 +120,7 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
 
     nyq_freq = 1.0 / (2.0 * dt)
     df = 1.0 / np.float64(n_seconds)
-    param_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
+    meta_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
                 'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
                 'detchans': detchans, 'filter': filtering, 'err_bin': 200, \
                 'adjust_seg': 0}
@@ -128,20 +128,20 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     ## 'total' is over all data files (i.e., in multi_ccf.py)
     ## 'whole' is over one data file (i.e., in ccf.py)
 
-    ci_total = Lightcurves(n_bins=param_dict['n_bins'], \
-            detchans=param_dict['detchans'], type='ci')
-    ref_total = Lightcurves(n_bins=param_dict['n_bins'], \
-            detchans=param_dict['detchans'], type='ref')
+    ci_total = Lightcurves(n_bins=meta_dict['n_bins'], \
+            detchans=meta_dict['detchans'], type='ci')
+    ref_total = Lightcurves(n_bins=meta_dict['n_bins'], \
+            detchans=meta_dict['detchans'], type='ref')
     total_seg = 0
-    total_cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], \
+    total_cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], \
             1), dtype=np.complex128)
     dt_total = np.array([])
     df_total = np.array([])
     total_exposure = 0
 
-    print "\nDT = %.15f" % param_dict['dt']
-    print "N_bins = %d" % param_dict['n_bins']
-    print "Nyquist freq = %f" % param_dict['nyquist']
+    print "\nDT = %.15f" % meta_dict['dt']
+    print "N_bins = %d" % meta_dict['n_bins']
+    print "Nyquist freq = %f" % meta_dict['nyquist']
     print "Filtering?", filtering
     print "Adjusting QPO?", adjust
 
@@ -154,7 +154,7 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
         bkgd_rate = xcor.get_background(bkgd_file)
     else:
         print "No background spectrum."
-        bkgd_rate = np.zeros(param_dict['detchans'])
+        bkgd_rate = np.zeros(meta_dict['detchans'])
     print " "
 
     ##################################
@@ -164,12 +164,12 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     for in_file in input_files:
 
         if adjust:
-            param_dict['adjust_seg'] = adjust_segments[i]
+            meta_dict['adjust_seg'] = adjust_segments[i]
         else:
-            param_dict['adjust_seg'] = 0
+            meta_dict['adjust_seg'] = 0
 
         cross_spec, ci_whole, ref_whole, n_seg, dt_whole, df_whole, exposure \
-                = xcor.fits_in(in_file, param_dict, test)
+                = xcor.fits_in(in_file, meta_dict, test)
 
         print "Segments for this file: %d\n" % (n_seg)
         total_cross_spec = np.dstack((total_cross_spec, cross_spec))
@@ -193,13 +193,13 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     ## End of for-loop
     # print "\tFinished cross-spec:", datetime.datetime.now()
 
-    param_dict['n_seg'] = total_seg
-    param_dict['exposure'] = total_exposure
-    param_dict['adjust_seg'] = adjust_segments
+    meta_dict['n_seg'] = total_seg
+    meta_dict['exposure'] = total_exposure
+    meta_dict['adjust_seg'] = adjust_segments
     # print "DT array:", dt_total
     # print "df array:", df_total
-    param_dict['dt'] = dt_total
-    param_dict['df'] = df_total
+    meta_dict['dt'] = dt_total
+    meta_dict['df'] = df_total
 
     # print "Mean dt:", np.mean(dt_total)
     # print "Mean df:", np.mean(df_total)
@@ -216,12 +216,12 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     ## Removing the segments with a negative variance
     ##################################################
 
-    absrms_power = xcor.raw_to_absrms(ref_total.power_array[0:param_dict['n_bins']/2+1,:], \
-            ref_total.mean_rate_array, param_dict['n_bins'], param_dict['dt'], \
+    absrms_power = xcor.raw_to_absrms(ref_total.power_array[0:meta_dict['n_bins']/2+1,:], \
+            ref_total.mean_rate_array, meta_dict['n_bins'], meta_dict['dt'], \
             True)
     print np.shape(absrms_power)
 
-    absrms_var, absrms_rms = xcor.var_and_rms(absrms_power, param_dict['df'])
+    absrms_var, absrms_rms = xcor.var_and_rms(absrms_power, meta_dict['df'])
     # print var
     print "\n\nPre:", absrms_rms
     mask = np.isnan(absrms_rms)
@@ -242,12 +242,12 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     temp = absrms_power[:,~mask]
     print "Temp:", temp[4,:]
 
-    if param_dict['dt'] is not np.array([]):
-        for element in param_dict['dt'][mask]:
-                param_dict['exposure'] -= element * param_dict['n_bins']
-    param_dict['dt'] = param_dict['dt'][~mask]
-    param_dict['df'] = param_dict['df'][~mask]
-    param_dict['n_seg'] = param_dict['n_seg'] - np.count_nonzero(mask)
+    if meta_dict['dt'] is not np.array([]):
+        for element in meta_dict['dt'][mask]:
+                meta_dict['exposure'] -= element * meta_dict['n_bins']
+    meta_dict['dt'] = meta_dict['dt'][~mask]
+    meta_dict['df'] = meta_dict['df'][~mask]
+    meta_dict['n_seg'] = meta_dict['n_seg'] - np.count_nonzero(mask)
 
     ######################################################################
     ## Bootstrapping the data to get errors changes which segments we use
@@ -265,15 +265,15 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
 
             # print "\n\tGetting random segs:", datetime.datetime.now()
             random_segs = np.random.randint(0, total_cross_spec.shape[2], \
-                    param_dict['n_seg'])  ## Draw with replacement
+                    meta_dict['n_seg'])  ## Draw with replacement
             if test:
                 print "Segments:", random_segs
 
-            ci_boot = Lightcurves(n_bins=param_dict['n_bins'], \
-                    detchans=param_dict['detchans'], type='ci')
-            ref_boot = Lightcurves(n_bins=param_dict['n_bins'], \
-                    detchans=param_dict['detchans'], type='ref')
-            boot_cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], \
+            ci_boot = Lightcurves(n_bins=meta_dict['n_bins'], \
+                    detchans=meta_dict['detchans'], type='ci')
+            ref_boot = Lightcurves(n_bins=meta_dict['n_bins'], \
+                    detchans=meta_dict['detchans'], type='ref')
+            boot_cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], \
                     1), dtype=np.complex128)
 
             # boot_cross_spec = total_cross_spec[:,:,random_segs]
@@ -293,18 +293,18 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
                         ci_total.power_array[:,:,i]))
                 ci_boot.mean_rate_array = np.hstack((ci_boot.mean_rate_array, \
                         np.reshape(ci_total.mean_rate_array[:,i], \
-                        (param_dict['detchans'],1))))
+                        (meta_dict['detchans'],1))))
                 ref_boot.power_array = np.hstack((ref_boot.power_array, \
                         np.reshape(ref_total.power_array[:,i], \
-                        (param_dict['n_bins'],1))))
+                        (meta_dict['n_bins'],1))))
                 ref_boot.mean_rate_array = np.vstack((ref_boot.mean_rate_array,\
                         ref_total.mean_rate_array[i]))
-                absrms_pow = xcor.raw_to_absrms(ref_total.power_array[0:param_dict['n_bins']/2+1, i], \
-                        ref_total.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
+                absrms_pow = xcor.raw_to_absrms(ref_total.power_array[0:meta_dict['n_bins']/2+1, i], \
+                        ref_total.mean_rate_array[i], meta_dict['n_bins'], meta_dict['dt'][i], \
                         True)
                 # print "\tNew Pow:", absrms_pow[4], temp[4,i], absrms_pow[4] == temp[4,i]
 
-                var, rms = xcor.var_and_rms(absrms_pow, param_dict['df'][i])
+                var, rms = xcor.var_and_rms(absrms_pow, meta_dict['df'][i])
                 boot_var = np.append(boot_var, var)
                 boot_rms = np.append(boot_rms, rms)
 
@@ -316,26 +316,26 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
             ref_boot.power_array = ref_boot.power_array[:,1:]
             ref_boot.mean_rate_array = ref_boot.mean_rate_array[1:]
 
-            # absrms_poweer = xcor.raw_to_absrms(ref_boot.power_array[0:param_dict['n_bins']/2+1,:], \
-            #         np.reshape(ref_boot.mean_rate_array, (param_dict['n_seg'])),
-            #         param_dict['n_bins'],
-            #         np.reshape(param_dict['dt'], (param_dict['n_seg'])))
+            # absrms_poweer = xcor.raw_to_absrms(ref_boot.power_array[0:meta_dict['n_bins']/2+1,:], \
+            #         np.reshape(ref_boot.mean_rate_array, (meta_dict['n_seg'])),
+            #         meta_dict['n_bins'],
+            #         np.reshape(meta_dict['dt'], (meta_dict['n_seg'])))
             # print "Pow:", absrms_poweer[4,:]
 
-            # variance, aremes = xcor.var_and_rms(absrms_poweer, param_dict['df'][i])
+            # variance, aremes = xcor.var_and_rms(absrms_poweer, meta_dict['df'][i])
 
             # print aremes
 
 
 
 
-            # for i in range(param_dict['n_seg']):
-            #     absrms_pow = xcor.raw_to_absrms(ref_boot.power_array[0:param_dict['n_bins']/2+1, i], \
-            #             ref_boot.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
+            # for i in range(meta_dict['n_seg']):
+            #     absrms_pow = xcor.raw_to_absrms(ref_boot.power_array[0:meta_dict['n_bins']/2+1, i], \
+            #             ref_boot.mean_rate_array[i], meta_dict['n_bins'], meta_dict['dt'][i], \
             #             True)
             #     print "\tNew Pow:", absrms_pow[4], temp[4,i], absrms_pow[4] == temp[4,i]
             #
-            #     var, rms = xcor.var_and_rms(absrms_pow, param_dict['df'][i])
+            #     var, rms = xcor.var_and_rms(absrms_pow, meta_dict['df'][i])
             #
             #
             #     print "\tNew RMSs:", rms, absrms_rms[i], rms == absrms_rms[i]
@@ -359,16 +359,16 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
             ## Making means from segments
             ##############################
 
-            avg_boot_cross_spec, cross_spec, ci_boot, ref_boot, param_dict = \
+            avg_boot_cross_spec, cross_spec, ci_boot, ref_boot, meta_dict = \
                     xcor.alltogether_means(boot_cross_spec, ci_boot, \
-                    ref_boot, param_dict, bkgd_rate, True)
+                    ref_boot, meta_dict, bkgd_rate, True)
             # print "\tMade means from segments:", datetime.datetime.now()
 
             ######################
             ## Making lag spectra
             ######################
 
-            xcor.save_for_lags(out_file, in_file_list, param_dict, \
+            xcor.save_for_lags(out_file, in_file_list, meta_dict, \
                     ci_boot.mean_rate, ref_boot.mean_rate, boot_cross_spec, \
                     ci_boot.power, ref_boot.power)
 
@@ -378,13 +378,13 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
 
             if filtering:
                 ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(avg_boot_cross_spec, \
-                        param_dict, ci_boot.mean_rate, ref_boot.mean_rate, \
+                        meta_dict, ci_boot.mean_rate, ref_boot.mean_rate, \
                         ci_boot.power, ref_boot.power, True, lo_freq, hi_freq)
             else:
-                ccf_end = xcor.UNFILT_cs_to_ccf(avg_boot_cross_spec, param_dict, \
+                ccf_end = xcor.UNFILT_cs_to_ccf(avg_boot_cross_spec, meta_dict, \
                         ref_boot, True)
 
-                ccf_error = xcor.standard_ccf_err(boot_cross_spec, param_dict, \
+                ccf_error = xcor.standard_ccf_err(boot_cross_spec, meta_dict, \
                         ref_boot, noisy=True, absrms_var=boot_var, \
                         absrms_rms=boot_rms)
 
@@ -392,7 +392,7 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
             # print "ccf end:", ccf_end[1:3,1:3]
             # print "\tGoing to output:", datetime.datetime.now()
             # print "Exposure_time = %.3f seconds" % exposure
-            # print "Total number of segments:", param_dict['n_seg']
+            # print "Total number of segments:", meta_dict['n_seg']
             # print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
             # print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
             # print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
@@ -402,9 +402,9 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
             ## Output
             ##########
 
-            t = np.arange(0, param_dict['n_bins'])  ## gives the 'front of the bin'
+            t = np.arange(0, meta_dict['n_bins'])  ## gives the 'front of the bin'
 
-            mxcor.fits_out(out_file, in_file_list, bkgd_file, param_dict, \
+            mxcor.fits_out(out_file, in_file_list, bkgd_file, meta_dict, \
                         ci_boot.mean_rate, ref_boot.mean_rate, t, ccf_end, \
                         ccf_error, filtering, lo_freq, hi_freq)
 
@@ -414,9 +414,9 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
         ## Making means from segments
         ##############################
 
-        avg_cross_spec, cross_spec, ci_total, ref_total, param_dict = \
+        avg_cross_spec, cross_spec, ci_total, ref_total, meta_dict = \
                 xcor.alltogether_means(total_cross_spec, ci_total, \
-                ref_total, param_dict, bkgd_rate, True)
+                ref_total, meta_dict, bkgd_rate, True)
 
         ##############################################
         ## Computing ccf from cs, and computing error
@@ -424,18 +424,18 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
 
         if filtering:
             ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(avg_cross_spec, \
-                    param_dict, ci_total.mean_rate, ref_total.mean_rate, \
+                    meta_dict, ci_total.mean_rate, ref_total.mean_rate, \
                     ci_total.power, ref_total.power, True, lo_freq, hi_freq)
         else:
-            ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, param_dict, \
+            ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, meta_dict, \
                     ref_total, True)
 
-            ccf_error = xcor.standard_ccf_err(total_cross_spec, param_dict, \
+            ccf_error = xcor.standard_ccf_err(total_cross_spec, meta_dict, \
                     ref_total, True)
 
         # print "ccf end:", ccf_end[1:3,1:3]
-        # print "Exposure_time = %.3f seconds" % param_dict['exposure']
-        # print "Total number of segments:", param_dict['n_seg']
+        # print "Exposure_time = %.3f seconds" % meta_dict['exposure']
+        # print "Total number of segments:", meta_dict['n_seg']
         # print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
         # print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
         # print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
@@ -446,9 +446,9 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
         ##########
 
         out_file = out_root.replace("_b-", "")
-        t = np.arange(0, param_dict['n_bins'])  ## gives the 'front of the bin'
+        t = np.arange(0, meta_dict['n_bins'])  ## gives the 'front of the bin'
 
-        mxcor.fits_out(out_file, in_file_list, bkgd_file, param_dict, \
+        mxcor.fits_out(out_file, in_file_list, bkgd_file, meta_dict, \
                     ci_total.mean_rate, ref_total.mean_rate, t, ccf_end, \
                     ccf_error, filtering, lo_freq, hi_freq)
 
