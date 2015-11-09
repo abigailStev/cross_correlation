@@ -20,7 +20,7 @@ with a broad energy reference band, over multiple RXTE event-mode data files.
 """
 
 ################################################################################
-def dat_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total, \
+def dat_out(out_file, in_file_list, bkgd_file, meta_dict, mean_rate_ci_total, \
     mean_rate_ref_total, t, ccf, ccf_error, filtering):
     """
     Writes the cross-correlation function to a .dat output file.
@@ -39,7 +39,7 @@ def dat_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total, \
     bkgd_file : string
         Description.
 
-    param_dict : dict
+    meta_dict : dict
         Description.
 
     mean_rate_ci_total : np.array of floats
@@ -75,12 +75,12 @@ def dat_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total, \
         out.write("\n# Date(YYYY-MM-DD localtime): %s" % str(datetime.now()))
         out.write("\n# List of event lists: %s" % in_file_list)
         out.write("\n# Background spectrum: %s" % bkgd_file)
-        out.write("\n# Time bin size = %.21f seconds" % param_dict['dt'])
-        out.write("\n# Number of bins per segment = %d" % param_dict['n_bins'])
-        out.write("\n# DETCHANS = %d" % param_dict['detchans'])
+        out.write("\n# Time bin size = %.21f seconds" % meta_dict['dt'])
+        out.write("\n# Number of bins per segment = %d" % meta_dict['n_bins'])
+        out.write("\n# DETCHANS = %d" % meta_dict['detchans'])
         out.write("\n# Total exposure time = %d seconds" % \
-            (param_dict['n_seg'] * param_dict['n_seconds']))
-        out.write("\n# Total number of segments = %d " % param_dict['n_seg'])
+            (meta_dict['n_seg'] * meta_dict['n_seconds']))
+        out.write("\n# Total number of segments = %d " % meta_dict['n_seg'])
         out.write("\n# Mean count rate of ci = %s" % \
             str(list(mean_rate_ci_total)))
         out.write("\n# Mean count rate of ref band = %.5f" % \
@@ -92,21 +92,22 @@ def dat_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total, \
         out.write("\n# Column 66-129: Error on ccf per energy channel [count "\
             "rate]")
         out.write("\n# ")
-        for j in xrange(0, param_dict['n_bins']):
+        for j in xrange(0, meta_dict['n_bins']):
             out.write("\n%d" % t[j])
-            for i in xrange(0, param_dict['detchans']):
+            for i in xrange(0, meta_dict['detchans']):
                 out.write("\t%.6e" % ccf[j][i].real)
             if filtering:
-                for i in xrange(0, param_dict['detchans']):
+                for i in xrange(0, meta_dict['detchans']):
                     out.write("\t%.6e" % ccf_error[i].real)
             else:
-                for i in xrange(0, param_dict['detchans']):
+                for i in xrange(0, meta_dict['detchans']):
                     out.write("\t%.6e" % ccf_error[j][i].real)
 
 
 ################################################################################
-def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
+def fits_out(out_file, in_file_list, bkgd_file, meta_dict, mean_rate_ci_total,\
     mean_rate_ref_total, t, ccf, ccf_error, filtering, lo_freq, hi_freq):
+
     """
     Writes time bins and the cross-correlation function to a .fits output file.
 
@@ -124,7 +125,7 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
     bkgd_file : string
         Description.
 
-    param_dict : dict
+    meta_dict : dict
         Description.
 
     mean_rate_ci_total : np.array of floats
@@ -157,9 +158,9 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
     nothing
 
     """
-    # print "\nOutput sent to: %s" % out_file
+    print("\nOutput sent to: %s" % out_file)
 
-    chan = np.arange(0, param_dict['detchans'])
+    chan = np.arange(0, meta_dict['detchans'])
     energy_channels = np.tile(chan, len(t))
     if filtering:
         ccf_error = np.tile(ccf_error, len(t))
@@ -174,20 +175,20 @@ def fits_out(out_file, in_file_list, bkgd_file, param_dict, mean_rate_ci_total,\
     prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
     prihdr.set('EVTLIST', in_file_list)
     prihdr.set('BKGD', bkgd_file)
-    prihdr.set('DT', np.mean(param_dict['dt']), "seconds")
-    prihdr.set('DF', np.mean(param_dict['df']), "Hz")
-    prihdr.set('N_BINS', param_dict['n_bins'], "time bins per segment")
-    prihdr.set('SEC_SEG', param_dict['n_seconds'], "seconds per segment")
-    prihdr.set('NYQUIST', param_dict['nyquist'], "Hz")
-    prihdr.set('SEGMENTS', param_dict['n_seg'], "segments, of all data")
-    prihdr.set('EXPOSURE', param_dict['exposure'], "seconds of data used")
-    prihdr.set('DETCHANS', param_dict['detchans'], "Number of detector energy "\
+    prihdr.set('DT', np.mean(meta_dict['dt']), "seconds")
+    prihdr.set('DF', np.mean(meta_dict['df']), "Hz")
+    prihdr.set('N_BINS', meta_dict['n_bins'], "time bins per segment")
+    prihdr.set('SEC_SEG', meta_dict['n_seconds'], "seconds per segment")
+    prihdr.set('NYQUIST', meta_dict['nyquist'], "Hz")
+    prihdr.set('SEGMENTS', meta_dict['n_seg'], "segments, of all data")
+    prihdr.set('EXPOSURE', meta_dict['exposure'], "seconds of data used")
+    prihdr.set('DETCHANS', meta_dict['detchans'], "Number of detector energy "\
         "channels")
     prihdr.set('RATE_CI', str(mean_rate_ci_total.tolist()), "counts/second")
     prihdr.set('RATE_REF', mean_rate_ref_total, "counts/second")
     prihdr.set('FILTER', str(filtering))
     prihdr.set('FILTFREQ', "%f:%f" % (lo_freq, hi_freq))
-    prihdr.set('ADJUST', str(param_dict['adjust_seg']))
+    prihdr.set('ADJUST', str(meta_dict['adjust_seg']))
     prihdu = fits.PrimaryHDU(header=prihdr)
 
     ## Making FITS table (extension 1)
@@ -287,7 +288,7 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
 
     nyq_freq = 1.0 / (2.0 * dt)
     df = 1.0 / np.float64(n_seconds)
-    param_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
+    meta_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
                 'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
                 'detchans': detchans, 'filter': filtering, \
                 'adjust_seg': 0, 'exposure': 0}
@@ -295,17 +296,17 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     ci_total = xcor.Lightcurve()
     ref_total = xcor.Lightcurve()
     total_seg = 0
-    total_cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], \
+    total_cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], \
             1), dtype=np.complex128)
-    ci_total.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
+    ci_total.power = np.zeros((meta_dict['n_bins'], meta_dict['detchans']), \
             dtype=np.float64)
-    ci_total.power_array = np.zeros((param_dict['n_bins'], \
-            param_dict['detchans'], 1), dtype=np.float64)
-    ci_total.mean_rate = np.zeros(param_dict['detchans'])
-    ci_total.mean_rate_array = np.zeros((param_dict['detchans'], 1), \
+    ci_total.power_array = np.zeros((meta_dict['n_bins'], \
+            meta_dict['detchans'], 1), dtype=np.float64)
+    ci_total.mean_rate = np.zeros(meta_dict['detchans'])
+    ci_total.mean_rate_array = np.zeros((meta_dict['detchans'], 1), \
             dtype=np.float64)
-    ref_total.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
-    ref_total.power_array = np.zeros((param_dict['n_bins'], 1), \
+    ref_total.power = np.zeros(meta_dict['n_bins'], dtype=np.float64)
+    ref_total.power_array = np.zeros((meta_dict['n_bins'], 1), \
             dtype=np.float64)
     ref_total.mean_rate = 0
     ref_total.mean_rate_array = 0
@@ -314,9 +315,9 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     total_exposure = 0
 
 
-    print "\nDT = %.15f" % param_dict['dt']
-    print "N_bins = %d" % param_dict['n_bins']
-    print "Nyquist freq = %f" % param_dict['nyquist']
+    print "\nDT = %.15f" % meta_dict['dt']
+    print "N_bins = %d" % meta_dict['n_bins']
+    print "Nyquist freq = %f" % meta_dict['nyquist']
     print "Testing?", test
     print "Filtering?", filtering
     print "Adjusting QPO?", adjust
@@ -330,7 +331,7 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
         bkgd_rate = xcor.get_background(bkgd_file)
     else:
         print "No background spectrum."
-        bkgd_rate = np.zeros(param_dict['detchans'])
+        bkgd_rate = np.zeros(meta_dict['detchans'])
     print " "
 
     ##################################
@@ -340,12 +341,12 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     for in_file in input_files:
 
         if adjust:
-            param_dict['adjust_seg'] = adjust_segments[i]
+            meta_dict['adjust_seg'] = adjust_segments[i]
         else:
-            param_dict['adjust_seg'] = 0
+            meta_dict['adjust_seg'] = 0
 
         cross_spec, ci_whole, ref_whole, n_seg, dt_whole, df_whole, exposure = \
-                xcor.fits_in(in_file, param_dict, test)
+                xcor.fits_in(in_file, meta_dict, test)
 
         print "Segments for this file: %d\n" % n_seg
         total_cross_spec = np.dstack((total_cross_spec, cross_spec))
@@ -365,13 +366,13 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     ## End of for-loop
     print " "
 
-    param_dict['n_seg'] = total_seg
-    param_dict['exposure'] = total_exposure
+    meta_dict['n_seg'] = total_seg
+    meta_dict['exposure'] = total_exposure
     # print "DT array:", dt_total
     # print "df array:", df_total
-    param_dict['dt'] = dt_total
-    param_dict['df'] = df_total
-    param_dict['adjust_seg'] = adjust_segments
+    meta_dict['dt'] = dt_total
+    meta_dict['df'] = df_total
+    meta_dict['adjust_seg'] = adjust_segments
 
     print "Mean dt:", np.mean(dt_total)
     print "Mean df:", np.mean(df_total)
@@ -387,9 +388,9 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     ## Array processing and making means from segments
     ###################################################
 
-    avg_cross_spec, cross_spec, ci_total, ref_total, param_dict = \
+    avg_cross_spec, cross_spec, ci_total, ref_total, meta_dict = \
             xcor.alltogether_means(total_cross_spec, ci_total, ref_total, \
-            param_dict, bkgd_rate, False)
+            meta_dict, bkgd_rate, False)
 
     # print ci_total.mean_rate[1:3]
 
@@ -397,7 +398,7 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     ## Making lag spectra
     ######################
 
-    xcor.save_for_lags(out_file, in_file_list, param_dict, ci_total.mean_rate,
+    xcor.save_for_lags(out_file, in_file_list, meta_dict, ci_total.mean_rate,
         ref_total.mean_rate, avg_cross_spec, ci_total.power, ref_total.power)
 
     ##############################################
@@ -407,33 +408,33 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     print "Done saving lags"
 
     if filtering:
-        ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(avg_cross_spec, param_dict,
+        ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(avg_cross_spec, meta_dict,
             ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
             ref_total.power, True, lo_freq, hi_freq)
     else:
-        ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, param_dict, ref_total, \
+        ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, meta_dict, ref_total, \
                 True)
         print "Done with cs to ccf, going to compute error."
-        ccf_error = xcor.standard_ccf_err(cross_spec, param_dict, \
+        ccf_error = xcor.standard_ccf_err(cross_spec, meta_dict, \
                 ref_total, True)
 
     print "ccf end:", ccf_end[1:3,1:3]
 
-    print "e = ", param_dict['n_seconds'] * param_dict['n_seg']
-    print "Exposure_time = %.3f seconds" % param_dict['exposure']
-    print "Total number of segments:", param_dict['n_seg']
+    print "e = ", meta_dict['n_seconds'] * meta_dict['n_seg']
+    print "Exposure_time = %.3f seconds" % meta_dict['exposure']
+    print "Total number of segments:", meta_dict['n_seg']
     print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
     print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
     print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
     print "Mean rate for ref:", ref_total.mean_rate
 
-    t = np.arange(0, param_dict['n_bins'])  ## gives the 'front of the bin'
+    t = np.arange(0, meta_dict['n_bins'])  ## gives the 'front of the bin'
 
     ##########
     ## Output
     ##########
 
-    fits_out(out_file, in_file_list, bkgd_file, param_dict, ci_total.mean_rate,\
+    fits_out(out_file, in_file_list, bkgd_file, meta_dict, ci_total.mean_rate,\
             ref_total.mean_rate, t, ccf_end, ccf_error, filtering, lo_freq, \
             hi_freq)
 
