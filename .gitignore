@@ -1,8 +1,8 @@
-*.dat
 *.aux
 *.txt
 *.synctex.gz
-*.png
+*.pdf
+*.out
 *.xml
 
 # Whatever this is
