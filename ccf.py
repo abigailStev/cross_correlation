@@ -99,7 +99,7 @@ def fits_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci_whole, \
 
 
 ################################################################################
-def raw_to_absrms(power, mean_rate, n_bins, dt, noisy):
+def raw_to_absrms(power, mean_rate, n_bins, dt, noisy=True):
     """
     Normalizes the power spectrum to absolute rms^2 normalization.
 
@@ -120,7 +120,7 @@ def raw_to_absrms(power, mean_rate, n_bins, dt, noisy):
     noisy : boolean
         True if there is Poisson noise in the power spectrum (i.e., from real
         data), False if there is no noise in the power spectrum (i.e.,
-        simulations without Poisson noise).
+        simulations without Poisson noise). Default is True.
 
     Returns
     -------
@@ -129,15 +129,17 @@ def raw_to_absrms(power, mean_rate, n_bins, dt, noisy):
 
     """
     if noisy:
-        noise = 2.0 * mean_rate #*0.985
+        noise = 2.0 * mean_rate
     else:
         noise = 0.0
-
+    # print "Power shape:", np.shape(power)
+    # print "DT shape:", np.shape(dt)
+    # print "Noise shape:", np.shape(noise)
     return power * (2.0 * dt / np.float(n_bins)) - noise
 
 
 ################################################################################
-def raw_to_fracrms(power, mean_rate, n_bins, dt, noisy):
+def raw_to_fracrms(power, mean_rate, n_bins, dt, noisy=True):
     """
     Normalizes the power spectrum to fractional rms^2 normalization.
 
@@ -158,7 +160,7 @@ def raw_to_fracrms(power, mean_rate, n_bins, dt, noisy):
     noisy : boolean
         True if there is Poisson noise in the power spectrum (i.e., from real
         data), False if there is no noise in the power spectrum (i.e.,
-        simulations without Poisson noise).
+        simulations without Poisson noise). Default is True.
 
     Returns
     -------
@@ -175,7 +177,7 @@ def raw_to_fracrms(power, mean_rate, n_bins, dt, noisy):
 
 
 ################################################################################
-def raw_to_leahy(power, mean_rate, n_bins, dt, noisy):
+def raw_to_leahy(power, mean_rate, n_bins, dt, noisy=True):
     """
     Normalizes the power spectrum to Leahy normalization.
 
@@ -196,7 +198,7 @@ def raw_to_leahy(power, mean_rate, n_bins, dt, noisy):
     noisy : boolean
         True if there is Poisson noise in the power spectrum (i.e., from real
         data), False if there is no noise in the power spectrum (i.e.,
-        simulations without Poisson noise).
+        simulations without Poisson noise). Default is True.
 
     Returns
     -------
@@ -216,22 +218,24 @@ def raw_to_leahy(power, mean_rate, n_bins, dt, noisy):
 def var_and_rms(power, df):
     """
     Computes the variance and rms (root mean square) of a power spectrum.
-    Assumes the negative-frequency powers have been removed.
+    Assumes the negative-frequency powers have been removed. DOES NOT WORK ON
+    2-D POWER ARRAYS! Not sure why.
 
     Parameters
     ----------
     power : np.array of floats
-        2-D array of the raw power at each of the *positive* Fourier
-        frequencies.
+        1-D array (size = n_bins/2+1) of the raw power at each of the *positive*
+        Fourier frequencies.
 
     df : float
         The step size between Fourier frequencies.
 
     Returns
     -------
-    float
+    variance : float
         The variance of the power spectrum.
-    float
+
+    rms : float
         The rms of the power spectrum.
 
     """
@@ -239,7 +243,7 @@ def var_and_rms(power, df):
     # print "Shape power:", np.shape(power)
     # print "Nonzero power:", power[np.where(power<=0.0)]
     variance = np.sum(power * df, axis=0)
-
+    # print np.shape(variance)
     # print "Variance:", variance
     # if variance > 0:
     #     rms = np.sqrt(variance)
@@ -741,7 +745,8 @@ def FILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref,
 
 
 ################################################################################
-def standard_ccf_err(cs_array, param_dict, ref, noisy):
+def standard_ccf_err(cs_array, param_dict, ref, noisy=True, absrms_var=None, \
+        absrms_rms=None):
     """
     Computes the standard error on each ccf bin from the segment-to-segment
     variations. Use this for *UNFILTERED* CCFs. This error is not correlated
@@ -769,20 +774,23 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy):
     # print "Shape mean rate array:", np.shape(ref.mean_rate_array)
     # print "Shape power array:", np.shape(ref.power_array)
 
-    absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
-            ref.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
-            noisy) for i in range(param_dict['n_seg'])])
-    ## Note that here, the axes are weird, so it's size (n_seg, n_bins)
+    if absrms_var == None and absrms_rms == None:
+        absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
+                ref.mean_rate_array[i], param_dict['n_bins'], param_dict['dt'][i], \
+                noisy) for i in range(param_dict['n_seg'])])
+        ## Note that here, the axes are weird, so it's size (n_seg, n_bins)
 
-    # print "Shape absrms power:", np.shape(absrms_power)
-    # print "Num seg:", param_dict['n_seg']
+        # print "Shape absrms power:", np.shape(absrms_power)
+        # print "Num seg:", param_dict['n_seg']
 
-    absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
+        absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
 
-    # mask = np.isnan(absrms_rms)
-    # print "Mask:", mask
-    # print "Shape absrms var:", np.shape(absrms_var)
-    # print "Shape absrms rms:", np.shape(absrms_rms)
+        print absrms_rms
+        mask = np.isnan(absrms_rms)
+        print "Mask:", mask
+        print "Shape absrms var:", np.shape(absrms_var)
+        print "Shape absrms rms:", np.shape(absrms_rms)
+
     # print "Shape cs:", np.shape(cs_array)
 
     ccf_array = fftpack.ifft(cs_array, axis=0).real
@@ -810,7 +818,7 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy):
 
 
 ################################################################################
-def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy):
+def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy, rms=None):
     """
     Takes the iFFT of the cross spectrum to get the cross-correlation function,
     and computes the error on the cross-correlation function.
@@ -847,24 +855,27 @@ def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy):
     ######################################################
 
     ccf = fftpack.ifft(cs_avg, axis=0).real
+    if rms == None:
+        ## Get the variance and rms of the reference band
+        absrms = NormPSD()
+        fracrms = NormPSD()
 
-    ## Get the variance and rms of the reference band
-    absrms = NormPSD()
-    fracrms = NormPSD()
+        absrms.power = raw_to_absrms(ref.pos_power, ref.mean_rate, \
+                param_dict['n_bins'], np.mean(param_dict['dt']), noisy)
+        fracrms.power = raw_to_fracrms(ref.pos_power, ref.mean_rate, \
+                param_dict['n_bins'], np.mean(param_dict['dt']), noisy)
 
-    absrms.power = raw_to_absrms(ref.pos_power, ref.mean_rate, \
-            param_dict['n_bins'], np.mean(param_dict['dt']), noisy)
-    fracrms.power = raw_to_fracrms(ref.pos_power, ref.mean_rate, \
-            param_dict['n_bins'], np.mean(param_dict['dt']), noisy)
+    # 	## Getting rms of reference band, to normalize the ccf
+        absrms.var, absrms.rms = var_and_rms(absrms.power, np.mean(param_dict['df']))
+        fracrms.var, fracrms.rms = var_and_rms(fracrms.power, np.mean(param_dict['df']))
 
-# 	## Getting rms of reference band, to normalize the ccf
-    absrms.var, absrms.rms = var_and_rms(absrms.power, np.mean(param_dict['df']))
-    fracrms.var, fracrms.rms = var_and_rms(fracrms.power, np.mean(param_dict['df']))
-
-    # print "Ref band var:", absrms.var, "(abs rms)"
-    # print "Ref band rms:", absrms.rms, "(abs rms)"
-    # print "Ref band var:", fracrms.var, "(frac rms)"
-    # print "Ref band rms:", fracrms.rms, "(frac rms)"
+        # print "Ref band var:", absrms.var, "(abs rms)"
+        # print "Ref band rms:", absrms.rms, "(abs rms)"
+        # print "Ref band var:", fracrms.var, "(frac rms)"
+        # print "Ref band rms:", fracrms.rms, "(frac rms)"
+    else:
+        absrms = NormPSD()
+        absrms.rms = rms
 
     ## Dividing ccf by rms of signal in reference band
     ccf *= (2.0 / np.float(param_dict['n_bins']) / absrms.rms)
@@ -1314,9 +1325,9 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
     ci.mean_rate = seg_average(ci.mean_rate_array)
     ci.power = seg_average(ci.power_array)
     ref.power = seg_average(ref.power_array)
+    ref.mean_rate_array = np.reshape(ref.mean_rate_array, (param_dict['n_seg']))
     ref.mean_rate = seg_average(ref.mean_rate_array)
     avg_cross_spec = seg_average(cross_spec)
-
     # print ci.mean_rate[1:3]
     # print bkgd_rate[1:3]
 
