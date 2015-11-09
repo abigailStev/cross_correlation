@@ -43,7 +43,8 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time, plot_file,
 
 # #     ratio[27:, ] = 0
     ratio[28:,] = 0
-    out_file = "./temp.dat"
+    out_file = os.path.dirname(plot_file) + "/temp.dat"
+    print out_file
     R = ratio.flatten('C')
     comment_str = "From %s" % tab_file
     np.savetxt(out_file, R, comments=comment_str)
