@@ -22,7 +22,7 @@ __year__ = "2014-2015"
 
 ################################################################################
 def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time, plot_file,
-        energies=None, prefix="", tab_file=None):
+        energies=None, prefix="--", tab_file=None):
 
     ###################################################################
     ## Make a ratio of ccf to the mean count rate in the interest band
@@ -196,17 +196,16 @@ if __name__ == "__main__":
     ## Parsing input arguments and calling 'main'
     ##############################################
 
-    parser = argparse.ArgumentParser(usage="python plot_2d.py tab_file [-o " \
-            "plot_file] [-p prefix] [-e chan_to_en]", description="Plots the "\
-            "ccf of multiple energy channels in a 2D colour plot.", epilog="" \
-            "For optional arguments, default values are given in brackets at " \
-            "end of description.")
+    parser = argparse.ArgumentParser(usage="python plot_2d.py tab_file " \
+            "[OPTIONAL ARGUMENTS]", description=__doc__,
+            epilog="For optional arguments, default values are given in "\
+            "brackets at end of description.")
 
     parser.add_argument('tab_file', help="The file with the CCF table from "\
             "ccf.py or multi_ccf.py, in .fits format.")
 
-    parser.add_argument('-o', '--outfile', dest='plot_file', default="" \
-            "./ccf_2D.png", help="The file name to save the plot to. " \
+    parser.add_argument('-o', '--outfile', dest='plot_file', default=""\
+            "./ccf_2D.png", help="The file name to save the plot to. "\
              "[./ccf_2D.png]")
 
     parser.add_argument('-p', '--prefix', dest='prefix', default="--", \
@@ -214,12 +213,12 @@ if __name__ == "__main__":
              "proposal ID). [--]")
 
     parser.add_argument('-l', '--length', dest='t_length', default=100, \
-            type=tools.type_positive_int, help="Number of time bins to use " \
+            type=tools.type_positive_int, help="Number of time bins to use "\
             "along the x-axis. [100]")
 
-    parser.add_argument('-e', dest='chan_to_en', help="Table of actual energy " \
-            "boundaries for energy channels as made in channel_to_energy.py. " \
-            "If not given, plot will be vs detector mode energy channel. " \
+    parser.add_argument('-e', dest='chan_to_en', help="Table of actual energy "\
+            "boundaries for energy channels as made in channel_to_energy.py. "\
+            "If not given, plot will be vs detector mode energy channel. "\
             "[no default]")
 
     args = parser.parse_args()
@@ -228,11 +227,11 @@ if __name__ == "__main__":
     assert args.tab_file[-4:].lower() == "fits", "ERROR: Data file must be in "\
             ".fits format."
     if args.chan_to_en != None:  ## If args.chan_to_en exists as a variable
-        assert os.path.isfile(args.chan_to_en), "ERROR: Table of real energy " \
+        assert os.path.isfile(args.chan_to_en), "ERROR: Table of real energy "\
                 "per energy channel does not exist."
 
     ## Calling main
     main(args.tab_file, args.plot_file, args.prefix, args.t_length, \
-        args.chan_to_en)
+        chan_to_en=args.chan_to_en)
 
 ################################################################################
