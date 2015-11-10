@@ -108,24 +108,24 @@ if __name__ == "__main__":
     ## Parsing input arguments
     ###########################
 
-    parser = argparse.ArgumentParser(usage="python plot_ccf.py tab_file [-o \
-out_root] [-p prefix]", description="Plots the cross-correlation per energy \
-channel, in the time domain.", epilog="For optional arguments, default values \
-are given in brackets at end of description.")
+    parser = argparse.ArgumentParser(usage="python plot_ccf.py tab_file "\
+            "[OPTIONAL ARGUMENTS]", description=__doc__, epilog="For optional "\
+            "arguments, default values are given in brackets at end of "\
+            "description.")
 
-    parser.add_argument('tab_file', help="The table file, in .dat or .fits \
-format.")
+    parser.add_argument('tab_file', help="The table file, in .dat or .fits "\
+            "format.")
 
     parser.add_argument('-o', '--outroot', dest='out_root', default="./ccf", \
-help="The root of the filename to save the plot to. Energy channel will be \
-appended to name before saving. [./ccf]")
+            help="The root of the filename to save the plot to. Energy channel"\
+            "will be appended to name before saving. [./ccf]")
 
     parser.add_argument('-p', '--prefix', dest='prefix', default="--", \
-help="The identifying prefix of the data (object nickname or proposal ID). \
-[--]")
+            help="The identifying prefix of the data (object nickname or data "\
+            "ID). [--]")
 
     parser.add_argument('-e', '--ext', dest='plot_ext', default='png', \
-help="File extension for the plot. Do not include the '.' [png]")
+            help="File extension for the plot. Do not include the '.' [png]")
 
     args = parser.parse_args()
 
