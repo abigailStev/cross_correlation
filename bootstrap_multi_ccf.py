@@ -10,32 +10,11 @@ import numpy as np
 import tools  # at https://github.com/abigailStev/whizzy_scripts
 import ccf as xcor
 import multi_ccf as mxcor
+import ccf_lightcurves as ccf_lc
+
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2015"
-
-class Lightcurves(object):
-    def __init__(self, n_bins=8192, detchans=64, type='ci'):
-        self.type = type
-
-        if type.lower() == "ci":
-            self.power = np.zeros((n_bins, detchans), dtype=np.float64)
-            self.power_array = np.zeros((n_bins, detchans, 1), dtype=np.float64)
-            self.mean_rate = np.zeros(detchans)
-            self.mean_rate_array = np.zeros((detchans, 1), dtype=np.float64)
-        elif type.lower() == "ref":
-            self.power = np.zeros(n_bins, dtype=np.float64)
-            self.power_array = np.zeros((n_bins, 1), dtype=np.float64)
-            self.mean_rate = 0
-            self.mean_rate_array = 0
-        else:
-            self.mean_rate = 0
-            self.mean_rate_array = 0
-            self.power = 0
-            self.power_array = 0
-            self.pos_power = 0
-
-
 
 ################################################################################
 def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
@@ -125,9 +104,9 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     ## 'total' is over all data files (i.e., in multi_ccf.py)
     ## 'whole' is over one data file (i.e., in ccf.py)
 
-    ci_total = Lightcurves(n_bins=meta_dict['n_bins'],
+    ci_total = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ci')
-    ref_total = Lightcurves(n_bins=meta_dict['n_bins'],
+    ref_total = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ref')
     total_seg = 0
     total_cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'],
@@ -266,9 +245,9 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
             if test:
                 print "Segments:", random_segs
 
-            ci_boot = Lightcurves(n_bins=meta_dict['n_bins'], \
+            ci_boot = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'], \
                     detchans=meta_dict['detchans'], type='ci')
-            ref_boot = Lightcurves(n_bins=meta_dict['n_bins'], \
+            ref_boot = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'], \
                     detchans=meta_dict['detchans'], type='ref')
             boot_cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], \
                     1), dtype=np.complex128)
