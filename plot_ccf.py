@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+"""
+Plots the cross-correlation per energy channel, in the time domain.
+
+Enter   python plot_ccf.py -h   at the command line for help.
+"""
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,15 +12,8 @@ import matplotlib.font_manager as font_manager
 from matplotlib.ticker import MultipleLocator
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
+__year__ = "2014-2015"
 
-"""
-Plots the cross-correlation per energy channel, in the time domain.
-
-Enter   python plot_ccf.py -h   at the command line for help.
-
-2014-2015
-
-"""
 
 ################################################################################
 def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \

@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+"""
+Computes the cross-correlation function of narrow energy channels of interest
+with a broad energy reference band, using an RXTE event list.
+"""
 import argparse
 import numpy as np
 import sys
@@ -9,14 +14,7 @@ from astropy.io import fits
 import tools  # in https://github.com/abigailStev/whizzy_scripts
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
-
-"""
-Computes the cross-correlation function of narrow energy channels of interest
-with a broad energy reference band from RXTE event-mode data.
-
-2014-2015
-
-"""
+__year__ = "2014-2015"
 
 class Lightcurve(object):
     def __init__(self):
@@ -1497,11 +1495,10 @@ if __name__ == "__main__":
     ## Parsing input arguments and calling 'main'
     ##############################################
 
-    parser = argparse.ArgumentParser(usage="python ccf.py infile outfile [-b "\
-        "BKGD_SPECTRUM] [-n NUM_SECONDS] [-m DT_MULT] [-t {0,1}] [-f {0,1}]",
-        description="Computes the cross-correlation function of a channel of "\
-        "interest with a reference band.", epilog="For optional arguments, "\
-        "default values are given in brackets at end of description.")
+    parser = argparse.ArgumentParser(usage="python ccf.py infile outfile "\
+            "[OPTIONAL ARGUMENTS]", description=__doc__, epilog="For optional "\
+            "arguments, default values are given in brackets at the end of the"\
+            " description.")
 
     parser.add_argument('infile', help="The name of the .fits or .dat event "\
         "list containing both the reference band and the channels of interest. "\

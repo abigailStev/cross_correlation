@@ -1,5 +1,8 @@
 #!/usr/bin/env
-
+"""
+Computes the cross-correlation function of narrow energy channels of interest
+with a broad energy reference band, over multiple RXTE event lists.
+"""
 import argparse
 import numpy as np
 import os.path
@@ -10,14 +13,7 @@ import tools  # at https://github.com/abigailStev/whizzy_scripts
 import ccf as xcor
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
-
-"""
-Computes the cross-correlation function of narrow energy channels of interest
-with a broad energy reference band, over multiple RXTE event-mode data files.
-
-2014-2015
-
-"""
+__year__ = "2014-2015"
 
 ################################################################################
 def dat_out(out_file, in_file_list, bkgd_file, meta_dict, mean_rate_ci_total, \
@@ -448,10 +444,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(usage="python multi_ccf.py infile outfile"\
         " [-b BKGD_SPECTRUM] [-n NUM_SECONDS] [-m DT_MULT] [-t {0,1}] [-f "\
-        "{0,1}]", description="Computes the cross-correlation function of a "\
-        "channel of interest with a reference band, over multiple RXTE "\
-        "eventlists.", epilog="For optional arguments, default values are "\
-        "given in brackets at end of description.")
+        "{0,1}]", description=__doc__, epilog="For optional arguments, default"\
+        "values are given in brackets at end of description.")
 
     parser.add_argument('infile_list', help="The name of the ASCII "\
         "file listing the event lists to be used. One file per line. Each "\

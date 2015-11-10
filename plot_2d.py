@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+"""
+Plots the ccf in a 2D colour plot, as time bins vs either energy channel or keV
+energy.
+
+"""
 import argparse
 import numpy as np
 from astropy.io import fits
@@ -12,11 +18,7 @@ import tools  # at https://github.com/abigailStev/whizzy_scripts
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2014-2015"
-"""
-Plots the ccf in a 2D colour plot, as time bins vs either energy channel or keV
-energy.
 
-"""
 
 ################################################################################
 def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time, plot_file,

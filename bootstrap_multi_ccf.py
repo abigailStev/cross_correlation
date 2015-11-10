@@ -1,5 +1,10 @@
 #!/usr/bin/env python
-
+"""
+Bootstraps the cross-correlation function for a set of RXTE event lists to
+compute the errors on the phase-resolved energy spectra.
+Use with run_multi_ccf_bootstrap.sh and ccf_bootstrap.sh. See multi_ccf.py and
+ccf.py for more details.
+"""
 import argparse
 import numpy as np
 import tools  # at https://github.com/abigailStev/whizzy_scripts
@@ -8,14 +13,6 @@ import multi_ccf as mxcor
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2015"
-
-"""
-Bootstraps the cross-correlation function for a set of RXTE event lists to
-compute the errors on the phase-resolved energy spectra.
-Use with run_multi_ccf_bootstrap.sh and ccf_bootstrap.sh. See multi_ccf.py and
-ccf.py for more details.
-"""
-
 
 class Lightcurves(object):
     def __init__(self, n_bins=8192, detchans=64, type='ci'):
