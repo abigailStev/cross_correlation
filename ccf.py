@@ -1501,27 +1501,28 @@ if __name__ == "__main__":
             " description.")
 
     parser.add_argument('infile', help="The name of the .fits or .dat event "\
-        "list containing both the reference band and the channels of interest. "\
-        "Assumes channels of interest = PCU 2, ref band = all other PCUs.")
+            "list containing both the reference band and the channels of "\
+            "interest. Assumes channels of interest = PCU 2, ref band = all "\
+            "other PCUs.")
 
     parser.add_argument('outfile', help="The name the FITS file to write the "\
-        "cross-correlation function to.")
+            "cross-correlation function to.")
 
     parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
-        help="Name of the background spectrum (in pha/fits format).")
+            help="Name of the background spectrum (in pha/fits format).")
 
     parser.add_argument('-n', '--n_seconds', type=tools.type_power_of_two,
-        default=1, dest='n_seconds', help="Number of seconds in each Fourier"\
-        " segment. Must be a power of 2, positive, integer. [1]")
+            default=1, dest='n_seconds', help="Number of seconds in each "\
+            "Fourier segment. Must be a power of 2, positive, integer. [1]")
 
     parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two,
-        default=1, dest='dt_mult', help="Multiple of dt (dt is from data file)"\
-        " for timestep between bins. Must be a power of 2, positive, integer. "\
-        "[1]")
+            default=1, dest='dt_mult', help="Multiple of dt (dt is from data "\
+            "file) for timestep between bins. Must be a power of 2, positive, "\
+            "integer. [1]")
 
     parser.add_argument('-t', '--test', type=int, default=0, choices={0,1},
-        dest='test', help="Int flag: 0 if computing all segments, 1 if only "\
-        "computing one segment for testing. [0]")
+            dest='test', help="Int flag: 0 if computing all segments, 1 if "\
+            "only computing one segment for testing. [0]")
 
     parser.add_argument('-f', '--filter', default="no", dest='filter',
             help="Filtering the cross spectrum: 'no' for QPOs, or 'lofreq:"\
