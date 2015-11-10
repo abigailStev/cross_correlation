@@ -116,15 +116,15 @@ if __name__ == "__main__":
     parser.add_argument('tab_file', help="The table file, in .dat or .fits "\
             "format.")
 
-    parser.add_argument('-o', '--outroot', dest='out_root', default="./ccf", \
+    parser.add_argument('-o', '--outroot', dest='out_root', default="./ccf", 
             help="The root of the filename to save the plot to. Energy channel"\
             "will be appended to name before saving. [./ccf]")
 
-    parser.add_argument('-p', '--prefix', dest='prefix', default="--", \
+    parser.add_argument('-p', '--prefix', dest='prefix', default="--",
             help="The identifying prefix of the data (object nickname or data "\
             "ID). [--]")
 
-    parser.add_argument('-e', '--ext', dest='plot_ext', default='png', \
+    parser.add_argument('-e', '--ext', dest='plot_ext', default='png',
             help="File extension for the plot. Do not include the '.' [png]")
 
     args = parser.parse_args()
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     try:
         file_hdu = fits.open(args.tab_file)
     except IOError:
-        print( "\tERROR: File does not exist: %s" % args.tab_file )
+        print("\tERROR: File does not exist: %s" % args.tab_file)
         exit()
 
     table = file_hdu[1].data
@@ -148,8 +148,8 @@ if __name__ == "__main__":
     frac_time = int(1.0/dt)  ## each time bin represents 1/frac_time seconds
 
     for i in range(15, 16):
-#     for i in range(6, 7):
-        channel_mask = table.field('CHANNEL') == i  ## make data mask for the energy channels i want
+        ## Make data mask for the energy channels I want
+        channel_mask = table.field('CHANNEL') == i
         table_i = table[channel_mask]
         ccf = table_i.field('CCF')
         ccf_err = table_i.field('ERROR')
