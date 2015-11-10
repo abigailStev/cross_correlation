@@ -406,7 +406,7 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
     phase = -np.arctan2(cs_avg.imag, cs_avg.real) ## Negative sign is so that a positive lag is a hard energy lag?
     err_phase = get_phase_err(cs_avg, power_ci, np.resize(np.repeat(power_ref, \
             detchans), np.shape(power_ci)), 1, n_seg)
-    print np.shape(err_phase)
+    # print np.shape(err_phase)
     f = np.resize(np.repeat(freq, detchans), (len(freq), detchans))
     tlag = phase_to_tlags(phase, f, detchans)
     err_tlag = phase_to_tlags(err_phase, f, detchans)
@@ -415,27 +415,27 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
     f_span_low = np.argmax(freq == low_freq)
     f_span_hi = np.argmax(freq == hi_freq)
     f_span = f_span_hi - f_span_low
-    print "Fspan low:", f_span_low
-    print "Fspan hi:", f_span_hi
-    print "F span:", f_span
+    # print "Fspan low:", f_span_low
+    # print "Fspan hi:", f_span_hi
+    # print "F span:", f_span
     frange_freq = freq[f_span_low:f_span_hi+1]
     frange_cs = np.mean(cs_avg[f_span_low:f_span_hi+1, ], axis=0)
     frange_pow_ci = np.mean(power_ci[f_span_low:f_span_hi+1, ], axis=0)
     frange_pow_ref = np.repeat(np.mean(power_ref[f_span_low:f_span_hi+1]), \
             detchans)
-    print "Shape cs:", np.shape(frange_cs)
+    # print "Shape cs:", np.shape(frange_cs)
     e_phase = -np.arctan2(frange_cs.imag, frange_cs.real)
     e_err_phase = get_phase_err(frange_cs, frange_pow_ci, frange_pow_ref, \
             f_span, n_seg)
-    print "Shape err phase:", np.shape(e_err_phase)
+    # print "Shape err phase:", np.shape(e_err_phase)
     f = np.repeat(np.mean(frange_freq), detchans)
-    print "Shape phase:", np.shape(e_phase)
-    print "Shape f:", np.shape(f)
+    # print "Shape phase:", np.shape(e_phase)
+    # print "Shape f:", np.shape(f)
 # 	exit()
     e_tlag = phase_to_tlags(e_phase, f, detchans)
-    print "Shape tlag:", np.shape(e_tlag)
+    # print "Shape tlag:", np.shape(e_tlag)
     e_err_tlag = phase_to_tlags(e_err_phase, f, detchans)
-    print "Shape err tlag:", np.shape(e_err_tlag)
+    # print "Shape err tlag:", np.shape(e_err_tlag)
 
     chan = np.arange(0, detchans)
     energy_channels = np.tile(chan, len(freq))
@@ -512,10 +512,10 @@ def save_for_lags(out_file, in_file, param_dict, mean_rate_ci, mean_rate_ref,
     ## Getting the Fourier frequencies for the cross spectrum
     freq = fftpack.fftfreq(param_dict['n_bins'], d=np.mean(param_dict['dt']))
     nyq_index = param_dict['n_bins']/2
-    print "Nyquist frequency:", freq[nyq_index]
-    print "One before nyquist:", freq[nyq_index-1]
-    print "One after nyquist:", freq[nyq_index+1]
-    print "Should be the nyquist frequency:", param_dict['nyquist']
+    # print "Nyquist frequency:", freq[nyq_index]
+    # print "One before nyquist:", freq[nyq_index-1]
+    # print "One after nyquist:", freq[nyq_index+1]
+    # print "Should be the nyquist frequency:", param_dict['nyquist']
     # assert np.abs(freq[nyq_index]) == param_dict['nyquist']
 
     ## Only keeping the parts associated with positive Fourier frequencies
@@ -783,11 +783,11 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy=True, absrms_var=None, \
 
         absrms_var, absrms_rms = var_and_rms(absrms_power.T, param_dict['df'])
 
-        print absrms_rms
+        # print absrms_rms
         mask = np.isnan(absrms_rms)
-        print "Mask:", mask
-        print "Shape absrms var:", np.shape(absrms_var)
-        print "Shape absrms rms:", np.shape(absrms_rms)
+        # print "Mask:", mask
+        # print "Shape absrms var:", np.shape(absrms_var)
+        # print "Shape absrms rms:", np.shape(absrms_rms)
 
     # print "Shape cs:", np.shape(cs_array)
 
