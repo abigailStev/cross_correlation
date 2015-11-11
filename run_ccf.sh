@@ -38,7 +38,7 @@ obsID="95335-01-01-05"
 dt=64
 numsec=64
 testing=0  # 0 for no, 1 for yes
-tlen=70
+tlen=40
 obs_epoch=5
 
 home_dir=$(ls -d ~) 
@@ -57,8 +57,8 @@ ec_table_file="$xte_exe_dir/e-c_table.txt"
 chan_bin_file="$home_dir/Reduced_data/${prefix}/chan.txt"
 energies_file="$home_dir/Reduced_data/${prefix}/energies.txt"
 
-filename="${obsID}_${day}_t${dt}_${numsec}sec_adj"
-#filename="${obsID}_${day}_t${dt}_${numsec}sec"
+#filename="${obsID}_${day}_t${dt}_${numsec}sec_adj"
+filename="${obsID}_${day}_t${dt}_${numsec}sec"
 
 
 #filtfreq="401:401"
@@ -83,17 +83,17 @@ fi
 ## Running ccf.py
 ##################
 
-if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
-	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
-		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" \
-		-a 932
-elif [ -e "$in_file" ]; then
-	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
-		-n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" -a 932
-else
-	echo -e "\tERROR: ccf.py was not run. Eventlist and/or background energy \
-spectrum doesn't exist."
-fi
+#if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
+#	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
+#		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" \
+#		-a 932
+#elif [ -e "$in_file" ]; then
+#	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
+#		-n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" -a 932
+#else
+#	echo -e "\tERROR: ccf.py was not run. Eventlist and/or background energy \
+#spectrum doesn't exist."
+#fi
 
 
 #################
@@ -146,7 +146,7 @@ detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fit
 if [ -e "$out_dir/temp.dat" ]; then
 	fimgcreate bitpix=-32 \
 		naxes="${tlen},${detchans}" \
-		datafile="$exe_dir/temp.dat" \
+		datafile="$out_dir/temp.dat" \
 		outfile="${plot_file}" \
 		nskip=1 \
 		history=true \
@@ -176,8 +176,10 @@ fi
 if [ -e "${out_file}.${t_ext}" ]; then
 	python "$lag_exe_dir"/plot_lags.py "${out_file}.${t_ext}" -o "${out_file}" \
 		-p "${prefix}/${obsID}"
-	if [ -e "$out_file"_lag-energy.png ]; then open "$out_file"_lag-energy.png; fi
-	if [ -e "$out_file"_lag-freq_15.png ]; then open "$out_file"_lag-freq_15.png; fi
+	if [ -e "$out_file"_lag-energy.png ]; then open "$out_file"_lag-energy.png
+	fi
+	if [ -e "$out_file"_lag-freq_15.png ]; then open "$out_file"_lag-freq_15.png
+	fi
 else
 	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
 fi
