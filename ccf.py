@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Computes the cross-correlation function of narrow energy channels of interest
-with a broad energy reference band, using an RXTE event list.
+with a broad energy reference band, using an RXTE .fits event list.
 """
 import argparse
 import numpy as np
@@ -12,24 +12,10 @@ import os
 import subprocess
 from astropy.io import fits
 import tools  # in https://github.com/abigailStev/whizzy_scripts
+import ccf_lightcurves as ccf_lc
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
-__year__ = "2014-2015"
-
-class Lightcurve(object):
-    def __init__(self):
-        self.mean_rate = 0
-        self.mean_rate_array = 0
-        self.power = 0
-        self.power_array = 0
-        self.pos_power = 0
-
-class NormPSD(object):
-    def __init__(self):
-        self.power = 0
-        self.noise = 0
-        self.variance = 0
-        self.rms = 0
+__year__ = "2014-2015
 
 
 ################################################################################
@@ -760,7 +746,7 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy=True, absrms_var=None, \
     param_dict : dictionary
         Descriptoin
 
-    ref : class Lightcurve
+    ref : ccf_lc.Lightcurves object
         Description.
 
     Returns
@@ -829,7 +815,7 @@ def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy, rms=None):
     param_dict : dict
         Dictionary of necessary meta-parameters for data analysis.
 
-    ref : Lightcurve object
+    ref : ccf_lc.Lightcurves object
         The reference band light curve and power.
 
     noisy : bool
@@ -855,8 +841,8 @@ def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy, rms=None):
     ccf = fftpack.ifft(cs_avg, axis=0).real
     if rms == None:
         ## Get the variance and rms of the reference band
-        absrms = NormPSD()
-        fracrms = NormPSD()
+        absrms = ccf_lc.NormPSD()
+        fracrms = ccf_lc.NormPSD()
 
         absrms.power = raw_to_absrms(ref.pos_power, ref.mean_rate, \
                 param_dict['n_bins'], np.mean(param_dict['dt']), noisy)
@@ -872,7 +858,7 @@ def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy, rms=None):
         # print "Ref band var:", fracrms.var, "(frac rms)"
         # print "Ref band rms:", fracrms.rms, "(frac rms)"
     else:
-        absrms = NormPSD()
+        absrms = ccf_lc.NormPSD()
         absrms.rms = rms
 
     ## Dividing ccf by rms of signal in reference band
@@ -882,30 +868,66 @@ def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy, rms=None):
 
 
 ################################################################################
-def stack_reference_band(rate_ref_2d, obs_epoch):
+def stack_reference_band(rate_ref_2d, instrument="PCA", obs_epoch=5):
     """
-    WARNING: Only tested with RXTE event-mode detector channels, 0-63 incl.
+    Stacks the photons in the reference band from 3-20 keV to make one broad
+    reference band.
+    WARNING: Only tested with RXTE PCA event-mode detector channels, 0-63 incl.
 
-    Stacks the photons in the reference band from 3-20 keV to make one 'band'.
-    Assumes that we are in epoch 5 or 3.
-    Should I be using chan.txt to assist with this?
-
+    RXTE PCA, 3-20 keV:
     Epoch 1: abs channels 10 - 74
     Epoch 2: abs channels 9 - 62
     Epoch 3: abs channels 7 - 54
     Epoch 4: abs channels 6 - 46
     Epoch 5: abs channels 6 - 48
 
+    TODO: Let user input the keV energy range for the reference band, use a
+    variety of instruments, use chan.txt to convert from keV bounds to energy
+    channels for the actual column selecting.
+
+    Parameters
+    ----------
+    rate_ref_2d : np.array of floats
+        2-D array of the reference band light curve, with
+        size=(n_bins, detchans).
+
+    instrument : str
+        Name of the instrument of the reference band light curve. Currently
+        only supports "PCA", as in the RXTE PCA. [PCA]
+
+    obs_epoch : int
+        If the instrument requires an observation epoch, note that here. For the
+        RXTE PCA, the energy channel to keV mapping changes over the epochs. [5]
+
+    Returns
+    -------
+    rate_ref : np.array of floats
+        1-D array of the reference band light curve, with size=(n_bins), summed
+        along the energy channel axis!
+
     """
-    if obs_epoch == 5:
-        rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
-        # channel 2 to 25 inclusive
-        # rate_ref = np.sum(rate_ref_2d[:, 5:100], axis=1)  # EPOCH 5
-    elif obs_epoch == 3:
-        rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
-        # channel 3 to 28 inclusive
+    if instrument.lower() == "PCA":
+        if obs_epoch == 5:
+            rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
+            # channel 2 to 25 inclusive
+            #
+        elif obs_epoch == 3:
+            rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
+            # channel 3 to 28 inclusive
+        else:
+            rate_ref = np.sum(rate_ref_2d, axis=1) # Summing all of it.
+            raise Warning("Reference band is not being properly stacked. Need "\
+                          "to put in channel information for your specific "\
+                          "RXTE PCA epoch.")
+
+    elif instrument.lower() == "NICER":
+        rate_ref = np.sum(rate_ref_2d[:, 5:100], axis=1)
+
     else:
-        rate_ref = np.sum(rate_ref_2d[:, 3:32], axis=1)  # TEMP, NOT FOR REALS
+        rate_ref = np.sum(rate_ref_2d, axis=1) # Summing all of it.
+        raise Warning("Reference band is not being properly stacked. Need "\
+                          "to put in channel information for your specific "\
+                          "instrument.")
 
     return rate_ref
 
@@ -915,6 +937,30 @@ def make_cs(rate_ci, rate_ref, param_dict):
     """
     Generating the cross spectrum for one segment of the light curve.
 
+    Parameters
+    ----------
+    rate_ci : np.array of floats
+        2-D array of the channel of interest light curve,
+        Size = (n_bins, detchans).
+
+    rate_ref : np.array of floats
+        1-D array of the reference band lightcurve, Size = (n_bins).
+
+    param_dict : dict
+        Dictionary of necessary meta-parameters for data analysis.
+
+    Returns
+    -------
+    cs_seg : np.array of complex numbers
+        2-D array of the cross spectrum of each channel of interest with the
+        reference band.
+
+    ci_seg : ccf_lc.Lightcurves object
+        The channel of interest light curve.
+
+    ref_seg : ccf_lc.Lightcurves object
+        The reference band light curve.
+
     """
     assert np.shape(rate_ci) == (param_dict['n_bins'], param_dict['detchans']),\
         "ERROR: CoI light curve has wrong dimensions. Must have size (n_bins, "\
@@ -922,8 +968,10 @@ def make_cs(rate_ci, rate_ref, param_dict):
     assert np.shape(rate_ref) == (param_dict['n_bins'], ), "ERROR: Reference "\
         "light curve has wrong dimensions. Must have size (n_bins, )."
 
-    ci_seg = Lightcurve()
-    ref_seg = Lightcurve()
+    ci_seg = ccf_lc.Lightcurves(n_bins=param_dict['n_bins'],
+            detchans=param_dict['detchans'], type='ci')
+    ref_seg = ccf_lc.Lightcurves(n_bins=param_dict['n_bins'],
+            detchans=param_dict['detchans'], type='ref')
 
     ## Computing the mean count rate of the segment
     ci_seg.mean_rate = np.mean(rate_ci, axis=0)
@@ -959,6 +1007,50 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
     """
     Turns the event list into a populated histogram, stacks the reference band,
     and makes the cross spectrum, per segment of light curve.
+
+    Parameters
+    ----------
+    time_ci : np.array of floats
+        1-D array of the photon arrival times of events in this segment for the
+        channel of interest.
+
+    time_ref : np.array of floats
+        1-D array of the photon arrival times of events in this segment for the
+        reference band.
+
+    energy_ci : np.array of ints
+        1-D array of the energy channels of events in this segment for the
+        channel of interest.
+
+    energy_ref : np.array of ints
+        1-D array of the energy channels of events in this segment for the
+        reference band.
+
+    param_dict : dict
+        Dictionary of necessary meta-parameters for data analysis.
+
+    start_time : float
+        Starting time of the segment (front of bin), in whatever units time_ci
+        and time_ref are in.
+
+    end_time : float
+        End time of the segment (back of bin), in whatever units time_ci,
+        time_ref, and start_time are in.
+
+    Returns
+    -------
+    cs_seg : np.array of complex numbers
+        The cross spectrum of the channels of interest with the reference band
+        for this segment of data. Size=(n_bins, detchans).
+
+    ci_seg : ccf_lc.Lightcurves object
+        The channels of interest light curve.
+
+    ref_seg : ccf_lc.Lightcurves object
+        The reference band light curve.
+
+    np.mean(rate_ci_2d) : float
+        The total mean count rate of the channels of interest.
 
     """
     assert len(time_ci) == len(energy_ci)
@@ -1010,7 +1102,7 @@ def fits_in(in_file, param_dict, test=False):
         The full path of the FITS data file being analyzed.
 
     param_dict : dictionary
-        Control parameters for the data analysis.
+        Dictionary of necessary meta-parameters for data analysis.
 
     test : boolean
         True if only running one segment of data for testing, False if analyzing
@@ -1018,18 +1110,31 @@ def fits_in(in_file, param_dict, test=False):
 
     Returns
     -------
-    3-D np.array of floats
-        The raw cross spectrum, per segment.
-        Dimensions: [n_bins, DETCHAN, n_seg]
+   cross_spec:  np.array of floats
+        3-D array of the raw cross spectrum, per segment.
+        Dimensions: [n_bins, detchans, n_seg]
 
-    Lightcurve object
+    ci_whole : ccf_lc.Lightcurves object
         Channel of interest for this data file.
 
-    Lightcurve object
+    ref_whole : ccf_lc.Lightcurves object
         Reference band for this data file.
 
-    int
+    n_seg : int
         Number of segments in this data file.
+
+    dt_whole : np.array of floats
+        1-D array of timestep between light curve bins for each segment. These
+        will be different if artificially adjusting the QPO frequency in Fourier
+        space (currently only doing that per data file, not per segment).
+
+    df_whole : np.array of floats
+        1-D array of frequency step between Fourier bins for each segment. These
+        will be different if artificially adjusting the QPO frequency in Fourier
+        space (currently only doing that per data file, not per segment).
+
+    exposure : float
+        The total (used) exposure of the data file.
 
     """
 
@@ -1066,22 +1171,24 @@ def fits_in(in_file, param_dict, test=False):
     ###################
 
     n_seg = 0
-    ci_whole = Lightcurve()
-    ref_whole = Lightcurve()
+    ci_whole = ccf_lc.Lightcurves(n_bins=param_dict['n_bins'],
+            detchans=param_dict['detchans'], type='ci')
+    ref_whole = ccf_lc.Lightcurves(n_bins=param_dict['n_bins'],
+            detchans=param_dict['detchans'], type='ref')
     cross_spec = np.zeros((param_dict['n_bins'], param_dict['detchans'], 1), \
             dtype=np.complex128)
-    ci_whole.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
-            dtype=np.float64)
-    ci_whole.power_array = np.zeros((param_dict['n_bins'], \
-            param_dict['detchans'], 1), dtype=np.float64)
-    ref_whole.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
-    ref_whole.power_array = np.zeros((param_dict['n_bins'], 1), \
-            dtype=np.float64)
-    ci_whole.mean_rate = np.zeros(param_dict['detchans'], dtype=np.float64)
-    ci_whole.mean_rate_array = np.zeros((param_dict['detchans'], 1),
-            dtype=np.float64)
-    ref_whole.mean_rate = 0
-    ref_whole.mean_rate_array = 0
+    # ci_whole.power = np.zeros((param_dict['n_bins'], param_dict['detchans']), \
+    #         dtype=np.float64)
+    # ci_whole.power_array = np.zeros((param_dict['n_bins'], \
+    #         param_dict['detchans'], 1), dtype=np.float64)
+    # ref_whole.power = np.zeros(param_dict['n_bins'], dtype=np.float64)
+    # ref_whole.power_array = np.zeros((param_dict['n_bins'], 1), \
+    #         dtype=np.float64)
+    # ci_whole.mean_rate = np.zeros(param_dict['detchans'], dtype=np.float64)
+    # ci_whole.mean_rate_array = np.zeros((param_dict['detchans'], 1),
+    #         dtype=np.float64)
+    # ref_whole.mean_rate = 0
+    # ref_whole.mean_rate_array = 0
     dt_whole = np.array([])
     df_whole = np.array([])
     exposure = 0
@@ -1226,6 +1333,22 @@ def fits_in(in_file, param_dict, test=False):
 
 ################################################################################
 def seg_average(array):
+    """
+    Takes the average of an array over all the segments (i.e., the last axis).
+
+    Parameters
+    ----------
+    array : np.array of numbers
+        Arbitrary-dimensioned array of numbers, where the last axis is the
+        segments.
+
+    Returns
+    -------
+    np.mean(array, axis=-1)
+        The mean of the array down the last axis, i.e. averaged over the
+        segments of data.
+
+    """
     return np.mean(array, axis=-1)
 
 ################################################################################
@@ -1236,15 +1359,15 @@ def get_background(bkgd_file):
     Parameters
     ----------
     bkgd_file : string
-        The full path name of the file containing the background energy
+        The full path name of the .pha file containing the background energy
         spectrum for the channels of interest, with energy channels binned in
         the same way as the data file.
 
     Returns
     -------
-    np.array of floats
-        The count rate per energy channel of the background energy spectrum for
-        the channels of interest.
+    rate : np.array of floats
+        1-D array of the count rate per energy channel of the background energy
+        spectrum for the channels of interest.
 
     """
 
@@ -1266,10 +1389,64 @@ def get_background(bkgd_file):
     return rate
 
 ################################################################################
-def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
+def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot=False):
+    """
+    Takes the means of all the data (cross spectrum, power spectra, mean count
+    rates) across the segments. If boot=False, first checks for and removes
+    segments where the reference band power has a negative variance, then takes
+    the average across the kept segments.
 
+    Parameters
+    ----------
+    cross_spec : np.array of complex numbers
+        3-dimensional array of the cross spectrum of the channels of interest
+        with the reference band. Size = (n_bins, detchans, n_seg)
+
+    ci : ccf_lc.Lightcurves object
+        The channels of interest.
+
+    ref : ccf_lc.Lightcurves object
+        The reference band.
+
+    param_dict : dict
+        Dictionary of necessary meta-parameters for data analysis.
+
+    bkgd_rate : np.array of floats
+        1-D array of the background spectrum in units of count rate for the
+        channels of interest. Size = (detchans).
+
+    boot : bool
+        If True, this method is being called by the bootstrapping and thus
+        doesn't need to check for negative variance of power spectra of segments
+        in the reference band, as this has already been done. [False]
+
+    Returns
+    -------
+    avg_cross_spec : np.array of floats
+        The segment-averaged cross spectrum of the channels of interest with the
+        reference band. Size = (n_bins, detchans).
+
+    cross_spec : np.array of floats
+        The cross spectrum. If boot=False, has the bad segments removed. If
+        boot=True, it's the same as the cross_spec that was input.
+        Size = (n_bins, detchans, n_seg) where n_seg has removed bad segments.
+
+    ci : ccf_lc.Lightcurves object
+        Channels of interest, with power and mean_rate assigned. If boot=False,
+        power_array and mean_rate_array have bad segments removed.
+
+    ref : ccf_lc.Lightcurves object
+        Reference band, with power and mean_rate assigned. If boot=False,
+        power_array and mean_rate_array have bad segments removed.
+
+    param_dict : dict
+        Dictionary of necessary meta-parameters for data analysis. If
+        boot=False, exposure and n_seg have been updated.
+
+    """
     if not boot:
         ## Already do this before selecting random segments for bootstrapped ccf
+        ## which is why it isn't done if called by bootstrapping
 
         ##################################################
         ## Removing the segments with a negative variance
@@ -1347,8 +1524,8 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot):
 
 
 ################################################################################
-def main(in_file, out_file, bkgd_file, n_seconds, dt_mult, test, filtering, \
-        lo_freq, hi_freq, adjust_seg):
+def main(in_file, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
+        test=False, filtering=False, lo_freq=0.0, hi_freq=0.0, adjust_seg=0):
     """
     Reads in one event list, splits into reference band and channels of
     interest (CoI), makes segments and populates them to give them length
@@ -1356,6 +1533,52 @@ def main(in_file, out_file, bkgd_file, n_seconds, dt_mult, test, filtering, \
     then averaged cross spectrum of all the segments per energy channel, and
     then computes the cross-correlation function (ccf) per energy channel.
 
+    Parameters
+    ----------
+    in_file : str
+        The name of the .fits event list containing both the reference band and
+        the channels of interest. Assumes channels of interest = PCU 2, ref
+        band = all other PCUs.
+
+    out_file : str
+        The name the FITS file to write the cross-correlation function to.
+
+    bkgd_file : str
+        Name of the background spectrum (in .pha format), with the same energy
+        channel binning as the event list. [None]
+
+    n_seconds : int
+        Number of seconds in each Fourier segment. Must be a power of 2,
+        positive. [64]
+
+    dt_mult : int
+        Multiple of dt (dt is from data file) for timestep between bins. Must be
+        a power of 2, positive. [64]
+
+    test : bool
+        If true, only computes one segment of data. If false, runs like normal.
+        [False]
+
+    filtering : bool
+        If true, filters the cross spectrum in frequency space using lo_freq and
+        hi_freq as boundaries. [False]
+
+    lo_freq : float
+        The lower frequency bound for filtering the cross spectrum, in Hz. Only
+        in effect if filtering=True. [0.0]
+
+    hi_freq : float
+        The upper frequency bound for filtering the cross spectrum, in Hz. Only
+        in effect if filtering=True. Must be hi_freq >= lo_freq (checked with
+        assert statement). [0.0]
+
+    adjust_seg : int
+        How much to adjust each n_bin by to artificially shift the QPO in
+        frequency. [0]
+
+    Returns
+    -------
+    nothing
     """
 
     #####################################################
@@ -1364,6 +1587,8 @@ def main(in_file, out_file, bkgd_file, n_seconds, dt_mult, test, filtering, \
 
     assert n_seconds > 0, "ERROR: n_seconds must be a positive integer."
     assert dt_mult >= 1, "ERROR: dt_mult must be a positive integer."
+    assert hi_freq >= lo_freq, "ERROR: Upper bound of frequency filtering must"\
+            " be equal to or greater than the lower bound."
 
     ##################################################
     ## Initializations; 'whole' is over one data file
@@ -1500,7 +1725,7 @@ if __name__ == "__main__":
             "arguments, default values are given in brackets at the end of the"\
             " description.")
 
-    parser.add_argument('infile', help="The name of the .fits or .dat event "\
+    parser.add_argument('infile', help="The name of the .fits event "\
             "list containing both the reference band and the channels of "\
             "interest. Assumes channels of interest = PCU 2, ref band = all "\
             "other PCUs.")
@@ -1509,16 +1734,17 @@ if __name__ == "__main__":
             "cross-correlation function to.")
 
     parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
-            help="Name of the background spectrum (in pha/fits format).")
+            default=None, help="Name of the background spectrum (in .pha "\
+            "format), with the same energy channel binning as the event list.")
 
     parser.add_argument('-n', '--n_seconds', type=tools.type_power_of_two,
-            default=1, dest='n_seconds', help="Number of seconds in each "\
-            "Fourier segment. Must be a power of 2, positive, integer. [1]")
+            default=64, dest='n_seconds', help="Number of seconds in each "\
+            "Fourier segment. Must be a power of 2, positive, integer. [64]")
 
     parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two,
-            default=1, dest='dt_mult', help="Multiple of dt (dt is from data "\
+            default=64, dest='dt_mult', help="Multiple of dt (dt is from data "\
             "file) for timestep between bins. Must be a power of 2, positive, "\
-            "integer. [1]")
+            "integer. [64]")
 
     parser.add_argument('-t', '--test', type=int, default=0, choices={0,1},
             dest='test', help="Int flag: 0 if computing all segments, 1 if "\
@@ -1551,7 +1777,9 @@ if __name__ == "__main__":
             Exception("Filter keyword used incorrectly. Acceptable inputs are "\
                       "'no' or 'low:high'.")
 
-    main(args.infile, args.outfile, args.bkgd_file, args.n_seconds,
-        args.dt_mult, test, filtering, lo_freq, hi_freq, args.adjust)
+    main(args.infile, args.outfile, bkgd_file=args.bkgd_file,
+            n_seconds=args.n_seconds, dt_mult=args.dt_mult, test=test,
+            filtering=filtering, lo_freq=lo_freq, hi_freq=hi_freq,
+            adjust=args.adjust)
 
 ################################################################################
