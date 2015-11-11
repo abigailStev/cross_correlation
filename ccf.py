@@ -15,7 +15,7 @@ import tools  # in https://github.com/abigailStev/whizzy_scripts
 import ccf_lightcurves as ccf_lc
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
-__year__ = "2014-2015
+__year__ = "2014-2015"
 
 
 ################################################################################
@@ -323,7 +323,7 @@ def get_phase_err(cs_avg, power_ci, power_ref, n, m):
     with np.errstate(all='ignore'):
         a = power_ci * power_ref
         coherence = np.where(a != 0, np.abs(cs_avg)**2 / a, 0)
-        print np.shape(coherence)
+        # print np.shape(coherence)
         phase_err = np.sqrt(np.where(coherence != 0, (1 - coherence) / \
                 (2 * coherence * n * m), 0))
 
@@ -1004,6 +1004,7 @@ def UNFILT_cs_to_ccf(cs_avg, param_dict, ref, noisy, rms=None):
     ######################################################
 
     ccf = fftpack.ifft(cs_avg, axis=0).real
+
     if rms == None:
         ## Get the variance and rms of the reference band
         absrms = ccf_lc.NormPSD()
@@ -1071,7 +1072,7 @@ def stack_reference_band(rate_ref_2d, instrument="PCA", obs_epoch=5):
         along the energy channel axis!
 
     """
-    if instrument.lower() == "PCA":
+    if instrument.upper() == "PCA":
         if obs_epoch == 5:
             rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
             # channel 2 to 25 inclusive
@@ -1233,7 +1234,8 @@ def each_segment(time_ci, time_ref, energy_ci, energy_ref, param_dict,\
         start_time, end_time)
 
     ## Stack the reference band
-    rate_ref = stack_reference_band(rate_ref_2d, param_dict['obs_epoch'])
+    rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
+                                    obs_epoch=param_dict['obs_epoch'])
 
     ## Save the reference band light curve to a text file
 # 	out_file="./GX339-BQPO_ref_lc.dat"
@@ -1631,8 +1633,8 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot=False):
         # print "Shape absrms rms:", np.shape(absrms_rms)
 
         mask = np.isnan(absrms_rms)
-        print type(mask)
-        print np.shape(mask)
+        # print type(mask)
+        # print np.shape(mask)
         # with open("mask.txt", 'w') as out:
         #     for element in mask:
         #         out.write("%s \n" % str(element))
@@ -1644,10 +1646,10 @@ def alltogether_means(cross_spec, ci, ref, param_dict, bkgd_rate, boot=False):
         ci.mean_rate_array = ci.mean_rate_array[:,~mask]
         ref.power_array = ref.power_array[:,~mask]
         ref.mean_rate_array = ref.mean_rate_array[~mask]
-        print param_dict['exposure']
+        # print param_dict['exposure']
         for element in param_dict['dt'][mask]:
             param_dict['exposure'] -= element * param_dict['n_bins']
-        print param_dict['exposure']
+        # print param_dict['exposure']
         param_dict['dt'] = param_dict['dt'][~mask]
         param_dict['df'] = param_dict['df'][~mask]
         # print "Total num seg:", param_dict['n_seg']
@@ -1843,7 +1845,7 @@ def main(in_file, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
     ##############################################
 
     if filtering:
-        ccf_end, ccf_error = FILT_cs_to_ccf_w_err(avg_cross_spec, param_dict,
+        ccf_avg, ccf_error = FILT_cs_to_ccf_w_err(avg_cross_spec, param_dict,
             ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.power,
             ref_whole.power, True, lo_freq, hi_freq)
     else:
@@ -1874,8 +1876,9 @@ def main(in_file, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
     ## Output
     ##########
 
-    fits_out(out_file, in_file, bkgd_file, param_dict, ci_whole.mean_rate, \
-        ref_whole.mean_rate, t, ccf_avg, ccf_error, filtering, lo_freq, hi_freq)
+    fits_out(out_file, in_file, bkgd_file, param_dict, ci_whole.mean_rate,
+            ref_whole.mean_rate, t, ccf_avg, ccf_error, filtering, lo_freq,
+             hi_freq)
 
 
 ################################################################################
@@ -1945,6 +1948,6 @@ if __name__ == "__main__":
     main(args.infile, args.outfile, bkgd_file=args.bkgd_file,
             n_seconds=args.n_seconds, dt_mult=args.dt_mult, test=test,
             filtering=filtering, lo_freq=lo_freq, hi_freq=hi_freq,
-            adjust=args.adjust)
+            adjust_seg=args.adjust)
 
 ################################################################################
