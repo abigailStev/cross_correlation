@@ -24,6 +24,52 @@ def fits_out(out_file, in_file, bkgd_file, param_dict, mean_rate_ci_whole, \
     """
     Writes the cross-correlation function to a .fits output file.
 
+    Parameters
+    ----------
+    out_file : str
+        Name of the FITS file to write the cross correlation function to,
+        including the ".fits".
+
+    in_file : str
+        Name of the input event list, to save in the FITS header.
+
+    bkgd_file : str
+        Name of the background energy spectrum of the channels of interest,
+        to save in the FITS header.
+
+    param_dict : dict
+        Dictionary of necessary meta-parameters for data analysis.
+
+    mean_rate_ci_whole : np.array of floats
+        1-D array of the mean count rate of the channels of interest, in cts/s.
+        Size = (detchans).
+
+    mean_rate_ref_whole : float
+        The mean count rate of the reference band, in cts/s.
+
+    t : np.array of ints
+        1-D array of integer time bins, size = n_bins.
+
+    ccf : np.array of floats
+        2-D array of the cross-correlation function. Size = (n_bins, detchans).
+
+    ccf_error : np.array of floats
+        2-D array of the error on the cross-correlation function.
+        If filtered, size = detchans. If normal, size = (n_bins, detchans).
+
+    filter : bool
+        If True, the average cross spectrum was filtered in frequency before
+        being iFFT'd to the cross-correlation function.
+
+    lo_freq : float
+        Low frequency bound of cross spectrum filter, in Hz.
+
+    hi_freq : float
+        High frequency bound of cross spectrum filter, in Hz.
+
+    Returns
+    -------
+    nothing, but writes to a file.
     """
 
     ## Getting data into a good output structure
@@ -90,7 +136,8 @@ def raw_to_absrms(power, mean_rate, n_bins, dt, noisy=True):
     Parameters
     ----------
     power : np.array of floats
-        The raw power at each Fourier frequency.
+        The raw power at each Fourier frequency, as a 1-D or 2-D array.
+        Size = (n_bins) or (n_bins, detchans).
 
     mean_rate : float
         The mean count rate for the light curve, in cts/s.
@@ -109,7 +156,8 @@ def raw_to_absrms(power, mean_rate, n_bins, dt, noisy=True):
     Returns
     -------
     np.array of floats
-        The noise-subtracted power spectrum in absolute rms^2 units.
+        The noise-subtracted power spectrum in absolute rms^2 units, in the
+        same size array as the input power.
 
     """
     if noisy:
@@ -130,7 +178,8 @@ def raw_to_fracrms(power, mean_rate, n_bins, dt, noisy=True):
     Parameters
     ----------
     power : np.array of floats
-        The raw power at each Fourier frequency.
+        The raw power at each Fourier frequency, as a 1-D or 2-D array.
+        Size = (n_bins) or (n_bins, detchans).
 
     mean_rate : float
         The mean count rate for the light curve, in cts/s.
@@ -149,7 +198,8 @@ def raw_to_fracrms(power, mean_rate, n_bins, dt, noisy=True):
     Returns
     -------
     np.array of floats
-        The noise-subtracted power spectrum in fractional rms^2 units.
+        The noise-subtracted power spectrum in fractional rms^2 units, in the
+        same size array as the input power.
 
     """
     if noisy:
@@ -168,7 +218,8 @@ def raw_to_leahy(power, mean_rate, n_bins, dt, noisy=True):
     Parameters
     ----------
     power : np.array of floats
-        The raw power at each Fourier frequency.
+        The raw power at each Fourier frequency, as a 1-D or 2-D array.
+        Size = (n_bins) or (n_bins, detchans).
 
     mean_rate : float
         The mean count rate for the light curve, in cts/s.
@@ -187,7 +238,8 @@ def raw_to_leahy(power, mean_rate, n_bins, dt, noisy=True):
     Returns
     -------
     np.array of floats
-        The noise-subtracted power spectrum in Leahy units.
+        The noise-subtracted power spectrum in Leahy units, in the same size
+        array as the input power.
 
     """
     if noisy:
@@ -265,7 +317,7 @@ def get_phase_err(cs_avg, power_ci, power_ref, n, m):
 
     Returns
     -------
-    np.array of floats
+    phase_err : np.array of floats
         2-D array of the error on the phase of the lags.
     """
     with np.errstate(all='ignore'):
@@ -296,7 +348,7 @@ def phase_to_tlags(phase, f, detchans):
 
     Returns
     -------
-    np.array of floats
+    tlags : np.array of floats
         The lags converted to time (in seconds).
     """
     assert np.shape(phase) == np.shape(f), "ERROR: Phase must have same "\
@@ -389,7 +441,8 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
     power_ref = power_ref[1:nyq_ind + 1]
 
     ## Getting lag and error for lag-frequency plot
-    phase = -np.arctan2(cs_avg.imag, cs_avg.real) ## Negative sign is so that a positive lag is a hard energy lag?
+    phase = -np.arctan2(cs_avg.imag, cs_avg.real) ## Negative sign is so that a
+            ## positive lag is a hard energy lag?
     err_phase = get_phase_err(cs_avg, power_ci, np.resize(np.repeat(power_ref, \
             detchans), np.shape(power_ci)), 1, n_seg)
     # print np.shape(err_phase)
@@ -494,6 +547,39 @@ def save_for_lags(out_file, in_file, param_dict, mean_rate_ci, mean_rate_ref,
     band power spectrum to a FITS file to use in the program make_lags.py to get
     cross-spectral lags.
 
+    Parameters
+    ----------
+    out_file : str
+        The name the FITS file to write the cross spectrum and power spectra to,
+        for computing the lags.
+
+    in_file : str
+        The name of the data file (or filename containing list of data files).
+
+    param_dict : dict
+        Dictionary of necessary meta-parameters for data analysis.
+
+    mean_rate_ci : np.array of floats
+        1-D array of the mean count rate of each of the channels of interest.
+        Size = (detchans).
+
+    mean_rate_ref : float
+        Mean count rate of the reference band.
+
+    cs_avg : np.array of complex numbers
+        2-D array of the averaged cross spectrum. Size = (n_bins, detchans).
+
+    power_ci : np.array of floats
+        2-D array of the power in the channels of interest.
+        Size = (n_bins, detchans).
+
+    power_ref : np.array of floats
+        1-D array of the power in the reference band. Size = (n_bins)
+
+    Returns
+    -------
+    nothing, but writes to a file.
+
     """
     ## Getting the Fourier frequencies for the cross spectrum
     freq = fftpack.fftfreq(param_dict['n_bins'], d=np.mean(param_dict['dt']))
@@ -590,7 +676,7 @@ def find_pulse_freq(freq, power_ref):
 
     Returns
     -------
-    float
+    pulse_freq : float
         The frequency at which there's a periodic pulsation. Assumes that the
         pulse frequency has the maximum power above 100 Hz.
 
@@ -608,12 +694,49 @@ def find_pulse_freq(freq, power_ref):
 
 
 ################################################################################
-def filter_freq(freq_space_array, dt, n_bins, detchans, lo_freq, hi_freq, \
+def filter_freq(freq_space_array, dt, n_bins, detchans, lo_freq, hi_freq,
         power_ref):
     """
     Applying a filter to the averaged cross-spectrum per energy channel (in
     frequency space). Any cross spectrum amplitudes above or below pulse_freq
     get zeroed out.
+
+    Parameters
+    ----------
+    freq_space_array : np.array of complex numbers
+        2-D array of the cross spectrum, in frequency space, to be filtered.
+        Size = (n_bins, detchans).
+
+    dt : float
+        Timestep between bins in the light curve, in seconds.
+
+    n_bins : int
+        The number of bins in one Fourier segment of the light curve.
+
+    detchans : int
+        Number of energy channels of the detector's data mode.
+
+    lo_freq : float
+        The lower frequency bound for filtering the cross spectrum, in Hz. [0.0]
+
+    hi_freq : float
+        The upper frequency bound for filtering the cross spectrum, in Hz. [0.0]
+
+    power_ref : np.array of floats
+        1-D array of the power in the reference band. Size = (n_bins).
+
+    Returns
+    -------
+    filt_freq_space_array : np.array of complex numbers
+        2-D array of the cross spectrum, zeroed out at non-filtered frequencies.
+
+    j_min : int
+        Index of the minimum frequency for filtering the averaged cross spectrum
+        (out of 0 to n_bins).
+
+    j_max : int
+        Index of the maximum frequency for filtering the averaged cross spectrum
+        (out of 0 to n_bins).
 
     """
     ## Compute the Fourier frequencies
@@ -655,13 +778,55 @@ as the original cross spectrum. Something went wrong."
 
 ################################################################################
 def FILT_cs_to_ccf_w_err(cs_avg, param_dict, countrate_ci, countrate_ref,
-    power_ci, power_ref, noisy, lo_freq, hi_freq):
+    power_ci, power_ref, lo_freq=0.0, hi_freq=0.0, noisy=True):
     """
     Filters the cross-spectrum in frequency space, takes the iFFT of the
     filtered cross spectrum to get the cross-correlation function, and computes
     the error on the cross-correlation function. Note that error is NOT
     independent between time bins due to the filtering! But is still independent
     between energy bins.
+
+    Parameters
+    ----------
+    cs_avg : np.array of complex numbers
+        2-D array of the segment-averaged cross spectrum of the channels of
+        interest with the reference band. Size = (n_bins, detchans).
+
+    param_dict : dict
+        Dictionary of necessary meta-parameters for data analysis.
+
+    countrate_ci : np.array of floats
+        1-D array of the mean count rate of each energy channel in the channels
+        of interest. Size = (detchans).
+
+    countrate_ref : float
+        The mean count rate of the reference band.
+
+    power_ci : np.array of floats
+        2-D array of the raw power of the channels of interest (only positive
+        Fourier frequencies). Size = (n_bins/2+1, detchans).
+
+    power_ref: np.array of floats
+        1-D array of the raw power in the reference band (only positive Fourier
+        frequencies). Size = (n_bins/2+1).
+
+    lo_freq : float
+        The lower frequency bound for filtering the cross spectrum, in Hz. [0.0]
+
+    hi_freq : float
+        The upper frequency bound for filtering the cross spectrum, in Hz. [0.0]
+
+    noisy : bool
+        If True, data has Poisson noise in it that must be subtracted away. If
+        False, using simulated data without Poisson noise.
+
+    Returns
+    -------
+    ccf_end : np.array of floats
+        2-D array of the cross-correlation function. Size = (n_bins, detchans).
+
+    ccf_error : np.array of floats
+        The error on the cross-correlation function.
 
     """
     ## Filter the cross spectrum in frequency
@@ -744,7 +909,7 @@ def standard_ccf_err(cs_array, param_dict, ref, noisy=True, absrms_var=None, \
         Description.
 
     param_dict : dictionary
-        Descriptoin
+        Dictionary of necessary meta-parameters for data analysis.
 
     ref : ccf_lc.Lightcurves object
         Description.

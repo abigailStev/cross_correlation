@@ -11,6 +11,7 @@ from datetime import datetime
 from astropy.io import fits
 import tools  # at https://github.com/abigailStev/whizzy_scripts
 import ccf as xcor
+import ccf_lightcurves as ccf_lc
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2014-2015"
@@ -23,20 +24,20 @@ def dat_out(out_file, in_file_list, bkgd_file, meta_dict, mean_rate_ci_total, \
 
     Parameters
     ----------
-    out_file : string
+    out_file : str
         Description.
 
-    in_file_list : string
+    in_file_list : str
         Description.
 
-    out_file : string
+    out_file : str
         Description.
 
-    bkgd_file : string
+    bkgd_file : str
         Description.
 
     meta_dict : dict
-        Description.
+        Dictionary of necessary meta-parameters for data analysis.
 
     mean_rate_ci_total : np.array of floats
         Description.
@@ -119,28 +120,32 @@ def fits_out(out_file, in_file_list, bkgd_file, meta_dict, mean_rate_ci_total,\
         Description.
 
     bkgd_file : string
-        Description.
+        Name of the background spectrum (in .pha format), with the same energy
+        channel binning as the event list.
 
     meta_dict : dict
-        Description.
+        Dictionary of necessary meta-parameters for data analysis.
 
     mean_rate_ci_total : np.array of floats
-        Description.
+        1-D array of the mean count rate in each energy channel, across all
+        data files.
 
     mean_rate_ref_total : float
-        Description.
+        The mean count rate in the reference band, across all data files.
 
     t : np.array of ints
-        Description.
+        1-D array of integer time bins, size = n_bins.
 
     ccf : np.array of floats
-        Description.
+        2-D array of the cross correlation function. Size=(n_bins, detchans).
 
     ccf_error : np.array of floats
-        Description.
+        2-D array of the error on the cross correlation function.
+        Size=(n_bins, detchans).
 
     filtering : boolean
-        Description.
+        If true, filters the cross spectrum in frequency space using lo_freq and
+        hi_freq as boundaries. [False]
 
     lo_freq : float
         Low frequency bound of cross spectrum filter, in Hz.
@@ -210,8 +215,8 @@ def fits_out(out_file, in_file_list, bkgd_file, meta_dict, mean_rate_ci_total,\
 
 
 ################################################################################
-def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
-    filtering, lo_freq, hi_freq, adjust):
+def main(in_file_list, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
+        test=False, filtering=False, lo_freq=0.0, hi_freq=0.0, adjust=False):
     """
     Reads in multiple event lists, splits into two light curves, makes segments
     and populates them to give them length n_bins, computes the cross spectrum
@@ -221,27 +226,42 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
 
     Parameters
     ----------
-    in_file_list : string
-        Name of text file that contains a list of the input data files for
-        analysis. Must be full path names. One file per line.
+    in_file_list : str
+        Name of text file that contains a list of the input .fits event lists
+        for analysis. Must be full path names. One file per line.
 
-    out_file : string
-        Description.
+    out_file : str
+        Name the FITS file to write the cross-correlation function to.
 
-    bkgd_file : string
-        Description.
+    bkgd_file : str
+        Name of the background spectrum (in .pha format), with the same energy
+        channel binning as the event list. [None]
 
     n_seconds : int
-        Description.
+        Number of seconds in each Fourier segment. Must be a power of 2,
+        positive. [64]
 
     dt_mult : int
-        Description.
+        Multiple of dt (dt is from data file) for timestep between bins of light
+        curve. Must be a power of 2, positive. [64]
 
-    test : boolean
-        Description.
+    filtering : bool
+        If true, filters the cross spectrum in frequency space using lo_freq and
+        hi_freq as boundaries. [False]
 
-    filtering : boolean
-        Description.
+    lo_freq : float
+        The lower frequency bound for filtering the cross spectrum, in Hz. Only
+        in effect if filtering=True. [0.0]
+
+    hi_freq : float
+        The upper frequency bound for filtering the cross spectrum, in Hz. Only
+        in effect if filtering=True. Must be hi_freq >= lo_freq (checked with
+        assert statement). [0.0]
+
+    adjust : bool
+        If True, adjust cross spectra to line up QPOs. Amounts to adjust each
+        data file by are built-in as of 150828, for the 2010 outburst GX339-4
+        Type B QPO data. [False]
 
     Returns
     -------
@@ -280,7 +300,7 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     try:
         detchans = np.int(tools.get_key_val(input_files[0], 0, 'DETCHANS'))
     except KeyError:
-        detchans = 238
+        detchans = 64
 
     nyq_freq = 1.0 / (2.0 * dt)
     df = 1.0 / np.float64(n_seconds)
@@ -289,23 +309,25 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
                 'detchans': detchans, 'filter': filtering, \
                 'adjust_seg': 0, 'exposure': 0}
 
-    ci_total = xcor.Lightcurve()
-    ref_total = xcor.Lightcurve()
+    ci_total = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'],
+            detchans=meta_dict['detchans'], type='ci')
+    ref_total = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'],
+            detchans=meta_dict['detchans'], type='ref')
     total_seg = 0
     total_cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], \
             1), dtype=np.complex128)
-    ci_total.power = np.zeros((meta_dict['n_bins'], meta_dict['detchans']), \
-            dtype=np.float64)
-    ci_total.power_array = np.zeros((meta_dict['n_bins'], \
-            meta_dict['detchans'], 1), dtype=np.float64)
-    ci_total.mean_rate = np.zeros(meta_dict['detchans'])
-    ci_total.mean_rate_array = np.zeros((meta_dict['detchans'], 1), \
-            dtype=np.float64)
-    ref_total.power = np.zeros(meta_dict['n_bins'], dtype=np.float64)
-    ref_total.power_array = np.zeros((meta_dict['n_bins'], 1), \
-            dtype=np.float64)
-    ref_total.mean_rate = 0
-    ref_total.mean_rate_array = 0
+    # ci_total.power = np.zeros((meta_dict['n_bins'], meta_dict['detchans']), \
+    #         dtype=np.float64)
+    # ci_total.power_array = np.zeros((meta_dict['n_bins'], \
+    #         meta_dict['detchans'], 1), dtype=np.float64)
+    # ci_total.mean_rate = np.zeros(meta_dict['detchans'])
+    # ci_total.mean_rate_array = np.zeros((meta_dict['detchans'], 1), \
+    #         dtype=np.float64)
+    # ref_total.power = np.zeros(meta_dict['n_bins'], dtype=np.float64)
+    # ref_total.power_array = np.zeros((meta_dict['n_bins'], 1), \
+    #         dtype=np.float64)
+    # ref_total.mean_rate = 0
+    # ref_total.mean_rate_array = 0
     dt_total = np.array([])
     df_total = np.array([])
     total_exposure = 0
@@ -401,8 +423,6 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     ## Computing ccf from cs, and computing error
     ##############################################
 
-    print "Done saving lags"
-
     if filtering:
         ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(avg_cross_spec, meta_dict,
             ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
@@ -410,11 +430,11 @@ def main(in_file_list, out_file, bkgd_file, n_seconds, dt_mult, test,
     else:
         ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, meta_dict, ref_total, \
                 True)
-        print "Done with cs to ccf, going to compute error."
+        # print "Done with cs to ccf, going to compute error."
         ccf_error = xcor.standard_ccf_err(cross_spec, meta_dict, \
                 ref_total, True)
 
-    print "ccf end:", ccf_end[1:3,1:3]
+    # print "ccf end:", ccf_end[1:3,1:3]
 
     print "e = ", meta_dict['n_seconds'] * meta_dict['n_seg']
     print "Exposure_time = %.3f seconds" % meta_dict['exposure']
@@ -443,34 +463,36 @@ if __name__ == "__main__":
     ##############################################
 
     parser = argparse.ArgumentParser(usage="python multi_ccf.py infile outfile"\
-        " [-b BKGD_SPECTRUM] [-n NUM_SECONDS] [-m DT_MULT] [-t {0,1}] [-f "\
-        "{0,1}]", description=__doc__, epilog="For optional arguments, default"\
-        "values are given in brackets at end of description.")
+            " [OPTIONAL ARGUMENTS]", description=__doc__, epilog="For optional"\
+            " arguments, default values are given in brackets at end of "\
+            "description.")
 
-    parser.add_argument('infile_list', help="The name of the ASCII "\
-        "file listing the event lists to be used. One file per line. Each "\
-        "event list must be .fits or .dat format containing both the reference"\
-        " band and the channels of interest. Assumes channels of interest = "\
-        "PCU 2, ref band = all other PCUs.")
+    parser.add_argument('infile_list', help="The name of the txt "\
+            "file listing the event lists to be used. One file per line. Each "\
+            "event list must be .fits format containing both the reference"\
+            " band and the channels of interest. Assumes channels of interest"\
+            " = PCU 2, ref band = all other PCUs.")
 
     parser.add_argument('outfile', help="The name of the FITS file to write "\
-        "the cross-correlation function to.")
+            "the cross-correlation function to.")
 
-    parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
-        help="Name of the (pha/fits) background spectrum. [none]")
+    parser.add_argument('-b', '--bkgd', required=False, default=None,
+            dest='bkgd_file', help="Name of the background spectrum (in .pha "\
+            "format), with the same energy channel binning as the event list. "\
+            "[None]")
 
     parser.add_argument('-n', '--n_seconds', type=tools.type_power_of_two,
-        default=1, dest='n_seconds', help="Number of seconds in each Fourier"\
-        " segment. Must be a power of 2, positive, integer. [1]")
+            default=64, dest='n_seconds', help="Number of seconds in each "\
+            "Fourier segment. Must be a power of 2, positive, integer. [64]")
 
     parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two,
-        default=1, dest='dt_mult', help="Multiple of dt (dt is from data file)"\
-        " for timestep between bins. Must be a power of 2, positive, integer. "\
-        "[1]")
+            default=64, dest='dt_mult', help="Multiple of dt (dt is from data "\
+            "file) for timestep between bins. Must be a power of 2, positive, "\
+            "integer. [64]")
 
     parser.add_argument('-t', '--test', type=int, default=0, choices={0,1},
-        dest='test', help="Int flag: 0 if computing all segments, 1 if "\
-        "computing only one segment for testing. [0]")
+            dest='test', help="Int flag: 0 if computing all segments, 1 if "\
+            "computing only one segment for testing. [0]")
 
     parser.add_argument('-f', '--filter', default="no", dest='filter',
             help="Filtering the cross spectrum: 'no' for QPOs, or 'lofreq:"\
@@ -499,7 +521,9 @@ if __name__ == "__main__":
             Exception("Filter keyword used incorrectly. Acceptable inputs are "\
                       "'no' or 'low:high'.")
 
-    main(args.infile_list, args.outfile, args.bkgd_file, args.n_seconds,
-        args.dt_mult, test, filtering, lo_freq, hi_freq, args.adjust)
+    main(args.infile_list, args.outfile, bkgd_file=args.bkgd_file,
+            n_seconds=args.n_seconds, dt_mult=args.dt_mult, test=test,
+            filtering=filtering, lo_freq=lo_freq, hi_freq=hi_freq,
+            adjust=args.adjust)
 
 ################################################################################
