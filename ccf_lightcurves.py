@@ -11,13 +11,14 @@ __year__ = "2015"
 
 
 class Lightcurves(object):
-    def __init__(self, n_bins=8192, detchans=64, type='ci'):
+    def __init__(self, n_bins=8192, detchans=64, type='ref'):
         self.type = type
 
         if type.lower() == "ci":
             self.power_array = np.zeros((n_bins, detchans, 1), dtype=np.float64)
             self.power = np.zeros((n_bins, detchans), dtype=np.float64)
-            self.pos_power = np.zeros((n_bins/2+1, detchans), dtype=np.float64)
+            self.pos_power = np.zeros((n_bins / 2 + 1, detchans), \
+                    dtype=np.float64)
             self.mean_rate_array = np.zeros((detchans, 1), dtype=np.float64)
             self.mean_rate = np.zeros(detchans)
         else:
@@ -29,7 +30,7 @@ class Lightcurves(object):
 
 
 class NormPSD(object):
-    def __init__(self, n_bins=8192, detchans=64, type='ci'):
+    def __init__(self, n_bins=8192, detchans=64, type='ref'):
         self.type = type
         self.noise = 0.0
 
