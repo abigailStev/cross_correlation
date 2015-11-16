@@ -116,7 +116,7 @@ if __name__ == "__main__":
     parser.add_argument('tab_file', help="The table file, in .dat or .fits "\
             "format.")
 
-    parser.add_argument('-o', '--outroot', dest='out_root', default="./ccf", 
+    parser.add_argument('-o', '--outroot', dest='out_root', default="./ccf",
             help="The root of the filename to save the plot to. Energy channel"\
             "will be appended to name before saving. [./ccf]")
 
