@@ -1257,15 +1257,21 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
     cross spectrum per energy channel and keeps running average of the cross
     spectra.
 
+    TODO: Make time binning be set by the reference band time binning.
+
     I take the approach: start time <= segment < end_time, to avoid double-
     counting and/or skipping events.
 
     Parameters
     ----------
-    in_file : string
+    in_file : str
         The full path of the FITS data file being analyzed.
 
-    meta_dict : dictionary
+    ref_band_file : str
+        Name of FITS optical or IR data file for reference band. This one file
+        has the reference band for the whole data set. Gaps are ok.
+        
+    meta_dict : dict
         Dictionary of necessary meta-parameters for data analysis.
 
     test : boolean
@@ -1327,8 +1333,8 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
         print("\tERROR: File does not exist: %s" % in_file)
         sys.exit()
 
-    ci_header = ci_fits_hdu[0].header	 ## Header info is in ext 0, data is in ext 1
-    ci_data = ci_fits_hdu[1].data
+    # ci_header = ci_fits_hdu[0].header  ## Header is in ext 0
+    ci_data = ci_fits_hdu[1].data  ## Data is in ext 1
     ci_fits_hdu.close()
 
     ###################
@@ -1370,8 +1376,8 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
         print("\tERROR: File does not exist: %s" % ref_band_file)
         sys.exit()
 
-    ref_header = ref_fits_hdu[0].header	 ## Header info is in ext 0, data is in ext 1
-    ref_data = ref_fits_hdu[1].data
+    # ref_header = ref_fits_hdu[0].header	 ## Header info is in ext 0
+    ref_data = ref_fits_hdu[1].data  ## Data is in ext 1
     ref_fits_hdu.close()
 
     ref_start_time = ref_data.field('TIME')[0]
@@ -1701,6 +1707,10 @@ def main(in_file, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
 
     out_file : str
         The name the FITS file to write the cross-correlation function to.
+
+    ref_band_file : str
+        Name of FITS optical or IR data file for reference band. This one file
+        has the reference band for the whole data set. Gaps are ok.
 
     bkgd_file : str
         Name of the background spectrum (in .pha format), with the same energy

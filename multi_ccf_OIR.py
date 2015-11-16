@@ -236,6 +236,10 @@ def main(in_file_list, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
     out_file : str
         Name the FITS file to write the cross-correlation function to.
 
+    ref_band_file : str
+        Name of FITS optical or IR data file for reference band. This one file
+        has the reference band for the whole data set. Gaps are ok.
+
     bkgd_file : str
         Name of the background spectrum (in .pha format), with the same energy
         channel binning as the event list. [None]
@@ -480,7 +484,9 @@ if __name__ == "__main__":
             "the cross-correlation function to.")
 
     parser.add_argument('--ref', dest='ref_band_file', default=None, \
-            help="Name of FITS optical or IR data file for reference band.")
+            help="Name of FITS optical or IR data file for reference band. "\
+            "This one file has the reference band for the whole data set. "\
+            "Gaps are ok.")
 
     parser.add_argument('-b', '--bkgd', default=None, dest='bkgd_file',
             help="Name of the background spectrum (in .pha "\
