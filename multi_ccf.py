@@ -2,6 +2,8 @@
 """
 Computes the cross-correlation function of narrow energy channels of interest
 with a broad energy reference band, over multiple RXTE event lists.
+
+Use run_multi_ccf.sh for an example.
 """
 import argparse
 import numpy as np
