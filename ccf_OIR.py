@@ -1229,11 +1229,10 @@ def each_segment(time_ci, time_ref, energy_ci, meta_dict,\
     ##############################################################
 
     rate_ci_2d = tools.make_2Dlightcurve(np.asarray(time_ci),
-        np.asarray(energy_ci), meta_dict['n_bins'], meta_dict['detchans'],
-        start_time, end_time)
+            np.asarray(energy_ci), meta_dict['n_bins'], meta_dict['detchans'],
+            start_time, end_time)
     rate_ref = tools.make_1Dlightcurve(np.asarray(time_ref),
-        meta_dict['n_bins'], meta_dict['detchans'],
-        start_time, end_time)
+            meta_dict['n_bins'], start_time, end_time)
 
     ## Save the reference band light curve to a text file
 # 	out_file="./GX339-BQPO_ref_lc.dat"
@@ -1382,8 +1381,8 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
 
     all_time_ref = np.asarray(ref_data.field('TIME'), dtype=np.float64)
 
-    start_time = np.max(ref_start_time, ci_start_time)
-    final_time = np.min(ref_final_time, ci_final_time)
+    start_time = np.max([ref_start_time, ci_start_time])
+    final_time = np.min([ref_final_time, ci_final_time])
     seg_end_time = start_time + meta_dict['n_seconds']
 
     print("Start: %.15f" % start_time)
@@ -1395,7 +1394,6 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
     print "Segments computed:"
 
     while (seg_end_time + (meta_dict['adjust_seg'] * meta_dict['dt'])) <= final_time:
-
         ## Adjusting segment length to artificially line up the QPOs
         seg_end_time += (meta_dict['adjust_seg'] * meta_dict['dt'])
 
@@ -1684,8 +1682,9 @@ def alltogether_means(cross_spec, ci, ref, meta_dict, bkgd_rate, boot=False):
 
 
 ################################################################################
-def main(in_file, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
-        test=False, filtering=False, lo_freq=0.0, hi_freq=0.0, adjust_seg=0):
+def main(in_file, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
+        dt_mult=64, test=False, filtering=False, lo_freq=0.0, hi_freq=0.0,
+        adjust_seg=0):
     """
     Reads in one event list, splits into reference band and channels of
     interest (CoI), makes segments and populates them to give them length
@@ -1787,7 +1786,7 @@ def main(in_file, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
     #################################################
 
     cross_spec, ci_whole, ref_whole, n_seg, dt, df, exposure = \
-            fits_in(in_file, meta_dict, test)
+            fits_in(in_file, ref_band_file, meta_dict, test)
 
     meta_dict['n_seg'] = n_seg
     meta_dict['exposure'] = exposure
@@ -1894,6 +1893,9 @@ if __name__ == "__main__":
     parser.add_argument('outfile', help="The name the FITS file to write the "\
             "cross-correlation function to.")
 
+    parser.add_argument('--ref', dest='ref_band_file', default=None, \
+            help="Name of FITS optical or IR data file for reference band.")
+
     parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
             default=None, help="Name of the background spectrum (in .pha "\
             "format), with the same energy channel binning as the event list.")
@@ -1938,9 +1940,9 @@ if __name__ == "__main__":
             Exception("Filter keyword used incorrectly. Acceptable inputs are "\
                       "'no' or 'low:high'.")
 
-    main(args.infile, args.outfile, bkgd_file=args.bkgd_file,
-            n_seconds=args.n_seconds, dt_mult=args.dt_mult, test=test,
-            filtering=filtering, lo_freq=lo_freq, hi_freq=hi_freq,
-            adjust_seg=args.adjust)
+    main(args.infile, args.outfile, args.ref_band_file,
+            bkgd_file=args.bkgd_file, n_seconds=args.n_seconds,
+            dt_mult=args.dt_mult, test=test, filtering=filtering,
+            lo_freq=lo_freq, hi_freq=hi_freq, adjust_seg=args.adjust)
 
 ################################################################################
