@@ -2,6 +2,8 @@
 """
 Computes the cross-correlation function of narrow energy channels of interest
 with a broad energy reference band, using an RXTE .fits event list.
+
+Use run_ccf.sh for an example.
 """
 import argparse
 import numpy as np
@@ -11,7 +13,7 @@ from datetime import datetime
 import os
 import subprocess
 from astropy.io import fits
-import tools  # in https://github.com/abigailStev/whizzy_scripts
+import tools  ## in https://github.com/abigailStev/whizzy_scripts
 import ccf_lightcurves as ccf_lc
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
