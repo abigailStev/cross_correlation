@@ -201,8 +201,8 @@ fi
 if [ -e "${out_file}_cs.fits" ]; then
 
 	python "$lag_exe_dir"/get_lags.py "${out_file}_cs.fits" \
-			"${out_file}_lag.fits" -o "${plot_root}" -p "$prefix" \
-			-e "${p_ext}" --lf "${lag_lf}" --uf "${lag_uf}" --le "${lag_le}" \
+			"${out_file}_lag.fits" -o "${plot_root}" --prefix "$prefix" \
+			--ext "${p_ext}" --lf "${lag_lf}" --uf "${lag_uf}" --le "${lag_le}" \
 			--ue "${lag_ue}"
 
 	if [ -e "$plot_root"_lag-energy."${p_ext}" ]; then
