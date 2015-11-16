@@ -21,18 +21,59 @@ __year__ = "2014-2015"
 
 
 ################################################################################
-def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time, plot_file,
-        energies=None, prefix="--", tab_file=None):
+def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
+        plot_file, energies=None, prefix="--", tab_file=None):
+    """
+    Actually makes the plots.
 
+    Parameters
+    ----------
+    ccf : np.array of floats
+        2-D array of the cross-correlation function.
+
+    t_bins : np.array of ints
+        1-D array of integer time bins.
+
+    mean_rate_ci : np.array of floats
+        1-D array of the mean count rate of the channels of interest, in cts/s.
+        Size = detchans.
+
+    t_length : int
+        The number of time bins before and after zero to plot (so, 2*t_length
+        get plotted along the x-axis).
+
+    frac_time : int
+        1/frac_time = dt, to be printed in the x label.
+
+    plot_file : str
+        The name of the file to save the 2-D CCF plot to.
+
+    energies : np.array of floats
+        1-D array of the keV energy bounds of each detector energy channel.
+        Size = (detchans+1)
+
+    prefix : str
+        The identifying prefix of the data (object nickname or data ID). [--]
+
+    tab_file : str
+        The file with the CCF table from ccf.py or multi_ccf.py, in FITS format,
+        for writing to temp.dat file for making the FIMGCREATE image in the bash
+        script.
+
+    Returns
+    -------
+    nothing
+
+    """
     ###################################################################
     ## Make a ratio of ccf to the mean count rate in the interest band
     ###################################################################
 
     mean_ccf = np.mean(ccf, axis=0)
     ccf_resid = ccf - mean_ccf
-    print "CCF shape:", np.shape(ccf)
+    # print "CCF shape:", np.shape(ccf)
     a = np.array([mean_rate_ci, ] * 2*t_length).T
-    print "A shape:", np.shape(a)
+    # print "A shape:", np.shape(a)
     with np.errstate(all='ignore'):
         ratio = np.where(a != 0, ccf / a, 0)
 
@@ -46,7 +87,7 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time, plot_file,
 # #     ratio[27:, ] = 0
     ratio[28:,] = 0
     out_file = os.path.dirname(plot_file) + "/temp.dat"
-    print out_file
+    # print out_file
     R = ratio.flatten('C')
     comment_str = "From %s" % tab_file
     np.savetxt(out_file, R, comments=comment_str)
@@ -113,7 +154,8 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time, plot_file,
     # plt.show()
     plt.savefig(plot_file)
     plt.close()
-    # subprocess.call(['cp', plot_file, "/Users/abigailstevens/Dropbox/Research/CCF_paper1/"])
+    # subprocess.call(['cp', plot_file, \
+    #       "/Users/abigailstevens/Dropbox/Research/CCF_paper1/"])
 
 
 ################################################################################
@@ -124,19 +166,19 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
 
     Parameters
     ----------
-    tab_file : string
+    tab_file : str
         The file with the CCF table from ccf.py or multi_ccf.py, in FITS format.
 
-    plot_file : string
+    plot_file : str
         The file name to save the plot to.
 
-    prefix : string
-        The identifying prefix of the data (object nickname or proposal ID).
+    prefix : str
+        The identifying prefix of the data (object nickname or data ID).
 
     t_length : int
         Number of time bins to use along the x-axis.
 
-    chan_to_en : string
+    chan_to_en : str
         Table of actual energy boundaries for energy channels as made in
         channel_to_energy.py. If not given, plot will be vs detector mode energy
         channel.
@@ -164,6 +206,9 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
     means_str = file_hdu[0].header["RATE_CI"]
     detchans = int(file_hdu[0].header["DETCHANS"])
     dt = float(file_hdu[0].header["DT"])
+    # print "%.15f" % dt
+    print_dt = dt * 10**3  ## Putting it in milliseconds units.
+    # print "%.3f" % print_dt
     frac_time = int(1.0 / dt)  ## Each time bin represents 1/frac_time sec
 
     table = file_hdu[1].data
@@ -210,7 +255,7 @@ if __name__ == "__main__":
 
     parser.add_argument('-p', '--prefix', dest='prefix', default="--", \
             help="The identifying prefix of the data (object nickname or "\
-             "proposal ID). [--]")
+             "data ID). [--]")
 
     parser.add_argument('-l', '--length', dest='t_length', default=100, \
             type=tools.type_positive_int, help="Number of time bins to use "\
