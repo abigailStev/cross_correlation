@@ -54,6 +54,9 @@ Bash script to run multi_ccf.py and plotting scripts.
 ### run_bootstrap_multi_ccf.sh
 Bash script to run ccf_bootstrap.py and plotting scripts.
 
+### ccf_OIR.py, multi_ccf_OIR.py, run_ccf_OIR.py, run_multi_ccf_OIR.py
+These are offshoots of their non-_OIR counterparts, created for collaboration
+with Federico Vincentelli and Piergiorgio Casella.
 
 ## Authors and License
 * Abigail Stevens (UvA API)
