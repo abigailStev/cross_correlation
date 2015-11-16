@@ -21,7 +21,7 @@
 ## Checking the number of input arguments
 if (( $# != 8 )); then
     echo -e "\tUsage: ./run_multi_ccf.sh <file list> <ref band file> <prefix>"\
-            " <dt multiple> <num seconds> <testing> <date> <filtering>\n"
+            " <dt> <num seconds> <testing> <date> <filtering>\n"
     exit
 fi
 
@@ -56,7 +56,7 @@ energies_file="$red_dir/energies.txt"
 
 bkgd_spec="$home_dir/Reduced_data/$prefix/evt_bkgd_rebinned.pha"
 
-filename="${prefix}_${day}_t${dt}_${numsec}sec"
+filename="${prefix}_${day}_${numsec}sec"
 
 lag_lf=4.0  ## Lower frequency bound for lag spectra, in Hz
 lag_uf=7.0  ## Upper frequency bound for lag spectra, in Hz
@@ -67,7 +67,6 @@ tlen=30 ## Number of time bins to plot along the 2D CCF x-axis
 obs_epoch=5
 
 p_ext="eps"
-#p_ext="pdf"
 
 ################################################################################
 ################################################################################
@@ -98,7 +97,7 @@ if [ -e "$saved_file_list" ] && [ -e "$bkgd_spec" ] && [ -e "${ref_band_file}" ]
 			"${ref_band_file}" \
 			-b "$bkgd_spec" \
 			-n "$numsec" \
-			-m "$dt" \
+			--dt "$dt" \
 			-t "$testing" \
 			-f "$filtering"
 
@@ -107,7 +106,7 @@ elif [ -e "$saved_file_list" ] && [ -e "${ref_band_file}" ]; then
 			"${out_file}.fits" \
 			"${ref_band_file}" \
 			-n "$numsec" \
-			-m "$dt" \
+			--dt "$dt" \
 			-t "$testing" \
 			-f "$filtering"
 else

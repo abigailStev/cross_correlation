@@ -11,7 +11,7 @@ import os.path
 import subprocess
 from datetime import datetime
 from astropy.io import fits
-import tools  # at https://github.com/abigailStev/whizzy_scripts
+import tools  ## at https://github.com/abigailStev/whizzy_scripts
 import ccf_OIR as xcorOIR
 import ccf_lightcurves as ccf_lc
 
@@ -218,7 +218,7 @@ def fits_out(out_file, in_file_list, bkgd_file, meta_dict, mean_rate_ci_total,\
 
 ################################################################################
 def main(in_file_list, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
-        dt_mult=64, test=False, filtering=False, lo_freq=0.0, hi_freq=0.0,
+        dt=0.0625, test=False, filtering=False, lo_freq=0.0, hi_freq=0.0,
         adjust=False):
     """
     Reads in multiple event lists, splits into two light curves, makes segments
@@ -248,9 +248,9 @@ def main(in_file_list, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
         Number of seconds in each Fourier segment. Must be a power of 2,
         positive. [64]
 
-    dt_mult : int
-        Multiple of dt (dt is from data file) for timestep between bins of light
-        curve. Must be a power of 2, positive. [64]
+    dt : float
+        Timestep between bins of the light curve, in seconds. Should be equal
+        to the time binning of the reference band. [0.0625]
 
     filtering : bool
         If true, filters the cross spectrum in frequency space using lo_freq and
@@ -281,7 +281,9 @@ def main(in_file_list, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
     #####################################################
 
     assert n_seconds > 0, "ERROR: n_seconds must be a positive integer."
-    assert dt_mult >= 1, "ERROR: dt_mult must be a positive integer."
+    assert dt > 0, "ERROR: dt must be a positive float."
+    assert tools.power_of_two(n_seconds / dt), "ERROR: n_bins must be a power "\
+            "of 2. Must change n_seconds."
 
     ##############################################################
     ## Getting the list of input files and putting them in a list
@@ -301,20 +303,21 @@ def main(in_file_list, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
     if not adjust:
         adjust_segments = [0,0,0,0,0,0,0,0,0]
 
-    t_res = np.float64(tools.get_key_val(input_files[0], 0, 'TIMEDEL'))
-    dt = dt_mult * t_res
-    n_bins = n_seconds * np.int(1.0 / dt)
     try:
         detchans = np.int(tools.get_key_val(input_files[0], 0, 'DETCHANS'))
     except KeyError:
         detchans = 64
 
-    nyq_freq = 1.0 / (2.0 * dt)
-    df = 1.0 / np.float64(n_seconds)
-    meta_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
-                'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
-                'detchans': detchans, 'filter': filtering, \
-                'adjust_seg': 0, 'exposure': 0}
+    meta_dict = {'dt': dt,
+            't_res': float(tools.get_key_val(input_files[0], 0, 'TIMEDEL')),
+            'n_seconds': n_seconds,
+            'df': 1.0 / np.float(n_seconds),
+            'nyquist': 1.0 / (2.0 * dt),
+            'n_bins': int(n_seconds / dt),
+            'detchans': detchans,
+            'filter': filtering,
+            'adjust_seg': 0,
+            'exposure': 0}
 
     ci_total = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ci')
@@ -323,18 +326,6 @@ def main(in_file_list, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
     total_seg = 0
     total_cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], \
             1), dtype=np.complex128)
-    # ci_total.power = np.zeros((meta_dict['n_bins'], meta_dict['detchans']), \
-    #         dtype=np.float64)
-    # ci_total.power_array = np.zeros((meta_dict['n_bins'], \
-    #         meta_dict['detchans'], 1), dtype=np.float64)
-    # ci_total.mean_rate = np.zeros(meta_dict['detchans'])
-    # ci_total.mean_rate_array = np.zeros((meta_dict['detchans'], 1), \
-    #         dtype=np.float64)
-    # ref_total.power = np.zeros(meta_dict['n_bins'], dtype=np.float64)
-    # ref_total.power_array = np.zeros((meta_dict['n_bins'], 1), \
-    #         dtype=np.float64)
-    # ref_total.mean_rate = 0
-    # ref_total.mean_rate_array = 0
     dt_total = np.array([])
     df_total = np.array([])
     total_exposure = 0
@@ -497,10 +488,9 @@ if __name__ == "__main__":
             default=64, dest='n_seconds', help="Number of seconds in each "\
             "Fourier segment. Must be a power of 2, positive, integer. [64]")
 
-    parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two,
-            default=64, dest='dt_mult', help="Multiple of dt (dt is from data "\
-            "file) for timestep between bins. Must be a power of 2, positive, "\
-            "integer. [64]")
+    parser.add_argument('--dt', type=tools.type_positive_float, default=0.0625,
+            dest='dt', help="Timestep between bins of light curve (should be "\
+            "set by the reference band), in seconds. [0.0625]")
 
     parser.add_argument('-t', '--test', type=int, default=0, choices={0,1},
             dest='test', help="Int flag: 0 if computing all segments, 1 if "\
@@ -535,7 +525,7 @@ if __name__ == "__main__":
 
     main(args.infile_list, args.outfile, args.ref_band_file,
             bkgd_file=args.bkgd_file, n_seconds=args.n_seconds,
-            dt_mult=args.dt_mult, test=test, filtering=filtering,
+            dt=args.dt_mult, test=test, filtering=filtering,
             lo_freq=lo_freq, hi_freq=hi_freq, adjust=args.adjust)
 
 ################################################################################

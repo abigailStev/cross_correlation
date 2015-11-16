@@ -1257,7 +1257,8 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
     cross spectrum per energy channel and keeps running average of the cross
     spectra.
 
-    TODO: Make time binning be set by the reference band time binning.
+    Assumes that the reference band times are the center of the bins, and the
+    CI times are at the front of the bins.
 
     I take the approach: start time <= segment < end_time, to avoid double-
     counting and/or skipping events.
@@ -1270,7 +1271,7 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
     ref_band_file : str
         Name of FITS optical or IR data file for reference band. This one file
         has the reference band for the whole data set. Gaps are ok.
-        
+
     meta_dict : dict
         Dictionary of necessary meta-parameters for data analysis.
 
@@ -1380,15 +1381,31 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
     ref_data = ref_fits_hdu[1].data  ## Data is in ext 1
     ref_fits_hdu.close()
 
-    ref_start_time = ref_data.field('TIME')[0]
-    ref_final_time = ref_data.field('TIME')[-1]
+    ## Correcting times to make them at the front of the bin.
+    all_time_ref = np.asarray(ref_data.field('TIME'), dtype=np.float64) \
+            - meta_dict['dt'] / 2.0
+
+    ref_start_time = all_time_ref[0]
+    ref_final_time = all_time_ref[-1]
     print("Ref start: %.15f" % ref_start_time)
     print("Ref final: %.15f" % ref_final_time)
 
-    all_time_ref = np.asarray(ref_data.field('TIME'), dtype=np.float64)
+    if ci_start_time > ref_start_time:
+        index = np.min(np.where(all_time_ref > ci_start_time))
+        start_time = all_time_ref[index]
+        all_time_ref = all_time_ref[index:]
+    else:
+        start_time = ref_start_time
 
-    start_time = np.max([ref_start_time, ci_start_time])
-    final_time = np.min([ref_final_time, ci_final_time])
+    if ci_final_time < ref_final_time:
+        # I don't think this has actually been tested...
+        index = np.max(np.where(all_time_ref < ci_final_time))
+        print "\t", index
+        final_time = all_time_ref[index]
+        all_time_ref = all_time_ref[0:index]
+    else:
+        final_time = ref_final_time
+
     seg_end_time = start_time + meta_dict['n_seconds']
 
     print("Start: %.15f" % start_time)
@@ -1402,6 +1419,7 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
     while (seg_end_time + (meta_dict['adjust_seg'] * meta_dict['dt'])) <= final_time:
         ## Adjusting segment length to artificially line up the QPOs
         seg_end_time += (meta_dict['adjust_seg'] * meta_dict['dt'])
+        print "Segment end time: %.15f" % seg_end_time
 
         ## Get events for channels of interest
         time_ci = all_time_ci[np.where(all_time_ci < seg_end_time)]
@@ -1689,7 +1707,7 @@ def alltogether_means(cross_spec, ci, ref, meta_dict, bkgd_rate, boot=False):
 
 ################################################################################
 def main(in_file, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
-        dt_mult=64, test=False, filtering=False, lo_freq=0.0, hi_freq=0.0,
+        dt=0.0625, test=False, filtering=False, lo_freq=0.0, hi_freq=0.0,
         adjust_seg=0):
     """
     Reads in one event list, splits into reference band and channels of
@@ -1720,9 +1738,9 @@ def main(in_file, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
         Number of seconds in each Fourier segment. Must be a power of 2,
         positive. [64]
 
-    dt_mult : int
-        Multiple of dt (dt is from data file) for timestep between bins. Must be
-        a power of 2, positive. [64]
+    dt : float
+        Timestep between bins of the light curve, in seconds. Should be equal
+        to the time binning of the reference band. [0.0625]
 
     test : bool
         If true, only computes one segment of data. If false, runs like normal.
@@ -1748,6 +1766,7 @@ def main(in_file, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
     Returns
     -------
     nothing
+
     """
 
     #####################################################
@@ -1755,7 +1774,9 @@ def main(in_file, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
     #####################################################
 
     assert n_seconds > 0, "ERROR: n_seconds must be a positive integer."
-    assert dt_mult >= 1, "ERROR: dt_mult must be a positive integer."
+    assert dt > 0, "ERROR: dt must be a positive float."
+    assert tools.power_of_two(n_seconds / dt), "ERROR: n_bins must be a power "\
+            "of 2. Must change n_seconds."
     assert hi_freq >= lo_freq, "ERROR: Upper bound of frequency filtering must"\
             " be equal to or greater than the lower bound."
 
@@ -1763,16 +1784,16 @@ def main(in_file, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
     ## Initializations; 'whole' is over one data file
     ##################################################
 
-    t_res = np.float(tools.get_key_val(in_file, 0, 'TIMEDEL'))
-    dt = dt_mult * t_res
-    n_bins = n_seconds * int(1.0 / dt)
-    nyquist_freq = 1.0 / (2.0 * dt)
-    detchans = int(tools.get_key_val(in_file, 0, 'DETCHANS'))
-    df = 1.0 / np.float(n_seconds)
-    meta_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
-                 'df': df, 'nyquist': nyquist_freq, 'n_bins': n_bins, \
-                 'detchans': detchans, 'filter': filtering, \
-                 'adjust_seg': adjust_seg, 'exposure': 0}
+    meta_dict = {'dt': dt,
+            't_res': float(tools.get_key_val(in_file, 0, 'TIMEDEL')),
+            'n_seconds': n_seconds,
+            'df': 1.0 / np.float(n_seconds),
+            'nyquist': 1.0 / (2.0 * dt),
+            'n_bins': int(n_seconds / dt),
+            'detchans': int(tools.get_key_val(in_file, 0, 'DETCHANS')),
+            'filter': filtering,
+            'adjust_seg': adjust_seg,
+            'exposure': 0}
 
     print "\nDT = %f" % meta_dict['dt']
     print "N_bins = %d" % meta_dict['n_bins']
@@ -1795,13 +1816,13 @@ def main(in_file, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
     ## Reading in data, computing the cross spectrum
     #################################################
 
-    cross_spec, ci_whole, ref_whole, n_seg, dt, df, exposure = \
+    cross_spec, ci_whole, ref_whole, n_seg, dt_whole, df_whole, exposure = \
             fits_in(in_file, ref_band_file, meta_dict, test)
 
     meta_dict['n_seg'] = n_seg
     meta_dict['exposure'] = exposure
-    meta_dict['dt'] = dt
-    meta_dict['df'] = df
+    meta_dict['dt'] = dt_whole
+    meta_dict['df'] = df_whole
 
     avg_cross_spec, cross_spec, ci_whole, ref_whole, meta_dict = \
             alltogether_means(cross_spec, ci_whole, ref_whole, meta_dict, \
@@ -1906,18 +1927,17 @@ if __name__ == "__main__":
     parser.add_argument('--ref', dest='ref_band_file', default=None, \
             help="Name of FITS optical or IR data file for reference band.")
 
-    parser.add_argument('-b', '--bkgd', required=False, dest='bkgd_file',
-            default=None, help="Name of the background spectrum (in .pha "\
+    parser.add_argument('-b', '--bkgd', dest='bkgd_file', default=None,
+            help="Name of the background spectrum (in .pha "\
             "format), with the same energy channel binning as the event list.")
 
     parser.add_argument('-n', '--n_seconds', type=tools.type_power_of_two,
             default=64, dest='n_seconds', help="Number of seconds in each "\
             "Fourier segment. Must be a power of 2, positive, integer. [64]")
 
-    parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two,
-            default=64, dest='dt_mult', help="Multiple of dt (dt is from data "\
-            "file) for timestep between bins. Must be a power of 2, positive, "\
-            "integer. [64]")
+    parser.add_argument('--dt', type=tools.type_positive_float, default=0.0625,
+            dest='dt', help="Timestep between bins of light curve (should be "\
+            "set by the reference band), in seconds. [0.0625]")
 
     parser.add_argument('-t', '--test', type=int, default=0, choices={0,1},
             dest='test', help="Int flag: 0 if computing all segments, 1 if "\
@@ -1952,7 +1972,7 @@ if __name__ == "__main__":
 
     main(args.infile, args.outfile, args.ref_band_file,
             bkgd_file=args.bkgd_file, n_seconds=args.n_seconds,
-            dt_mult=args.dt_mult, test=test, filtering=filtering,
+            dt=args.dt, test=test, filtering=filtering,
             lo_freq=lo_freq, hi_freq=hi_freq, adjust_seg=args.adjust)
 
 ################################################################################

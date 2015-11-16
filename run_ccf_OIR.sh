@@ -32,7 +32,7 @@ fi
 prefix="GX339-BQPO-OIR"
 obsID="95409-01-15-06"
 
-dt=64
+dt=0.0625
 numsec=64
 testing=0  # 0 for no, 1 for yes
 tlen=40
@@ -54,7 +54,7 @@ ec_table_file="$xte_exe_dir/e-c_table.txt"
 chan_bin_file="$home_dir/Reduced_data/GX339-BQPO/chan.txt"
 energies_file="$home_dir/Reduced_data/GX339-BQPO/energies.txt"
 
-filename="${obsID}_${day}_t${dt}_${numsec}sec"
+filename="${obsID}_${day}_${numsec}sec"
 
 filtfreq="no"
 
@@ -81,12 +81,12 @@ fi
 
 if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
 	time python "$exe_dir"/ccf_OIR.py "${in_file}" "${out_file}.${t_ext}" \
-		    --ref "${OIR_ref_band}" -b "$bkgd_spec" -n "$numsec" -m "$dt" \
+		    --ref "${OIR_ref_band}" -b "$bkgd_spec" -n "$numsec" --dt "$dt" \
 		    -t "$testing" -f "$filtfreq"
 
 elif [ -e "$in_file" ]; then
 	time python "$exe_dir"/ccf_OIR.py "${in_file}" "${out_file}.${t_ext}" \
-		    --ref "${OIR_ref_band}" -n "$numsec" -m "$dt" -t "$testing" \
+		    --ref "${OIR_ref_band}" -n "$numsec" --dt "$dt" -t "$testing" \
 		    -f "$filtfreq"
 
 else
@@ -104,7 +104,7 @@ if [ -e "${out_file}.${t_ext}" ]; then
 	python "$exe_dir"/plot_ccf.py "${out_file}.${t_ext}" -o "${out_file}" \
 		-p "${prefix}/${obsID}"
 
-	if [ -e "${out_file}_chan_15.${p_ext}" ]; then open "${out_file}_chan_15.${p_ext}"; fi
+#	if [ -e "${out_file}_chan_15.${p_ext}" ]; then open "${out_file}_chan_15.${p_ext}"; fi
 
 	multi_plot="${out_file}_multiccfs.${p_ext}"
 	python "$exe_dir"/plot_multi.py "${out_file}.${t_ext}" "$multi_plot" \
@@ -136,7 +136,7 @@ plot_file="${out_file}_2Dccf.${p_ext}"
 if [ -e "${out_file}.${t_ext}" ]; then
 	python "$exe_dir"/plot_2d.py "${out_file}.${t_ext}" -o "${plot_file}" \
 		-p "${prefix}/${obsID}" -l "$tlen" -e "$energies_file"
-	if [ -e "${plot_file}" ]; then open "${plot_file}"; fi
+#	if [ -e "${plot_file}" ]; then open "${plot_file}"; fi
 fi
 
 plot_file="${out_file}_2Dccf.fits"
