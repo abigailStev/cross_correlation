@@ -89,87 +89,87 @@ elif (( $testing == 1 )); then
 fi
 
 cp "$file_list" "$saved_file_list"
-#
-#########################
-### Running multi_ccf.py
-#########################
-#
-#if [ -e "$saved_file_list" ] && [ -e "$bkgd_spec" ]; then
-#	python "$exe_dir"/multi_ccf.py "$saved_file_list" "${out_file}.${t_ext}" \
-#		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtering" -a
-#elif [ -e "$saved_file_list" ]; then
-#	python "$exe_dir"/multi_ccf.py "$saved_file_list" "${out_file}.${t_ext}" \
-#		-n "$numsec" -m "$dt" -t "$testing" -f "$filtering" -a
-#else
-#	echo -e "\tERROR: multi_ccf.py was not run. List of eventlists and/or "\
-#            "background energy spectrum doesn't exist."
-#fi
-#
-#################################
-### Plotting the individual ccfs
-#################################
-#
-#if [ -e "${out_file}.${t_ext}" ]; then
-#	python "$exe_dir"/plot_CCF.py "${out_file}.${t_ext}" -o "${plot_root}" \
-#		-p "$prefix" --ext "$p_ext"
-#	if [ -e "${plot_root}_chan_15.${p_ext}" ]; then open "${plot_root}_chan_15.${p_ext}"; fi
-#
-#	multi_plot="${plot_root}_multiccfs.${p_ext}"
-#	python "$exe_dir"/plot_multi.py "${out_file}.${t_ext}" "$multi_plot" \
-#		-p "$prefix"
-##	if [ -e "$multi_plot" ]; then open "$multi_plot"; fi
-#fi
-#
-################################################
-### Getting the energy list from a channel list
-################################################
-#
-#if [ ! -e "$energies_file" ]; then
-#	if [ -e "$ec_table_file" ] && [ -e "$chan_bin_file" ]; then
-#		python "$xte_exe_dir"/channel_to_energy.py "$ec_table_file" \
-#			"$chan_bin_file" "$energies_file" "$obs_epoch"
-#	else
-#		echo -e "\tERROR: channel_to_energy.py not run. ec_table_file and/or "\
-#                "chan_bin_file do not exist."
-#	fi
-#fi
-#
-#
+
 ########################
-### Plotting the 2D ccf
+## Running multi_ccf.py
 ########################
-#
-#plot_file="${plot_root}_2Dccf.${p_ext}"
-#if [ -e "${out_file}.${t_ext}" ]; then
-#	python "$exe_dir"/plot_2d.py "${out_file}.${t_ext}" -o "${plot_file}" \
-#		-p "$prefix" -l "$tlen" -e "$energies_file"
-#	if [ -e "${plot_file}" ]; then
-#		open "${plot_file}"
-#        cp "$plot_file" "$home_dir/Dropbox/Research/CCF_paper1/"
-#    fi
-#fi
-#
-#plot_file="${plot_root}_2Dccf.fits"
-#detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fits', 0, 'DETCHANS'))")
-#tlen2=$(( 2*tlen ))
-#
-#if [ -e "$exe_dir/temp.dat" ]; then
-#	fimgcreate bitpix=-32 \
-#		naxes="${tlen2},${detchans}" \
-#		datafile="$exe_dir/temp.dat" \
-#		outfile="${plot_root}_2Dccf.fits" \
-#		nskip=1 \
-#		history=true \
-#		clobber=yes
-#else
-#	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
-#fi
-#
-#if [ -e "${plot_root}_2Dccf.fits" ]; then
-#	echo "FITS 2D ccf ratio image: ${plot_root}_2Dccf.fits"
-#else
-#	echo -e "\tERROR: FIMGCREATE was not successful."
-#fi
+
+if [ -e "$saved_file_list" ] && [ -e "$bkgd_spec" ]; then
+	python "$exe_dir"/multi_ccf.py "$saved_file_list" "${out_file}.${t_ext}" \
+		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtering" -a
+elif [ -e "$saved_file_list" ]; then
+	python "$exe_dir"/multi_ccf.py "$saved_file_list" "${out_file}.${t_ext}" \
+		-n "$numsec" -m "$dt" -t "$testing" -f "$filtering" -a
+else
+	echo -e "\tERROR: multi_ccf.py was not run. List of eventlists and/or "\
+            "background energy spectrum doesn't exist."
+fi
+
+################################
+## Plotting the individual ccfs
+################################
+
+if [ -e "${out_file}.${t_ext}" ]; then
+	python "$exe_dir"/plot_CCF.py "${out_file}.${t_ext}" -o "${plot_root}" \
+		-p "$prefix" --ext "$p_ext"
+	if [ -e "${plot_root}_chan_15.${p_ext}" ]; then open "${plot_root}_chan_15.${p_ext}"; fi
+
+	multi_plot="${plot_root}_multiccfs.${p_ext}"
+	python "$exe_dir"/plot_multi.py "${out_file}.${t_ext}" "$multi_plot" \
+		-p "$prefix"
+#	if [ -e "$multi_plot" ]; then open "$multi_plot"; fi
+fi
+
+###############################################
+## Getting the energy list from a channel list
+###############################################
+
+if [ ! -e "$energies_file" ]; then
+	if [ -e "$ec_table_file" ] && [ -e "$chan_bin_file" ]; then
+		python "$xte_exe_dir"/channel_to_energy.py "$ec_table_file" \
+			"$chan_bin_file" "$energies_file" "$obs_epoch"
+	else
+		echo -e "\tERROR: channel_to_energy.py not run. ec_table_file and/or "\
+                "chan_bin_file do not exist."
+	fi
+fi
+
+
+#######################
+## Plotting the 2D ccf
+#######################
+
+plot_file="${plot_root}_2Dccf.${p_ext}"
+if [ -e "${out_file}.${t_ext}" ]; then
+	python "$exe_dir"/plot_2d.py "${out_file}.${t_ext}" -o "${plot_file}" \
+		-p "$prefix" -l "$tlen" -e "$energies_file"
+	if [ -e "${plot_file}" ]; then
+		open "${plot_file}"
+        cp "$plot_file" "$home_dir/Dropbox/Research/CCF_paper1/"
+    fi
+fi
+
+plot_file="${plot_root}_2Dccf.fits"
+detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fits', 0, 'DETCHANS'))")
+tlen2=$(( 2*tlen ))
+
+if [ -e "$exe_dir/temp.dat" ]; then
+	fimgcreate bitpix=-32 \
+		naxes="${tlen2},${detchans}" \
+		datafile="$exe_dir/temp.dat" \
+		outfile="${plot_root}_2Dccf.fits" \
+		nskip=1 \
+		history=true \
+		clobber=yes
+else
+	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
+fi
+
+if [ -e "${plot_root}_2Dccf.fits" ]; then
+	echo "FITS 2D ccf ratio image: ${plot_root}_2Dccf.fits"
+else
+	echo -e "\tERROR: FIMGCREATE was not successful."
+fi
 
 #####################
 ## Plotting the lags
