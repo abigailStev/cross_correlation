@@ -333,7 +333,7 @@ def get_phase_err(cs_avg, power_ci, power_ref, n, m):
 
 
 ################################################################################
-def phase_to_tlags(phase, f, detchans):
+def phase_to_tlags(phase, f):
     """
     Converts a complex phase (in radians) to a time lag (in seconds).
 
@@ -345,9 +345,6 @@ def phase_to_tlags(phase, f, detchans):
     f : np.array of floats
         Array of the Fourier frequencies for the cross-spectrum.
 
-    detchans : int
-        Number of detector energy channels for the data mode.
-
     Returns
     -------
     tlags : np.array of floats
@@ -357,15 +354,14 @@ def phase_to_tlags(phase, f, detchans):
             "dimensions as f."
 
     with np.errstate(all='ignore'):
-        tlags =  np.where(f != 0, phase / (2.0 * np.pi * f), 0)
+        tlags = np.where(f != 0, phase / (2.0 * np.pi * f), 0)
 
     return tlags
 
 
 ################################################################################
-def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
-    n_seg, mean_rate_ci_whole, mean_rate_ref_whole, cs_avg, power_ci,
-    power_ref):
+def make_lags(out_file, in_file, meta_dict, mean_rate_ci_whole, \
+        mean_rate_ref_whole, cs_avg, power_ci, power_ref):
     """
     Computes the phase lag and time lag from the average cross spectrum, and
     writes the lag information to a .fits output file.
@@ -379,20 +375,8 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
     in_file : str
         The input file / event list, for writing into the header.
 
-    dt : float
-        The timestep between bins in the light curve.
-
-    n_bins : int
-        The number of time bins in one Fourier segment of the data.
-
-    detchans : int
-        The number of detector energy channels for the data mode used.
-
-    n_seconds : int
-        The number of seconds in one Fourier segment of the data.
-
-    n_seg : int
-        The number of Fourier segments in all the data used.
+    meta_dict : dict
+        Dictionary of necessary meta-parameters for data analysis.
 
     mean_rate_ci_whole : np.array of floats
         1-D array (size=detchans) of the mean count rate of the channels of
@@ -418,9 +402,9 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
     nothing, but writes to the output file
 
     """
-    assert np.shape(power_ci) == (n_bins, detchans)
-    assert np.shape(power_ref) == (n_bins, )
-    assert np.shape(cs_avg) == (n_bins, detchans)
+    assert np.shape(power_ci) == (meta_dict['n_bins'], meta_dict['detchans'])
+    assert np.shape(power_ref) == (meta_dict['n_bins'], )
+    assert np.shape(cs_avg) == (meta_dict['n_bins'], meta_dict['detchans'])
 
 # 	low_freq = 4.47
 # 	hi_freq = 6.35
@@ -428,7 +412,7 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
     hi_freq = 7.0
 
     ## Getting the Fourier frequencies for the cross spectrum
-    freq = fftpack.fftfreq(n_bins, d=dt)
+    freq = fftpack.fftfreq(meta_dict['n_bins'], d=meta_dict['dt'])
 
     ## Only keeping the parts associated with positive Fourier frequencies
     nyq_ind = np.argmax(freq)+1  ## because in python, the scipy fft makes the
@@ -446,11 +430,12 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
     phase = -np.arctan2(cs_avg.imag, cs_avg.real) ## Negative sign is so that a
             ## positive lag is a hard energy lag?
     err_phase = get_phase_err(cs_avg, power_ci, np.resize(np.repeat(power_ref, \
-            detchans), np.shape(power_ci)), 1, n_seg)
+            meta_dict['detchans']), np.shape(power_ci)), 1, meta_dict['n_seg'])
     # print np.shape(err_phase)
-    f = np.resize(np.repeat(freq, detchans), (len(freq), detchans))
-    tlag = phase_to_tlags(phase, f, detchans)
-    err_tlag = phase_to_tlags(err_phase, f, detchans)
+    f = np.resize(np.repeat(freq, meta_dict['detchans']), (len(freq), \
+            meta_dict['detchans']))
+    tlag = phase_to_tlags(phase, f)
+    err_tlag = phase_to_tlags(err_phase, f)
 
     ## Getting lag and error for lag-energy plot (averaging over frequencies)
     f_span_low = np.argmax(freq == low_freq)
@@ -463,22 +448,22 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
     frange_cs = np.mean(cs_avg[f_span_low:f_span_hi+1, ], axis=0)
     frange_pow_ci = np.mean(power_ci[f_span_low:f_span_hi+1, ], axis=0)
     frange_pow_ref = np.repeat(np.mean(power_ref[f_span_low:f_span_hi+1]), \
-            detchans)
+            meta_dict['detchans'])
     # print "Shape cs:", np.shape(frange_cs)
     e_phase = -np.arctan2(frange_cs.imag, frange_cs.real)
     e_err_phase = get_phase_err(frange_cs, frange_pow_ci, frange_pow_ref, \
-            f_span, n_seg)
+            f_span, meta_dict['n_seg'])
     # print "Shape err phase:", np.shape(e_err_phase)
-    f = np.repeat(np.mean(frange_freq), detchans)
+    f = np.repeat(np.mean(frange_freq), meta_dict['detchans'])
     # print "Shape phase:", np.shape(e_phase)
     # print "Shape f:", np.shape(f)
 # 	exit()
-    e_tlag = phase_to_tlags(e_phase, f, detchans)
+    e_tlag = phase_to_tlags(e_phase, f)
     # print "Shape tlag:", np.shape(e_tlag)
-    e_err_tlag = phase_to_tlags(e_err_phase, f, detchans)
+    e_err_tlag = phase_to_tlags(e_err_phase, f)
     # print "Shape err tlag:", np.shape(e_err_tlag)
 
-    chan = np.arange(0, detchans)
+    chan = np.arange(0, meta_dict['detchans'])
     energy_channels = np.tile(chan, len(freq))
     bins = np.repeat(freq, len(chan))
 
@@ -490,12 +475,11 @@ def make_lags(out_file, in_file, dt, n_bins, detchans, n_seconds,
     prihdr.set('TYPE', "Time lag data")
     prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
     prihdr.set('EVTLIST', in_file)
-    prihdr.set('DT', dt, "seconds")
-    prihdr.set('N_BINS', n_bins, "time bins per segment")
-    prihdr.set('SEGMENTS', n_seg, "segments in the whole light curve")
-    prihdr.set('EXPOSURE', n_seg * n_bins * dt,
-            "seconds, of light curve")
-    prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
+    prihdr.set('DT', meta_dict['dt'], "seconds")
+    prihdr.set('N_BINS', meta_dict['n_bins'], "time bins per segment")
+    prihdr.set('SEGMENTS', meta_dict['n_seg'], "segments in the whole light curve")
+    prihdr.set('EXPOSURE', meta_dict['exposure'], "seconds, of light curve")
+    prihdr.set('DETCHANS', meta_dict['detchans'], "Number of detector energy channels")
     prihdr.set('LOWFREQ', low_freq)
     prihdr.set('HIGHFREQ', hi_freq)
     prihdr.set('RATE_CI', str(mean_rate_ci_whole.tolist()), "counts/second")
@@ -1764,15 +1748,16 @@ def main(in_file, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
     ##################################################
 
     t_res = np.float(tools.get_key_val(in_file, 0, 'TIMEDEL'))
-    dt = dt_mult * t_res
-    n_bins = n_seconds * int(1.0 / dt)
-    nyquist_freq = 1.0 / (2.0 * dt)
-    detchans = int(tools.get_key_val(in_file, 0, 'DETCHANS'))
-    df = 1.0 / np.float(n_seconds)
-    meta_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
-                 'df': df, 'nyquist': nyquist_freq, 'n_bins': n_bins, \
-                 'detchans': detchans, 'filter': filtering, \
-                 'adjust_seg': adjust_seg, 'exposure': 0}
+    meta_dict = {'dt': dt_mult * t_res,
+            't_res': t_res,
+            'n_seconds': n_seconds,
+            'df': 1.0 / np.float(n_seconds),
+            'nyquist': 1.0 / (2.0 * dt_mult * t_res),
+            'n_bins': n_seconds * int(1.0 / (dt_mult * t_res)),
+            'detchans': int(tools.get_key_val(in_file, 0, 'DETCHANS')),
+            'filter': filtering,
+            'adjust_seg': adjust_seg,
+            'exposure': 0}
 
     print "\nDT = %f" % meta_dict['dt']
     print "N_bins = %d" % meta_dict['n_bins']
@@ -1840,7 +1825,12 @@ def main(in_file, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
     ######################
 
     save_for_lags(out_file, in_file, meta_dict, ci_whole.mean_rate,
-        ref_whole.mean_rate, avg_cross_spec, ci_whole.power, ref_whole.power)
+            ref_whole.mean_rate, avg_cross_spec, ci_whole.power,
+            ref_whole.power)
+
+    make_lags(out_file, in_file, meta_dict, ci_whole.mean_rate,
+            ref_whole.mean_rate, avg_cross_spec, ci_whole.power,
+            ref_whole.power)
 
     ##############################################
     ## Computing ccf from cs, and computing error
@@ -1848,8 +1838,8 @@ def main(in_file, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
 
     if filtering:
         ccf_avg, ccf_error = FILT_cs_to_ccf_w_err(avg_cross_spec, meta_dict,
-            ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.power,
-            ref_whole.power, True, lo_freq, hi_freq)
+                ci_whole.mean_rate, ref_whole.mean_rate, ci_whole.power,
+                ref_whole.power, True, lo_freq, hi_freq)
     else:
         ccf_avg = UNFILT_cs_to_ccf(avg_cross_spec, meta_dict, ref_whole, True)
         ccf_error = standard_ccf_err(cross_spec, meta_dict, ref_whole, True)
