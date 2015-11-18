@@ -1493,13 +1493,13 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
             seg_end_time += meta_dict['n_seconds']
 
         ## This next bit deals with gappy data
-        elif len(time_ci) == 0 and len(time_ref) == 0:
+        else:
             start_time = max(all_time_ci[0], all_time_ref[0])
             seg_end_time = start_time + meta_dict['n_seconds']
-
-        else:
-            start_time = seg_end_time
-            seg_end_time += meta_dict['n_seconds']
+        #
+        # else:
+        #     start_time = seg_end_time
+        #     seg_end_time += meta_dict['n_seconds']
 
         ## End of 'if there are counts in this segment'
 
