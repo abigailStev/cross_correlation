@@ -1767,8 +1767,7 @@ def main(in_file, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
     meta_dict['df'] = df_whole
 
     avg_cross_spec, cross_spec, ci_whole, ref_whole, meta_dict = \
-            alltogether_means(cross_spec, ci_whole, ref_whole, meta_dict, \
-            bkgd_rate, False)
+            alltogether_means(cross_spec, ci_whole, ref_whole, meta_dict)
 
     #########################################
     ## Turning sums over segments into means
