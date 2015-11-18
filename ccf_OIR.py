@@ -1154,7 +1154,8 @@ def make_cs(rate_ci, rate_ref, meta_dict):
     ## Taking the FFT of the time-domain photon count rate
     ## SciPy is faster than NumPy or pyFFTW for my array sizes
     fft_data_ci = fftpack.fft(rate_sub_mean_ci, axis=0)
-    fft_data_ref = fftpack.fft(rate_sub_mean_ref)
+    # fft_data_ref = fftpack.fft(rate_sub_mean_ref)
+    fft_data_ref = fftpack.fft(rate_ref)
 
     ## Computing the power from the fourier transform
     ci_seg.power = np.absolute(fft_data_ci) ** 2
