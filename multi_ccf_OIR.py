@@ -406,9 +406,19 @@ def main(in_file_list, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
 
     avg_cross_spec, cross_spec, ci_total, ref_total, meta_dict = \
             xcor.alltogether_means(total_cross_spec, ci_total, ref_total, \
-            meta_dict, bkgd_rate, False)
+            meta_dict)
 
     # print ci_total.mean_rate[1:3]
+
+    ##################################################################
+    ## Subtracting the background count rate from the mean count rate
+    ##################################################################
+
+    ci_total.mean_rate -= bkgd_rate
+
+    # ## Need to use a background from ref. PCU for the reference band...
+    # ref_bkgd_rate = np.mean(bkgd_rate[2:26])
+    # ref_total.mean_rate -= ref_bkgd_rate
 
     ######################
     ## Making lag spectra

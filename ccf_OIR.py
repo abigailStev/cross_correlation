@@ -1575,12 +1575,10 @@ def get_background(bkgd_file):
     return rate
 
 ################################################################################
-def alltogether_means(cross_spec, ci, ref, meta_dict, bkgd_rate, boot=False):
+def alltogether_means(cross_spec, ci, ref, meta_dict):
     """
     Takes the means of all the data (cross spectrum, power spectra, mean count
-    rates) across the segments. If boot=False, first checks for and removes
-    segments where the reference band power has a negative variance, then takes
-    the average across the kept segments.
+    rates) across the segments.
 
     Parameters
     ----------
@@ -1596,15 +1594,6 @@ def alltogether_means(cross_spec, ci, ref, meta_dict, bkgd_rate, boot=False):
 
     meta_dict : dict
         Dictionary of necessary meta-parameters for data analysis.
-
-    bkgd_rate : np.array of floats
-        1-D array of the background spectrum in units of count rate for the
-        channels of interest. Size = (detchans).
-
-    boot : bool
-        If True, this method is being called by the bootstrapping and thus
-        doesn't need to check for negative variance of power spectra of segments
-        in the reference band, as this has already been done. [False]
 
     Returns
     -------
@@ -1630,51 +1619,6 @@ def alltogether_means(cross_spec, ci, ref, meta_dict, bkgd_rate, boot=False):
         boot=False, exposure and n_seg have been updated.
 
     """
-    if not boot:
-        ## Already do this before selecting random segments for bootstrapped ccf
-        ## which is why it isn't done if called by bootstrapping
-
-        ##################################################
-        ## Removing the segments with a negative variance
-        ##################################################
-        # print "Alltogether means:"
-        absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i],
-                ref.mean_rate_array[i], meta_dict['n_bins'], \
-                meta_dict['dt'][i], True) for i in range(meta_dict['n_seg'])])
-        ## Note that here, the axes are weird, so it's size (n_seg, n_bins)
-        absrms_var, absrms_rms = var_and_rms(absrms_power.T, meta_dict['df'])
-
-        # print "Absrms var:", absrms_var
-        # print "Absrms rms:", absrms_rms
-
-        # print "Shape of power:", np.shape(absrms_power)
-        # print "Shape absrms var:", np.shape(absrms_var)
-        # print "Shape absrms rms:", np.shape(absrms_rms)
-
-        mask = np.isnan(absrms_rms)
-        # print type(mask)
-        # print np.shape(mask)
-        # with open("mask.txt", 'w') as out:
-        #     for element in mask:
-        #         out.write("%s \n" % str(element))
-
-        # print "Not nan in mask:", np.count_nonzero(mask)
-
-        cross_spec = cross_spec[:,:,~mask]
-        ci.power_array = ci.power_array[:,:,~mask]
-        ci.mean_rate_array = ci.mean_rate_array[:,~mask]
-        ref.power_array = ref.power_array[:,~mask]
-        ref.mean_rate_array = ref.mean_rate_array[~mask]
-        # print meta_dict['exposure']
-        for element in meta_dict['dt'][mask]:
-            meta_dict['exposure'] -= element * meta_dict['n_bins']
-        # print meta_dict['exposure']
-        meta_dict['dt'] = meta_dict['dt'][~mask]
-        meta_dict['df'] = meta_dict['df'][~mask]
-        # print "Total num seg:", meta_dict['n_seg']
-        meta_dict['n_seg'] = meta_dict['n_seg'] - np.count_nonzero(mask)
-
-        # print "Non-nan num seg:", meta_dict['n_seg']
 
     #########################################
     ## Turning sums over segments into means
@@ -1696,12 +1640,6 @@ def alltogether_means(cross_spec, ci, ref, meta_dict, bkgd_rate, boot=False):
     # cs_out = np.column_stack((fftpack.fftfreq(meta_dict['n_bins'], d=dt), \
     #         avg_cross_spec.real))
     # np.savetxt('cs_avg.dat', cs_out)
-
-    ##################################################################
-    ## Subtracting the background count rate from the mean count rate
-    ##################################################################
-
-    ci.mean_rate -= bkgd_rate
 
     ## Need to use a background from ref pcu for the reference band...
     # ref_total.mean_rate -= np.mean(bkgd_rate[2:26])
@@ -1856,9 +1794,9 @@ def main(in_file, out_file, ref_band_file, bkgd_file=None, n_seconds=64,
 
     ci_whole.mean_rate -= bkgd_rate
 
-    ## Need to use a background from ref. PCU for the reference band...
-    ref_bkgd_rate = np.mean(bkgd_rate[2:26])
-    ref_whole.mean_rate -= ref_bkgd_rate
+    # ## Need to use a background from ref. PCU for the reference band...
+    # ref_bkgd_rate = np.mean(bkgd_rate[2:26])
+    # ref_whole.mean_rate -= ref_bkgd_rate
 
     ######################
     ## Making lag spectra
