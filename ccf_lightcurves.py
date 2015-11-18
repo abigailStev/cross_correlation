@@ -27,6 +27,11 @@ class Lightcurves(object):
             self.pos_power = np.zeros(n_bins/2+1, dtype=np.float64)
             self.mean_rate_array = 0.0
             self.mean_rate = 0.0
+            self.var = 0.0   # variance of the absolute-rms-normalized power
+                             # spectrum of the ref band
+            self.rms = 0.0   # rms of the absolute-rms-normalized power spectrum
+                             #  of the ref band
+            self.rms_array = 0.0
 
 
 class NormPSD(object):
