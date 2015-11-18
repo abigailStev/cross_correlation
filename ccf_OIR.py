@@ -1171,7 +1171,7 @@ def make_cs(rate_ci, rate_ref, meta_dict):
 
 
 ################################################################################
-def each_segment(time_ci, time_ref, energy_ci, meta_dict,\
+def each_segment(time_ci, energy_ci, rate_ref, meta_dict,\
     start_time, end_time):
     """
     Turns the event list into a populated histogram, stacks the reference band,
@@ -1231,8 +1231,9 @@ def each_segment(time_ci, time_ref, energy_ci, meta_dict,\
     rate_ci_2d = tools.make_2Dlightcurve(np.asarray(time_ci),
             np.asarray(energy_ci), meta_dict['n_bins'], meta_dict['detchans'],
             start_time, end_time)
-    rate_ref = tools.make_1Dlightcurve(np.asarray(time_ref),
-            meta_dict['n_bins'], start_time, end_time)
+
+    print "CI shape:", np.shape(rate_ci_2d)
+    print "ref shape:", np.shape(rate_ref)
 
     ## Save the reference band light curve to a text file
 # 	out_file="./GX339-BQPO_ref_lc.dat"
@@ -1384,6 +1385,7 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
     ## Correcting times to make them at the front of the bin.
     all_time_ref = np.asarray(ref_data.field('TIME'), dtype=np.float64) \
             - meta_dict['dt'] / 2.0
+    all_rate_ref = np.asarray(ref_data.field('RATE'), dtype=np.float64)
 
     ref_start_time = all_time_ref[0]
     ref_final_time = all_time_ref[-1]
@@ -1432,10 +1434,12 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
 
         ## Get events for reference band
         time_ref = all_time_ref[np.where(all_time_ref < seg_end_time)]
+        rate_ref = all_rate_ref[np.where(all_time_ref < seg_end_time)]
 
         ## Chop current segment off the rest of the list
         for_next_iteration_ref = np.where(all_time_ref >= seg_end_time)
         all_time_ref = all_time_ref[for_next_iteration_ref]
+        all_rate_ref = all_rate_ref[for_next_iteration_ref]
 
         ###########################
         ## At the end of a segment
@@ -1444,7 +1448,7 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
         if len(time_ci) > 0 and len(time_ref) > 0:
 
             cs_seg, ci_seg, ref_seg, rate_ci = each_segment(time_ci, \
-                    time_ref, energy_ci, meta_dict, start_time, \
+                    energy_ci, rate_ref, meta_dict, start_time, \
                     seg_end_time)
 
             dt_seg = (seg_end_time - start_time) / float(meta_dict['n_bins'])
