@@ -1445,7 +1445,7 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
         ## At the end of a segment
         ###########################
 
-        if len(time_ci) > 0 and len(time_ref) > 0:
+        if len(time_ci) > 0 and len(rate_ref) == meta_dict['n_bins']:
 
             cs_seg, ci_seg, ref_seg, rate_ci = each_segment(time_ci, \
                     energy_ci, rate_ref, meta_dict, start_time, \
