@@ -1337,6 +1337,7 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
     all_time_ref = np.asarray(ref_data.field('TIME'), dtype=np.float64) \
             - meta_dict['dt'] / 2.0
     all_rate_ref = np.asarray(ref_data.field('RATE'), dtype=np.float64)
+    all_err_ref = np.asarray(ref_data.field('ERROR'), dtype=np.float64)
 
     ref_start_time = all_time_ref[0]
     ref_final_time = all_time_ref[-1]
@@ -1386,11 +1387,15 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
         ## Get events for reference band
         time_ref = all_time_ref[np.where(all_time_ref < seg_end_time)]
         rate_ref = all_rate_ref[np.where(all_time_ref < seg_end_time)]
+        err_ref = all_err_ref[np.where(all_time_ref < seg_end_time)]
+
 
         ## Chop current segment off the rest of the list
         for_next_iteration_ref = np.where(all_time_ref >= seg_end_time)
         all_time_ref = all_time_ref[for_next_iteration_ref]
         all_rate_ref = all_rate_ref[for_next_iteration_ref]
+        all_err_ref = all_err_ref[for_next_iteration_ref]
+
 
         ###########################
         ## At the end of a segment
@@ -1407,10 +1412,17 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
 
             ## Computing variance and rms of the positive-frequency power in the
             ## reference band. Only keeping segments where the variance > 0.
-            absrms_pow = raw_to_absrms(ref_seg.power[0:meta_dict['n_bins']/2+1],
+            absrms_pow = raw_to_absrms(,
                     ref_seg.mean_rate, meta_dict['n_bins'], dt_seg, noisy=True)
 
-            var, rms = var_and_rms(absrms_pow, df_seg)
+            num = len(err_ref)
+            IR_poisson = np.sum(err_ref ** 2) / float(num)
+            print IR_poisson
+            absrms_IR_pow = ref_seg.power[0:meta_dict['n_bins']/2+1] * \
+                    (2.0 * dt_seg / np.float(meta_dict['n_bins'])) - \
+                    IR_poisson
+
+            var, rms = var_and_rms(absrms_IR_pow, df_seg)
 
             if var >= 0.0:
 
@@ -1420,15 +1432,6 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
                 cross_spec = np.dstack((cross_spec, cs_seg))
                 ref_whole.rms_array = np.append(ref_whole.rms_array,
                         np.sqrt(var))
-
-                # ci_whole.power_array = np.dstack((ci_whole.power_array, \
-                #         ci_seg.power))
-                # ci_whole.mean_rate_array = np.hstack((ci_whole.mean_rate_array, \
-                #         np.reshape(ci_seg.mean_rate, (meta_dict['detchans'],1)) ))
-                # ref_whole.power_array = np.hstack((ref_whole.power_array, \
-                #         np.reshape(ref_seg.power, (meta_dict['n_bins'],1)) ))
-                # ref_whole.mean_rate_array = np.append(ref_whole.mean_rate_array, \
-                #         ref_seg.mean_rate)
 
                 ## Sums across segments -- arrays, so it adds by index
                 exposure += (seg_end_time - start_time)
