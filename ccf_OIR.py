@@ -1416,12 +1416,11 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
             IR_poisson = np.sum(err_ref ** 2) / float(num)
             print IR_poisson
             absrms_IR_pow = ref_seg.power[0:meta_dict['n_bins']/2+1] * \
-                    (2.0 * dt_seg / np.float(meta_dict['n_bins'])) - \
-                    IR_poisson
+                    (2.0 * dt_seg / np.float(meta_dict['n_bins']))
 
             var, rms = var_and_rms(absrms_IR_pow, df_seg)
             print var, rms
-            
+
             if var >= 0.0:
 
                 dt_whole = np.append(dt_whole, dt_seg)
