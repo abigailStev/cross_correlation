@@ -1412,9 +1412,6 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
 
             ## Computing variance and rms of the positive-frequency power in the
             ## reference band. Only keeping segments where the variance > 0.
-            absrms_pow = raw_to_absrms(,
-                    ref_seg.mean_rate, meta_dict['n_bins'], dt_seg, noisy=True)
-
             num = len(err_ref)
             IR_poisson = np.sum(err_ref ** 2) / float(num)
             print IR_poisson
@@ -1423,7 +1420,8 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
                     IR_poisson
 
             var, rms = var_and_rms(absrms_IR_pow, df_seg)
-
+            print var, rms
+            
             if var >= 0.0:
 
                 dt_whole = np.append(dt_whole, dt_seg)
