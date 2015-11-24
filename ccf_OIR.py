@@ -1315,9 +1315,9 @@ def fits_in(in_file, ref_band_file, meta_dict, test=False):
     ###################################
 
     PCU2_mask = ci_data.field('PCUID') == 2
-    data_pcu2 = ci_data[PCU2_mask]
-    all_time_ci = np.asarray(data_pcu2.field('TIME'), dtype=np.float64)
-    all_energy_ci = np.asarray(data_pcu2.field('CHANNEL'), dtype=np.float64)
+    ci_data_pcu2 = ci_data[PCU2_mask]
+    all_time_ci = np.asarray(ci_data_pcu2.field('TIME'), dtype=np.float64)
+    all_energy_ci = np.asarray(ci_data_pcu2.field('CHANNEL'), dtype=np.float64)
 
     ####################################
     ## Selecting PCU for reference band
