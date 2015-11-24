@@ -195,7 +195,7 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     absrms_power = xcor.raw_to_absrms(ref_total.power_array[0:meta_dict['n_bins']/2+1,:], \
             ref_total.mean_rate_array, meta_dict['n_bins'], meta_dict['dt'], \
             True)
-    print np.shape(absrms_power)
+    # print np.shape(absrms_power)
 
     absrms_var, absrms_rms = xcor.var_and_rms(absrms_power, meta_dict['df'])
     # print var
@@ -234,7 +234,7 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
     if boot_num >= 1:
         for b in range(1, boot_num+1):
 
-            if b % 20 == 0:
+            if b % 5 == 0:
                 print "\t%d" % b
 
             out_file = out_root.replace("_b-", "_b-%d" % b)
@@ -302,9 +302,6 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
 
             # print aremes
 
-
-
-
             # for i in range(meta_dict['n_seg']):
             #     absrms_pow = xcor.raw_to_absrms(ref_boot.power_array[0:meta_dict['n_bins']/2+1, i], \
             #             ref_boot.mean_rate_array[i], meta_dict['n_bins'], meta_dict['dt'][i], \
@@ -329,8 +326,6 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
                     "ERROR: Random draw-with-replacement of segments was not "\
                     "successful. Ref mean rate array values broke."
 
-            # exit()
-
             ##############################
             ## Making means from segments
             ##############################
@@ -344,25 +339,20 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
             ## Making lag spectra
             ######################
 
-            xcor.save_for_lags(out_file, in_file_list, meta_dict, \
-                    ci_boot.mean_rate, ref_boot.mean_rate, boot_cross_spec, \
-                    ci_boot.power, ref_boot.power)
+            # xcor.save_for_lags(out_file, in_file_list, meta_dict, \
+            #         ci_boot.mean_rate, ref_boot.mean_rate, boot_cross_spec, \
+            #         ci_boot.power, ref_boot.power)
 
             ##############################################
             ## Computing ccf from cs, and computing error
             ##############################################
 
-            if filtering:
-                ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(avg_boot_cross_spec, \
-                        meta_dict, ci_boot.mean_rate, ref_boot.mean_rate, \
-                        ci_boot.power, ref_boot.power, True, lo_freq, hi_freq)
-            else:
-                ccf_end = xcor.UNFILT_cs_to_ccf(avg_boot_cross_spec, meta_dict, \
-                        ref_boot, True)
+            ccf_end = xcor.UNFILT_cs_to_ccf(avg_boot_cross_spec, meta_dict, \
+                    ref_boot, True)
 
-                ccf_error = xcor.standard_ccf_err(boot_cross_spec, meta_dict, \
-                        ref_boot, noisy=True, absrms_var=boot_var, \
-                        absrms_rms=boot_rms)
+            ccf_error = xcor.standard_ccf_err(boot_cross_spec, meta_dict, \
+                    ref_boot, noisy=True, absrms_var=boot_var, \
+                    absrms_rms=boot_rms)
 
             # print ccf_error
             # print "ccf end:", ccf_end[1:3,1:3]
@@ -398,16 +388,12 @@ def main(in_file_list, out_root, bkgd_file, n_seconds, dt_mult, test,
         ## Computing ccf from cs, and computing error
         ##############################################
 
-        if filtering:
-            ccf_end, ccf_error = xcor.FILT_cs_to_ccf_w_err(avg_cross_spec, \
-                    meta_dict, ci_total.mean_rate, ref_total.mean_rate, \
-                    ci_total.power, ref_total.power, True, lo_freq, hi_freq)
-        else:
-            ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, meta_dict, \
-                    ref_total, True)
 
-            ccf_error = xcor.standard_ccf_err(total_cross_spec, meta_dict, \
-                    ref_total, True)
+        ccf_end = xcor.UNFILT_cs_to_ccf(avg_cross_spec, meta_dict, \
+                ref_total, True)
+
+        ccf_error = xcor.standard_ccf_err(total_cross_spec, meta_dict, \
+                ref_total, True)
 
         # print "ccf end:", ccf_end[1:3,1:3]
         # print "Exposure_time = %.3f seconds" % meta_dict['exposure']
