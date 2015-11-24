@@ -2,8 +2,8 @@
 
 ################################################################################
 ##
-## Simple script to run ccf.py, plot_ccf.py, plot_multi.py, plot_2d.py, and 
-## plot_lags.py
+## Simple script to run ccf.py, plot_ccf.py, plot_multi.py, plot_2d.py,
+## get_lags.py, and covariance_spectrum.py.
 ##
 ## Don't give command line arguments. Change things in this script below.
 ##
@@ -13,11 +13,11 @@
 ## Notes: HEASOFT 6.11.*, bash 3.*, and Python 2.7.* (with supporting libraries) 
 ## 		  must be installed in order to run this script. 
 ##
-## Abigail Stevens, A.L.Stevens@uva.nl, 2014-2015
+## Author: Abigail Stevens <A.L.Stevens at uva.nl> 2014-2015
 ##
 ################################################################################
 
-## Checking the number of input arguments
+## Checking the number of input arguments; shouldn't have any!
 if (( $# != 0 )); then
     echo -e "\tDo not give command line arguments. Usage: ./run_ccf.sh\n"
     exit
@@ -30,160 +30,203 @@ fi
 
 ################################################################################
 
-#prefix="j1808-1HzQPO"
-#obsID="70080-03-11-00"
+# Identifying prefix (object nickname or data ID)
 prefix="GX339-BQPO"
-obsID="95335-01-01-05"
+# ObsID of the data
+obsID="95335-01-01-01"
 
-dt=64
+# Multiple of time resolution of the data for binning the light curve
+dt=512
+# Number of seconds per Fourier segment
 numsec=64
-testing=0  # 0 for no, 1 for yes
-tlen=40
+# RXTE observation epoch of your data
 obs_epoch=5
+# Whether or not to run 'testing'; 0 for no, 1 for yes
+testing=0
+# Number of time bins to plot for the two-dimensional ccf
+tlen=20
+# Whether or not you want to filter the cross spectrum in frequency.
+# Expected format: "no" or "low:high" (e.g. "400:402"
+filtfreq="no"
+# Lower frequency bound for lag-energy spectra, in Hz
+lag_lf=4.0
+# Upper frequency bound for lag-energy spectra, in Hz
+lag_uf=7.0
+# Lower energy bound for lag-frequency spectra, in detector channels
+lag_le=3
+# Upper energy bound for lag-frequency spectra, in detector channels
+lag_ue=15
+# Desired plot file extension, without the dot
+p_ext="eps"
 
-home_dir=$(ls -d ~) 
-day=$(date +%y%m%d)
-exe_dir="$home_dir/Dropbox/Research/cross_correlation"
-out_dir="$exe_dir/out_ccf/${prefix}"
+# Your computer's home directory (gets automatically)
+home_dir=$(ls -d ~)
+# Today's date (gets automatically), for writing in file names
+#day=$(date +%y%m%d)
+day="151123"
+# Directory with the ccf code. Probably $home_dir/[something]/cross_correlation
+ccf_exe_dir="$home_dir/Dropbox/Research/cross_correlation"
+# Directory with the ccf code. Probably $home_dir/[something]/rxte_reduce
 xte_exe_dir="$home_dir/Dropbox/Research/rxte_reduce"
-lag_exe_dir="$home_dir/Dropbox/Research/lags"
-lag_out_dir="$lag_exe_dir/out_lags/${prefix}"
-
+# Directory with the ccf code. Probably $home_dir/[something]/lag_spectra
+lag_exe_dir="$home_dir/Dropbox/Research/lag_spectra"
+# Directory with the reduced data
 red_dir="$home_dir/Reduced_data/${prefix}/$obsID"
-# red_dir="$home_dur/Dropbox/Research/sample_data"
+# File name of the GTI'd event list in fits format (from rxte_reduce/
+# good_event.sh)
 in_file="$red_dir/GTId_eventlist.fits"
+# File name of the background energy spectrum for the chans of interest,
+# binned to the same energy resolution as the chans of interest.
 bkgd_spec="$home_dir/Reduced_data/$prefix/evt_bkgd_rebinned.pha"
-ec_table_file="$xte_exe_dir/e-c_table.txt"
+# Energy to channel conversion table from the heasoft website.
+ec_table_file="${xte_exe_dir}/e-c_table.txt"
+# Table telling how the RXTE Std2 energy channels are binned together for your
+# particular data mode.
 chan_bin_file="$home_dir/Reduced_data/${prefix}/chan.txt"
+# Energy bounds for detector channels, in keV.
+# Ex: if 4 channels, should have 5 energies in this file.
+# If this doesn't exist, it's created in rxte_reduce/channel_to_energy.py
 energies_file="$home_dir/Reduced_data/${prefix}/energies.txt"
+# Response matrix for the chans of interest data.
+# Gets copied to the local lag directory later.
+rsp_matrix="$home_dir/Reduced_data/${prefix}/PCU2.rsp"
+
+################################################################################
+################################################################################
+
+# Output directory for cross_correlation and lag_spectra products.
+# I recommend leaving this, hence why it's below the double hash lines.
+ccf_out_dir="${ccf_exe_dir}/out_ccf/${prefix}"
+lag_out_dir="${lag_exe_dir}/out_lags/${prefix}"
 
 #filename="${obsID}_${day}_t${dt}_${numsec}sec_adj"
 filename="${obsID}_${day}_t${dt}_${numsec}sec"
 
-
-#filtfreq="401:401"
-filtfreq="no"
-
-t_ext="fits"
-p_ext="png"
-
-################################################################################
-################################################################################
-
-if [ ! -d "$out_dir" ]; then mkdir -p "$out_dir"; fi
-if [ ! -d "$lag_out_dir" ]; then mkdir -p "$lag_out_dir"; fi
+if [ ! -d "${ccf_out_dir}" ]; then mkdir -p "${ccf_out_dir}"; fi
+if [ ! -d "${lag_out_dir}" ]; then mkdir -p "${lag_out_dir}"; fi
 
 if (( $testing == 0 )); then
-	out_file="$out_dir/$filename"
+	ccf_out_file="${ccf_out_dir}/$filename.fits"
+	ccf_plot_root="${ccf_out_dir}/$filename"
+	lag_out_file="$lag_out_dir/$filename"
+	lag_plot_root="$lag_out_dir/$filename"
 elif (( $testing == 1 )); then
-	out_file="$out_dir/test_$filename"
+	ccf_out_file="${ccf_out_dir}/test_$filename.fits"
+	ccf_plot_root="${ccf_out_dir}/test_$filename"
+    lag_out_file="$lag_out_dir/test_$filename"
+	lag_plot_root="$lag_out_dir/test_$filename"
 fi
 
-##################
-## Running ccf.py
-##################
-
+###################
+### Running ccf.py
+###################
+#
 #if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
-#	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
-#		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" \
-#		-a 932
-#elif [ -e "$in_file" ]; then
-#	time python "$exe_dir"/ccf.py "${in_file}" "${out_file}.${t_ext}" \
-#		-n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" -a 932
+#	time python "${ccf_exe_dir}"/ccf.py "${in_file}" "${ccf_out_file}" \
+#		-b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq"
+#elif [ -e "${in_file}" ]; then
+#	time python "${ccf_exe_dir}"/ccf.py "${in_file}" "${ccf_out_file}" \
+#		-n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq"
 #else
 #	echo -e "\tERROR: ccf.py was not run. Eventlist and/or background energy \
 #spectrum doesn't exist."
 #fi
-
-
-#################
-## Plotting ccfs
-#################
-
-#if [ -e "${out_file}.${t_ext}" ]; then
 #
-#	python "$exe_dir"/plot_ccf.py "${out_file}.${t_ext}" -o "${out_file}" \
-#		-p "${prefix}/${obsID}"
 #
-#	if [ -e "${out_file}_chan_15.${p_ext}" ]; then open "${out_file}_chan_15.${p_ext}"; fi
+##################
+### Plotting ccfs
+##################
 #
-#	multi_plot="${out_file}_multiccfs.${p_ext}"
-#	python "$exe_dir"/plot_multi.py "${out_file}.${t_ext}" "$multi_plot" \
-#		-p "${prefix}/${obsID}"
+#if [ -e "${ccf_out_file}" ]; then
 #
-## 	if [ -e "$ccfs_plot" ]; then open "$ccfs_plot"; fi
+#	python "${ccf_exe_dir}"/plot_ccf.py "${ccf_out_file}" -o "${ccf_plot_root}" \
+#		    --prefix "${prefix}/${obsID}" --ext "${p_ext}"
+#
+#	if [ -e "${ccf_out_file}_chan_15.${p_ext}" ]; then
+#	    open "${ccf_out_file}_chan_15.${p_ext}"; fi
+#
+#	ccf_multi_plot="${ccf_out_file}_multiccfs.${p_ext}"
+#	python "${ccf_exe_dir}"/plot_multi.py "${ccf_out_file}" "$ccf_multi_plot" \
+#		    --prefix "${prefix}/${obsID}"
+#
+# 	if [ -e "$ccfs_plot" ]; then open "$ccfs_plot"; fi
 #
 #fi
-
-###############################################
-## Getting the energy list from a channel list
-###############################################
-
-if [ ! -e "$energies_file" ]; then
-	if [ -e "$ec_table_file" ] && [ -e "$chan_bin_file" ]; then
-		python "$xte_exe_dir"/channel_to_energy.py "$ec_table_file" \
-			"$chan_bin_file" "$energies_file" "$obs_epoch"
-	else
-		echo -e "\tERROR: channel_to_energy.py not run. ec_table_file and/or \
-chan_bin_file do not exist."
-	fi
-fi	
-
-####################################
-## Plotting the 2D ccf with colours
-####################################
-
-plot_file="${out_file}_2Dccf.${p_ext}"
-if [ -e "${out_file}.${t_ext}" ]; then
-	python "$exe_dir"/plot_2d.py "${out_file}.${t_ext}" -o "${plot_file}" \
-		-p "${prefix}/${obsID}" -l "$tlen" -e "$energies_file"
-	if [ -e "${plot_file}" ]; then open "${plot_file}"; fi
-fi
-
-plot_file="${out_file}_2Dccf.fits"
-detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}.fits', 0, 'DETCHANS'))")
-
-if [ -e "$out_dir/temp.dat" ]; then
-	fimgcreate bitpix=-32 \
-		naxes="${tlen},${detchans}" \
-		datafile="$out_dir/temp.dat" \
-		outfile="${plot_file}" \
-		nskip=1 \
-		history=true \
-		clobber=yes
-else
-	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
-fi
-
-if [ -e "${plot_file}" ]; then
-	echo "FITS 2D ccf ratio image: ${plot_file}"
-else
-	echo -e "\tERROR: FIMGCREATE was not successful."
-fi
+#
+################################################
+### Getting the energy list from a channel list
+################################################
+#
+#if [ ! -e "$energies_file" ]; then
+#	if [ -e "$ec_table_file" ] && [ -e "$chan_bin_file" ]; then
+#		python "${xte_exe_dir}"/channel_to_energy.py "$ec_table_file" \
+#			    "$chan_bin_file" "$energies_file" "$obs_epoch"
+#	else
+#		echo -e "\tERROR: channel_to_energy.py not run. ec_table_file and/or "\
+#                "chan_bin_file do not exist."
+#	fi
+#fi
+#
+#####################################
+### Plotting the 2D ccf with colours
+#####################################
+#
+#ccf2d_plot="${ccf_plot_root}_2Dccf.${p_ext}"
+#if [ -e "${ccf_out_file}" ]; then
+#	python "${ccf_exe_dir}"/plot_2d.py "${ccf_out_file}" -o "${ccf2d_plot}" \
+#		    -p "${prefix}/${obsID}" -l "$tlen" -e "$energies_file"
+#	if [ -e "${ccf2d_plot}" ]; then open "${ccf2d_plot}"; fi
+#fi
+#
+#ccf2d_fits_plot="${ccf_plot_root}_2Dccf.fits"
+#detchans=$(python -c "import tools; print int(tools.get_key_val('${ccf_out_file}.fits', 0, 'DETCHANS'))")
+#
+#if [ -e "${ccf_out_dir}/temp.dat" ]; then
+#	fimgcreate bitpix=-32 \
+#		naxes="${tlen},${detchans}" \
+#		datafile="${ccf_out_dir}/temp.dat" \
+#		outfile="${ccf2d_fits_plot}" \
+#		nskip=1 \
+#		history=true \
+#		clobber=yes
+#else
+#	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
+#fi
+#
+#if [ -e "${ccf2d_fits_plot}" ]; then
+#	echo "FITS 2D ccf ratio image: ${ccf2d_fits_plot}"
+#else
+#	echo -e "\tERROR: FIMGCREATE was not successful."
+#fi
 
 #####################
 ## Plotting the lags
 #####################
 
-cd "$lag_exe_dir"
+cd "${lag_exe_dir}"
+local_rsp_matrix="${lag_out_dir}/${obsID}.rsp"
+if [ ! -e "${local_rsp_matrix}" ]; then
+    cp "${rsp_matrix}" "${local_rsp_matrix}"; fi
 
-if (( $testing == 0 )); then
-	out_file="$lag_out_dir/$filename"
-elif (( $testing == 1 )); then
-	out_file="$lag_out_dir/test_$filename"
-fi
+if [ -e "${lag_out_file}_cs.fits" ]; then
 
-if [ -e "${out_file}.${t_ext}" ]; then
-	python "$lag_exe_dir"/plot_lags.py "${out_file}.${t_ext}" -o "${out_file}" \
-		-p "${prefix}/${obsID}"
-	if [ -e "$out_file"_lag-energy.png ]; then open "$out_file"_lag-energy.png
+	python "${lag_exe_dir}"/get_lags.py "${lag_out_file}_cs.fits" \
+			"${lag_out_file}_lag.fits" "${energies_file}" \
+			-o "${lag_plot_root}" --prefix "$prefix" --ext "${p_ext}" \
+			--lf "${lag_lf}" --uf "${lag_uf}" --le "${lag_le}" --ue "${lag_ue}"
+
+	if [ -e "${lag_plot_root}"_lag-energy."${p_ext}" ]; then
+	    open "${lag_plot_root}"_lag-energy."${p_ext}"
 	fi
-	if [ -e "$out_file"_lag-freq_15.png ]; then open "$out_file"_lag-freq_15.png
-	fi
+
+	python "${lag_exe_dir}"/covariance_spectrum.py "${lag_out_file}_cs.fits" \
+			"${lag_out_file}_cov.fits" --prefix "$prefix" --ext "${p_ext}" \
+			--rsp "${local_rsp_matrix}" --lf "${lag_lf}" --uf "${lag_uf}"
+
 else
-	echo -e "\tERROR: plot_lags.py was not run. Lag output file does not exist."
+	echo -e "\tERROR: get_lags.py was not run. Cross spectrum output file does"\
+	        " not exist."
 fi
-
 ################################################################################
 ## All done!
 ################################################################################
