@@ -71,5 +71,8 @@ coverage.xml
 *.png
 *.txt
 
-
+# Other
+.DS_Store
+old_methods.py
+array_manipulation.ipynb
 
