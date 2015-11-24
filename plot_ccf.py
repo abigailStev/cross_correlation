@@ -54,21 +54,21 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
     font_prop = font_manager.FontProperties(size=18)
 
     # fig, ax = plt.subplots(1,1, figsize=(12,6), dpi=300)
-    fig, ax = plt.subplots(1,1, figsize=(10, 7.5), dpi=300)
+    fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
 
 # 	ax.plot(x_bins, ccf_amps, lw=2, c='black')
     ax.vlines(0.0, -1.5, 3.0, linestyle='dotted', color='gray', lw=1.5)
     ax.hlines(0.0, -30, 30, linestyle='dashed', color='gray', lw=1.5)
     ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=2, c='black',
             drawstyle='steps-mid', elinewidth=1.5, capsize=1.5)
-    ax.plot([-5], [ccf_amps[n_bins/2-5]], "o", mfc='red', mew=1, mec='black',
-            ms=20)
-    ax.plot([1], [ccf_amps[n_bins/2+1]],"*",  mfc='orange', mew=1, mec='black',
-            ms=30)
-    ax.plot([6], [ccf_amps[n_bins/2+6]], "^", mfc='green', mew=1, mec='black',
-            ms=20)
-    ax.plot([14], [ccf_amps[n_bins/2+14]], 's', mfc='blue', mew=1, mec='black',
-            ms=20)
+    # ax.plot([-5], [ccf_amps[n_bins/2-5]], "o", mfc='red', mew=1, mec='black',
+    #         ms=20)
+    # ax.plot([1], [ccf_amps[n_bins/2+1]],"*",  mfc='orange', mew=1, mec='black',
+    #         ms=30)
+    # ax.plot([6], [ccf_amps[n_bins/2+6]], "^", mfc='green', mew=1, mec='black',
+    #         ms=20)
+    # ax.plot([14], [ccf_amps[n_bins/2+14]], 's', mfc='blue', mew=1, mec='black',
+    #         ms=20)
     ax.set_xlabel(r'Time ($\times\,1/%d\,$s)' % frac_time, \
             fontproperties=font_prop)
     ax.set_ylabel(r'Deviation from mean (cts / s)', \
@@ -95,7 +95,6 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
     title="%s, Energy channel %d" % (prefix, chan)
     # ax.set_title(title, fontproperties=font_prop)
 
-    fig.set_tight_layout(True)
     plt.savefig(plot_file)
 # 	plt.show()
     plt.close()
@@ -108,34 +107,32 @@ if __name__ == "__main__":
     ## Parsing input arguments
     ###########################
 
-    parser = argparse.ArgumentParser(usage="python plot_ccf.py tab_file "\
+    parser = argparse.ArgumentParser(usage="python plot_ccf.py ccf_file "\
             "[OPTIONAL ARGUMENTS]", description=__doc__, epilog="For optional "\
             "arguments, default values are given in brackets at end of "\
             "description.")
 
-    parser.add_argument('tab_file', help="The table file, in .dat or .fits "\
-            "format.")
+    parser.add_argument('ccf_file', help="The CCF file, in .fits format.")
 
-    parser.add_argument('-o', '--outroot', dest='out_root', default="./ccf",
-            help="The root of the filename to save the plot to. Energy channel"\
-            "will be appended to name before saving. [./ccf]")
+    parser.add_argument('-o', '--plotroot', dest='plot_root', default="./ccf",
+            help="The root of the filename to save the 1-D ccf plot to. Energy"\
+            " channel will be appended to name before saving. [./ccf]")
 
     parser.add_argument('-p', '--prefix', dest='prefix', default="--",
             help="The identifying prefix of the data (object nickname or data "\
             "ID). [--]")
 
-    parser.add_argument('-e', '--ext', dest='plot_ext', default='png',
-            help="File extension for the plot. Do not include the '.' [png]")
+    parser.add_argument('-e', '--ext', dest='plot_ext', default='eps',
+            help="File extension for the plot. Do not include the '.' [eps]")
 
     args = parser.parse_args()
 
-
-    print( "Plotting the ccf: %s_chan_xx.%s" % (args.out_root, args.plot_ext) )
+    print("Plotting the ccf: %s_chan_xx.%s" % (args.plot_root, args.plot_ext))
 
     try:
-        file_hdu = fits.open(args.tab_file)
+        file_hdu = fits.open(args.ccf_file)
     except IOError:
-        print("\tERROR: File does not exist: %s" % args.tab_file)
+        print("\tERROR: File does not exist: %s" % args.ccf_file)
         exit()
 
     table = file_hdu[1].data
@@ -169,10 +166,10 @@ if __name__ == "__main__":
         ccf_err = np.append(neg_time_ccf_err, pos_time_ccf_err)
 
         if i < 10:
-            plot_file = args.out_root + "_chan_" + str(0) + str(i) + "." + \
+            plot_file = args.plot_root + "_chan_" + str(0) + str(i) + "." + \
                         args.plot_ext
         else:
-            plot_file = args.out_root + "_chan_" + str(i) + "." + args.plot_ext
+            plot_file = args.plot_root + "_chan_" + str(i) + "." + args.plot_ext
 
 
         make_plot(time_bins, ccf, ccf_err, n_bins, args.prefix, plot_file, i,
