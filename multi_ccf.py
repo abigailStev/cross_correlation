@@ -205,7 +205,7 @@ def main(in_file_list, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
 
     adjust_segments = [932, 216, 184, 570, 93, 346, 860, 533, -324]
     if not adjust:
-        adjust_segments = [0,0,0,0,0,0,0,0,0]
+        adjust_segments = np.zeros(len(input_files))
 
     t_res = np.float64(tools.get_key_val(input_files[0], 0, 'TIMEDEL'))
     dt = dt_mult * t_res
@@ -217,10 +217,16 @@ def main(in_file_list, out_file, bkgd_file=None, n_seconds=64, dt_mult=64,
 
     nyq_freq = 1.0 / (2.0 * dt)
     df = 1.0 / np.float64(n_seconds)
-    meta_dict = {'dt': dt, 't_res': t_res, 'n_seconds': n_seconds, \
-                'df': df, 'nyquist': nyq_freq, 'n_bins': n_bins, \
-                'detchans': detchans, 'filter': filtering, \
-                'adjust_seg': 0, 'exposure': 0}
+    meta_dict = {'dt': dt,
+                 't_res': t_res,
+                 'n_seconds': n_seconds,
+                 'df': df,
+                 'nyquist': nyq_freq,
+                 'n_bins': n_bins,
+                 'detchans': detchans,
+                 'filter': filtering,
+                 'adjust_seg': 0,
+                 'exposure': 0}
 
     ci_total = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ci')
