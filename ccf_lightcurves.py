@@ -2,7 +2,7 @@
 Class for CCF Lightcurves object and normalized power spectra.
 Typically imported as ccf_lc. At top of program, along with other import
 statements, write: "import ccf_lightcurves.py as ccf_lc", then you can call
-ccf_lc.Lightcurves and ccf_lc.NormPSD!
+ccf_lc.Lightcurve and ccf_lc.NormPSD!
 """
 import numpy as np
 
@@ -10,7 +10,7 @@ __author__ = 'Abigail Stevens <A.L.Stevens at uva.nl>'
 __year__ = "2015"
 
 
-class Lightcurves(object):
+class Lightcurve(object):
     def __init__(self, n_bins=8192, detchans=64, type='ref'):
         self.type = type
 
