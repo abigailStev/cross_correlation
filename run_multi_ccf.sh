@@ -52,7 +52,7 @@ ec_table_file="$xte_exe_dir/e-c_table.txt"
 chan_bin_file="$red_dir/chan.txt"
 energies_file="$red_dir/energies.txt"
 
-bkgd_spec="$home_dir/Reduced_data/$prefix/evt_bkgd_rebinned.pha"
+bkgd_spec="$red_dir/evt_bkgd_rebinned.pha"
 
 filename="${prefix}_${day}_t${dt}_${numsec}sec_adj"
 # Response matrix for the chans of interest data.
