@@ -2,7 +2,7 @@
 
 ################################################################################
 ## 
-## Use with ccf_bootstrap.sh
+## Use with ccf_bootstrap.sh. Runs bootstrap_ccf.py, a version of ccf.py.
 ##
 ## Change the directory names and specifiers before the double '#' row to best
 ## suit your setup.
@@ -10,14 +10,14 @@
 ## Notes: HEASOFT 6.14 (or higher), bash 3.*, and Python 2.7.* (with supporting 
 ## 		  libraries) must be installed in order to run this script. 
 ##
-## Written by Abigail Stevens, A.L.Stevens at uva.nl, 2015
+## Author: Abigail Stevens <A.L.Stevens at uva.nl> 2015
 ##
 ################################################################################
 
 ## Checking the number of input arguments
 if (( $# != 8 )); then
-    echo -e "\tUsage: ./run_multi_ccf.sh <file list> <prefix> <dt multiple> "\
-            "<num seconds> <testing> <date> <filtering> <boot_num>\n"
+    echo -e "\tUsage: ./run_bootstrap_ccf.sh <file list> <prefix> <dt "\
+            "multiple> <num seconds> <testing> <date> <filtering> <boot_num>\n"
     exit
 fi
 
@@ -30,28 +30,23 @@ day=$6
 filtering=$7 ## "no" for QPOs, or "lofreq-hifreq" in Hz for coherent pulsations
 boot_num=$8  ## Number of bootstrap iterations to run
 
-################################################################################
-
 ## If heainit isn't running, start it
 if (( $(echo $DYLD_LIBRARY_PATH | grep heasoft | wc -l) < 1 )); then
 	. ${HEADAS}/headas-init.sh
 fi
 
+################################################################################
+
 home_dir=$(ls -d ~)
 
-exe_dir="$home_dir/Dropbox/Research/cross_correlation"
-out_dir="$exe_dir/out_ccf/${prefix}/bootstrapped"
-lag_exe_dir="$home_dir/Dropbox/Research/lags"
-lag_out_dir="$lag_exe_dir/out_lags"
+ccf_exe_dir="$home_dir/Dropbox/Research/cross_correlation"
+ccf_out_dir="${ccf_exe_dir}/out_ccf/${prefix}/bootstrapped"
 xte_exe_dir="$home_dir/Dropbox/Research/rxte_reduce"
 red_dir="$home_dir/Reduced_data/${prefix}"
 
 ec_table_file="$xte_exe_dir/e-c_table.txt"
 chan_bin_file="$red_dir/chan.txt"
 energies_file="$red_dir/energies.txt"
-
-if [ ! -d "$out_dir" ]; then mkdir -p "$out_dir"; fi
-if [ ! -d "$lag_out_dir" ]; then mkdir -p "$lag_out_dir"; fi
 
 bkgd_spec="$home_dir/Reduced_data/$prefix/evt_bkgd_rebinned.pha"
 filename="${prefix}_${day}_t${dt}_${numsec}sec_adj_b-"
@@ -62,38 +57,43 @@ lag_uf=7.0  ## Upper frequency bound for lag spectra, in Hz
 tlen=30  ## Number of time bins to plot along the 2D CCF x-axis
 obs_epoch=5
 
-t_ext="fits"
 p_ext="eps"
 
 ################################################################################
 ################################################################################
 
+if [ ! -d "${ccf_out_dir}" ]; then mkdir -p "${ccf_out_dir}"; fi
+
 if (( $testing == 0 )); then
-	out_file="$out_dir/$filename"
-	plot_root="$out_dir/$filename"
-	saved_file_list="$out_dir/${filename}_filelist"
+	out_file="${ccf_out_dir}/$filename"
+	plot_root="${ccf_out_dir}/$filename"
+	saved_file_list="${ccf_out_dir}/${filename}filelist.lst"
 elif (( $testing == 1 )); then
-	out_file="$out_dir/test_$filename"
-	plot_root="$out_dir/test_$filename"
-	saved_file_list="$out_dir/test_${filename}_filelist"
+	out_file="${ccf_out_dir}/test_$filename"
+	plot_root="${ccf_out_dir}/test_$filename"
+	saved_file_list="${ccf_out_dir}/test_${filename}filelist.lst"
 fi
 
 cp "$file_list" "$saved_file_list"
 
-########################
-## Running multi_ccf.py
-########################
+############################
+## Running bootstrap_ccf.py
+############################
 
 if [ -e "$saved_file_list" ] && [ -e "$bkgd_spec" ]; then
-	python "$exe_dir"/bootstrap_multi_ccf.py "$saved_file_list" \
-	        "${out_file}.${t_ext}" -b "$bkgd_spec" -n "$numsec" -m "$dt" \
+
+	python "${ccf_exe_dir}"/bootstrap_ccf.py "$saved_file_list" \
+	        "${out_file}.fits" -b "$bkgd_spec" -n "$numsec" -m "$dt" \
 	        -t "$testing" -f "$filtering" --bootstrap "$boot_num" -a
+
 elif [ -e "$saved_file_list" ]; then
-	python "$exe_dir"/bootstrap_multi_ccf.py "$saved_file_list" \
-	        "${out_file}.${t_ext}" -n "$numsec" -m "$dt" -t "$testing" \
+
+	python "${ccf_exe_dir}"/bootstrap_ccf.py "$saved_file_list" \
+	        "${out_file}.fits" -n "$numsec" -m "$dt" -t "$testing" \
 	        -f "$filtering" --bootstrap "$boot_num" -a
+	        
 else
-	echo -e "\tERROR: multi_ccf.py was not run. List of eventlists and/or "\
+	echo -e "\tERROR: bootstrap_ccf.py was not run. List of eventlists and/or "\
             "background energy spectrum doesn't exist."
 fi
 #
@@ -101,13 +101,14 @@ fi
 ### Plotting the individual ccfs
 #################################
 #
-#if [ -e "${out_file}1.${t_ext}" ]; then
-#	python "$exe_dir"/plot_CCF.py "${out_file}1.${t_ext}" -o "${plot_root}1" \
+#if [ -e "${out_file}1.fits" ]; then
+#	python "${ccf_exe_dir}"/plot_CCF.py "${out_file}1.fits" -o "${plot_root}1" \
 #		-p "$prefix" --ext "$p_ext"
-##	if [ -e "${plot_root}1_chan_15.${p_ext}" ]; then open "${plot_root}1_chan_15.${p_ext}"; fi
+##	if [ -e "${plot_root}1_chan_15.${p_ext}" ]; then
+##       open "${plot_root}1_chan_15.${p_ext}"; fi
 #
 #	multi_plot="${plot_root}1_multiccfs.${p_ext}"
-#	python "$exe_dir"/plot_multi.py "${out_file}1.${t_ext}" "$multi_plot" \
+#	python "${ccf_exe_dir}"/plot_multi.py "${out_file}1.fits" "$multi_plot" \
 #		-p "$prefix"
 ##	if [ -e "$multi_plot" ]; then open "$multi_plot"; fi
 #fi
@@ -131,8 +132,8 @@ fi
 ########################
 #
 #plot_file="${plot_root}1_2Dccf.${p_ext}"
-#if [ -e "${out_file}1.${t_ext}" ]; then
-#	python "$exe_dir"/plot_2d.py "${out_file}1.${t_ext}" -o "${plot_file}" \
+#if [ -e "${out_file}1.fits" ]; then
+#	python "${ccf_exe_dir}"/plot_2d.py "${out_file}1.fits" -o "${plot_file}" \
 #		-p "$prefix" -l "$tlen" -e "$energies_file"
 ##	if [ -e "${plot_file}" ]; then
 ##		open "${plot_file}"
@@ -144,8 +145,8 @@ fi
 #detchans=$(python -c "import tools; print int(tools.get_key_val('${out_file}1.fits', 0, 'DETCHANS'))")
 #tlen2=$(( 2*tlen ))
 #curr_dir=$(pwd)
-#cd "$out_dir"
-#if [ -e "$out_dir/temp.dat" ]; then
+#cd "${ccf_out_dir}"
+#if [ -e "${ccf_out_dir}/temp.dat" ]; then
 #	fimgcreate bitpix=-32 \
 #		naxes="${tlen2},${detchans}" \
 #		datafile="temp.dat" \
