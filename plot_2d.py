@@ -6,9 +6,9 @@ energy.
 """
 import argparse
 import numpy as np
-from astropy.io import fits
 import os.path
 import subprocess
+from astropy.table import Table
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.collections import PatchCollection
@@ -69,11 +69,9 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
     ## Make a ratio of ccf to the mean count rate in the interest band
     ###################################################################
 
-    mean_ccf = np.mean(ccf, axis=0)
-    ccf_resid = ccf - mean_ccf
-    # print "CCF shape:", np.shape(ccf)
-    a = np.array([mean_rate_ci, ] * 2*t_length).T
-    # print "A shape:", np.shape(a)
+    # mean_ccf = np.mean(ccf, axis=0)
+    # ccf_resid = ccf - mean_ccf
+    a = np.array([mean_rate_ci, ] * (2*t_length+1)).T
     with np.errstate(all='ignore'):
         ratio = np.where(a != 0, ccf / a, 0)
 
@@ -92,18 +90,24 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
     comment_str = "From %s" % tab_file
     np.savetxt(out_file, R, comments=comment_str)
 
+
+    print np.shape(ratio)
+    print np.shape(t_bins)
+    print np.shape(energies)
+
     #############
     ## Plotting!
     #############
     print("Plotting 2D CCF: %s" % plot_file)
 
-    font_prop = font_manager.FontProperties(size=18)
+    font_prop = font_manager.FontProperties(size=20)
     fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
 
     if energies[0] != None:  ## If energies exists as a variable
         plt.pcolor(t_bins, energies, ratio, cmap='hot')
         # plt.pcolor(t_bins, energies, ratio, cmap='hot', vmin=-0.26, vmax=0.42)
-#         plt.pcolor(t_bins, energies, ratio, cmap='spring', vmin=-0.04, vmax=0.04)
+        # plt.pcolor(t_bins, energies, ratio, cmap='spring', vmin=-0.04,
+        #         vmax=0.04)
     else:
 # 		plt.pcolor(ratio, cmap='hot', vmin=-4.0, vmax=4.0)
         plt.pcolor(ratio, cmap='hot')
@@ -112,16 +116,14 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
     cbar = plt.colorbar()
     cbar.set_label('Ratio of CCF to mean count rate', \
             fontproperties=font_prop)
+    cb_ax = cbar.ax
+    cb_ax.tick_params(axis='y', labelsize=16)
     # cbar.set_ticks([-0.04, -0.03, -0.02, -0.01, 0.00, 0.01, 0.02, 0.03, 0.04])
-    # ax.set_xlabel(r'Time ( $\times\,\frac{1}{%d}\,$s)' % frac_time, \
-    ax.set_xlabel(r'Time ( $\times\,1/%d\,$s)' % frac_time, \
-            fontproperties=font_prop)
 
     if energies[0] != None:  ## If energies exists as a variable
         ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
-        # ax.set_ylim(3, 20)
         ax.set_ylim(3, 20)
-        rect = patches.Rectangle((-t_length,energies[10]), 2*t_length, 0.41, \
+        rect = patches.Rectangle((-t_length,energies[10]), 2*t_length, 0.41,
                 ec="none")
     else:
         ax.set_ylabel('Energy channel', fontproperties=font_prop)
@@ -135,20 +137,22 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
     ax.add_patch(zero_outline)
 
     ax.set_xlim(-t_length, t_length)
+    ax.set_xlabel(r'Time ( $\times\,1/%d\,$s)' % frac_time,
+            fontproperties=font_prop)
     ## Setting the axes' minor ticks. It's complicated.
     x_maj_loc = ax.get_xticks()
     y_maj_loc = ax.get_yticks()
     # y_maj_loc = [5, 10, 15, 20]
     # ax.set_yticks(y_maj_loc)
-    x_min_mult = 0.1 * (x_maj_loc[1] - x_maj_loc[0])
+    x_min_mult = 0.2 * (x_maj_loc[1] - x_maj_loc[0])
     y_min_mult = 0.2 * (y_maj_loc[1] - y_maj_loc[0])
     xLocator = MultipleLocator(x_min_mult)  ## loc of minor ticks on x-axis
     yLocator = MultipleLocator(y_min_mult)  ## loc of minor ticks on y-axis
     ax.xaxis.set_minor_locator(xLocator)
     ax.yaxis.set_minor_locator(yLocator)
 
-    ax.tick_params(axis='x', labelsize=18)
-    ax.tick_params(axis='y', labelsize=18)
+    ax.tick_params(axis='x', labelsize=20)
+    ax.tick_params(axis='y', labelsize=20)
     # ax.set_title(prefix)
 
     # plt.show()
@@ -167,7 +171,8 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
     Parameters
     ----------
     tab_file : str
-        The file with the CCF table from ccf.py or multi_ccf.py, in FITS format.
+        The file with the CCF table from ccf.py saved as an Astropy Table, with
+        column 1 as the CCF and column 2 as the errors.
 
     plot_file : str
         The file name to save the plot to.
@@ -197,26 +202,24 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
         energies = np.loadtxt(chan_to_en)
 
     try:
-        file_hdu = fits.open(tab_file)
+        in_table = Table.read(tab_file)
     except IOError:
         print("\tERROR: File does not exist: %s" % tab_file)
         exit()
 
-    n_bins = int(file_hdu[0].header["N_BINS"])
-    means_str = file_hdu[0].header["RATE_CI"]
-    detchans = int(file_hdu[0].header["DETCHANS"])
-    dt = float(file_hdu[0].header["DT"])
-    # print "%.15f" % dt
+    ## Need to transpose it here so that it plots with time on the x-axis
+    ## and energy on the y-axis
+    ccf = in_table['CCF'].T
+    # error = in_table['ERROR']
+
+    n_bins = in_table.meta['N_BINS']
+    means_str = in_table.meta['RATE_CI']
+    dt = in_table.meta['DT']
     print_dt = dt * 10**3  ## Putting it in milliseconds units.
     # print "%.3f" % print_dt
     frac_time = int(1.0 / dt)  ## Each time bin represents 1/frac_time sec
 
-    table = file_hdu[1].data
-    file_hdu.close()
-
     mean_rate_ci = [float(num.strip()) for num in means_str[1:-1].split(',')]
-    ccf = np.reshape(table.field('CCF'), (n_bins, detchans), order='C')
-    ccf = ccf.T  ## Transpose it to get the axes we want
 
     pos_time_ccf = ccf[:,0:n_bins/2]
     neg_time_ccf = ccf[:,n_bins/2:]
@@ -228,8 +231,8 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
     neg_time_bins = time_bins[n_bins/2:] - n_bins
     time_bins = np.append(neg_time_bins, pos_time_bins)
 
-    ccf = ccf[:, n_bins/2-t_length:n_bins/2+t_length]
-    t_bins = time_bins[n_bins/2-t_length:n_bins/2+t_length]
+    ccf = ccf[:, n_bins/2-t_length:n_bins/2+t_length+1]
+    t_bins = time_bins[n_bins/2-t_length:n_bins/2+t_length+1]
 
     make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time, plot_file,
             energies=energies, prefix=prefix, tab_file=tab_file)
@@ -246,8 +249,9 @@ if __name__ == "__main__":
             epilog="For optional arguments, default values are given in "\
             "brackets at end of description.")
 
-    parser.add_argument('tab_file', help="The file with the CCF table from "\
-            "ccf.py or multi_ccf.py, in .fits format.")
+    parser.add_argument('tab_file', help="The .fits file with the CCF table "\
+            "from ccf.py saved as an Astropy Table, with column 1 as the CCF "\
+            "and column 2 as the errors.")
 
     parser.add_argument('-o', '--outfile', dest='plot_file', default=""\
             "./ccf_2D.png", help="The file name to save the plot to. "\
