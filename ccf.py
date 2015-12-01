@@ -419,90 +419,90 @@ def make_cs(rate_ci, rate_ref, meta_dict):
     # return cs_seg, ci_seg.mean_rate, ref_seg.mean_rate, ci_seg.power, ref_seg.power
     return cs_seg, ci_seg, ref_seg
 
-
-################################################################################
-def each_segment(time_ci, time_ref, energy_ci, energy_ref, meta_dict,\
-    start_time, end_time):
-    """
-    Turn the event list into a populated histogram, stack the reference band,
-    and make the cross spectrum, per segment of light curve.
-
-    Parameters
-    ----------
-    time_ci : np.array of floats
-        1-D array of the photon arrival times of events in this segment for the
-        channel of interest.
-
-    time_ref : np.array of floats
-        1-D array of the photon arrival times of events in this segment for the
-        reference band.
-
-    energy_ci : np.array of ints
-        1-D array of the energy channels of events in this segment for the
-        channel of interest.
-
-    energy_ref : np.array of ints
-        1-D array of the energy channels of events in this segment for the
-        reference band.
-
-    meta_dict : dict
-        Dictionary of necessary meta-parameters for data analysis.
-
-    start_time : float
-        Starting time of the segment (front of bin), in whatever units time_ci
-        and time_ref are in.
-
-    end_time : float
-        End time of the segment (back of bin), in whatever units time_ci,
-        time_ref, and start_time are in.
-
-    Returns
-    -------
-    cs_seg : np.array of complex numbers
-        The cross spectrum of the channels of interest with the reference band
-        for this segment of data. Size=(n_bins, detchans).
-
-    ci_seg : ccf_lc.Lightcurve object
-        The channels of interest light curve.
-
-    ref_seg : ccf_lc.Lightcurve object
-        The reference band light curve.
-
-    np.mean(rate_ci_2d) : float
-        The total mean count rate of the channels of interest.
-
-    """
-    assert len(time_ci) == len(energy_ci)
-    assert len(time_ref) == len(energy_ref)
-
-    ##############################################################
-    ## Populate the light curves for interest and reference bands
-    ##############################################################
-
-    rate_ci_2d = tools.make_2Dlightcurve(np.asarray(time_ci),
-        np.asarray(energy_ci), meta_dict['n_bins'], meta_dict['detchans'],
-        start_time, end_time)
-    rate_ref_2d = tools.make_2Dlightcurve( np.asarray(time_ref),
-        np.asarray(energy_ref), meta_dict['n_bins'], meta_dict['detchans'],
-        start_time, end_time)
-
-    ## Stack the reference band
-    rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
-                                    obs_epoch=meta_dict['obs_epoch'])
-
-    ## Save the reference band light curve to a text file
-# 	out_file="./GX339-BQPO_ref_lc.dat"
-# 	f_handle = file(out_file, 'a')
-# 	np.savetxt(f_handle, rate_ref)
-# 	f_handle.close()
-
-    ###########################
-    ## Make the cross spectrum
-    ###########################
-
-    cs_seg, ci_seg, ref_seg = make_cs(rate_ci_2d, rate_ref, meta_dict)
-
-    return cs_seg, ci_seg, ref_seg, np.mean(rate_ci_2d)
+#
+# ################################################################################
+# def each_segment(time_ci, time_ref, energy_ci, energy_ref, meta_dict,\
+#     start_time, end_time):
+#     """
+#     Turn the event list into a populated histogram, stack the reference band,
+#     and make the cross spectrum, per segment of light curve.
+#
+#     Parameters
+#     ----------
+#     time_ci : np.array of floats
+#         1-D array of the photon arrival times of events in this segment for the
+#         channel of interest.
+#
+#     time_ref : np.array of floats
+#         1-D array of the photon arrival times of events in this segment for the
+#         reference band.
+#
+#     energy_ci : np.array of ints
+#         1-D array of the energy channels of events in this segment for the
+#         channel of interest.
+#
+#     energy_ref : np.array of ints
+#         1-D array of the energy channels of events in this segment for the
+#         reference band.
+#
+#     meta_dict : dict
+#         Dictionary of necessary meta-parameters for data analysis.
+#
+#     start_time : float
+#         Starting time of the segment (front of bin), in whatever units time_ci
+#         and time_ref are in.
+#
+#     end_time : float
+#         End time of the segment (back of bin), in whatever units time_ci,
+#         time_ref, and start_time are in.
+#
+#     Returns
+#     -------
+#     cs_seg : np.array of complex numbers
+#         The cross spectrum of the channels of interest with the reference band
+#         for this segment of data. Size=(n_bins, detchans).
+#
+#     ci_seg : ccf_lc.Lightcurve object
+#         The channels of interest light curve.
+#
+#     ref_seg : ccf_lc.Lightcurve object
+#         The reference band light curve.
+#
+#     np.mean(rate_ci_2d) : float
+#         The total mean count rate of the channels of interest.
+#
+#     """
+#     assert len(time_ci) == len(energy_ci)
+#     assert len(time_ref) == len(energy_ref)
+#
+#     ##############################################################
+#     ## Populate the light curves for interest and reference bands
+#     ##############################################################
+#
+#     rate_ci_2d = tools.make_2Dlightcurve(np.asarray(time_ci),
+#         np.asarray(energy_ci), meta_dict['n_bins'], meta_dict['detchans'],
+#         start_time, end_time)
+#     rate_ref_2d = tools.make_2Dlightcurve( np.asarray(time_ref),
+#         np.asarray(energy_ref), meta_dict['n_bins'], meta_dict['detchans'],
+#         start_time, end_time)
+#
+#     ## Stack the reference band
+#     rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
+#                                     obs_epoch=meta_dict['obs_epoch'])
+#
+#     ## Save the reference band light curve to a text file
+# # 	out_file="./GX339-BQPO_ref_lc.dat"
+# # 	f_handle = file(out_file, 'a')
+# # 	np.savetxt(f_handle, rate_ref)
+# # 	f_handle.close()
+#
+#     ###########################
+#     ## Make the cross spectrum
+#     ###########################
+#
+#     cs_seg, ci_seg, ref_seg = make_cs(rate_ci_2d, rate_ref, meta_dict)
+#
+#     return cs_seg, ci_seg, ref_seg, np.mean(rate_ci_2d)
 
 
 ################################################################################
@@ -822,8 +822,7 @@ def fits_in(in_file, meta_dict, test=False):
 
                 if n_seg % print_iterator == 0:
                     print "\t", n_seg
-                print test
-                print n_seg
+
                 if test is True and n_seg == 1:  # For testing
                     break
 
@@ -859,27 +858,7 @@ def fits_in(in_file, meta_dict, test=False):
 
 
 ################################################################################
-def seg_average(array):
-    """
-    Takes the average of an array over all the segments (i.e., the last axis).
-
-    Parameters
-    ----------
-    array : np.array of numbers
-        Arbitrary-dimensioned array of numbers, where the last axis is the
-        segments.
-
-    Returns
-    -------
-    np.mean(array, axis=-1)
-        The mean of the array down the last axis, i.e. averaged over the
-        segments of data.
-
-    """
-    return np.mean(array, axis=-1)
-
-################################################################################
-def get_background(bkgd_file):
+def get_background(bkgd_file="evt_bkgd_rebinned.pha"):
     """
     Get the background count rate from a background spectrum file.
 
@@ -914,82 +893,6 @@ def get_background(bkgd_file):
     rate = counts / exposure
 
     return rate
-
-################################################################################
-def alltogether_means(cross_spec, ci, ref, meta_dict, bkgd_rate, boot=False):
-    """
-    Takes the means of all the data (cross spectrum, power spectra, mean count
-    rates) across the segments. If boot=False, first checks for and removes
-    segments where the reference band power has a negative variance, then takes
-    the average across the kept segments.
-
-    Parameters
-    ----------
-    cross_spec : np.array of complex numbers
-        3-dimensional array of the cross spectrum of the channels of interest
-        with the reference band. Size = (n_bins, detchans, n_seg)
-
-    ci : ccf_lc.Lightcurve object
-        The channels of interest.
-
-    ref : ccf_lc.Lightcurve object
-        The reference band.
-
-    meta_dict : dict
-        Dictionary of necessary meta-parameters for data analysis.
-
-    bkgd_rate : np.array of floats
-        1-D array of the background spectrum in units of count rate for the
-        channels of interest. Size = (detchans).
-
-    boot : bool
-        If True, this method is being called by the bootstrapping and thus
-        doesn't need to check for negative variance of power spectra of segments
-        in the reference band, as this has already been done. [False]
-
-    Returns
-    -------
-    avg_cross_spec : np.array of floats
-        The segment-averaged cross spectrum of the channels of interest with the
-        reference band. Size = (n_bins, detchans).
-
-    cross_spec : np.array of floats
-        The cross spectrum. If boot=False, has the bad segments removed. If
-        boot=True, it's the same as the cross_spec that was input.
-        Size = (n_bins, detchans, n_seg) where n_seg has removed bad segments.
-
-    ci : ccf_lc.Lightcurve object
-        Channels of interest, with power and mean_rate assigned. If boot=False,
-        power_array and mean_rate_array have bad segments removed.
-
-    ref : ccf_lc.Lightcurve object
-        Reference band, with power and mean_rate assigned. If boot=False,
-        power_array and mean_rate_array have bad segments removed.
-
-    meta_dict : dict
-        Dictionary of necessary meta-parameters for data analysis. If
-        boot=False, exposure and n_seg have been updated.
-
-    """
-
-    #########################################
-    ## Turning sums over segments into means
-    #########################################
-
-    ci.mean_rate = seg_average(ci.mean_rate_array)
-    ci.power = seg_average(ci.power_array)
-    ref.power = seg_average(ref.power_array)
-    ref.mean_rate_array = np.reshape(ref.mean_rate_array, (meta_dict['n_seg']))
-    ref.mean_rate = seg_average(ref.mean_rate_array)
-    avg_cross_spec = seg_average(cross_spec)
-
-    ## Printing the cross spectrum to a file, for plotting/checking
-    # cs_out = np.column_stack((fftpack.fftfreq(meta_dict['n_bins'], d=dt), \
-    #         avg_cross_spec.real))
-    # np.savetxt('cs_avg.dat', cs_out)
-
-    return avg_cross_spec, cross_spec, ci, ref, meta_dict
-
 
 
 ################################################################################
@@ -1363,7 +1266,7 @@ def standard_ccf_err(cs_array, meta_dict, ref, noisy=True, absrms_var=None, \
 
 
 ################################################################################
-def UNFILT_cs_to_ccf(cs_avg, meta_dict, ref, noisy, rms=None):
+def UNFILT_cs_to_ccf(cs_avg, cs_array, meta_dict, ref, noisy, rms=None):
     """
     Takes the iFFT of the cross spectrum to get the cross-correlation function,
     and computes the error on the cross-correlation function.
@@ -1400,6 +1303,11 @@ def UNFILT_cs_to_ccf(cs_avg, meta_dict, ref, noisy, rms=None):
     ######################################################
 
     ccf = fftpack.ifft(cs_avg, axis=0).real
+
+    ccf_array = fftpack.ifft(cs_array, axis=0).real
+    other_ccf_avg = np.mean(ccf_array, axis=-1)
+    print np.shape(other_ccf_avg)
+
 
     if rms == None:
         ## Get the variance and rms of the reference band
@@ -1512,9 +1420,6 @@ def UNFILT_cs_to_ccf(cs_avg, meta_dict, ref, noisy, rms=None):
 #
 #     return ccf_avg, standard_error
 #
-
-
-
 
 
 ################################################################################
@@ -1635,15 +1540,6 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     print "Filtering?", meta_dict['filter']
     print "Adjusting QPO?", adjust
 
-    ###################################################################
-    ## Reading in the background count rate from a background spectrum
-    ###################################################################
-    if bkgd_file:
-        bkgd_rate = get_background(bkgd_file)
-    else:
-        bkgd_rate = np.zeros(meta_dict['detchans'])
-    print " "
-
     ci_total = ccf_lc.Lightcurve(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ci')
     ref_total = ccf_lc.Lightcurve(n_bins=meta_dict['n_bins'],
@@ -1693,6 +1589,10 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     meta_dict['exposure'] = total_exposure
     meta_dict['dt'] = dt_total
     meta_dict['df'] = df_total
+    meta_dict['adjust_seg'] = adjust_segments
+
+    print "Mean dt:", np.mean(dt_total)
+    print "Mean df:", np.mean(df_total)
 
     ## Removing the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
@@ -1700,68 +1600,70 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
     ref_total.rms_array = ref_total.rms_array[1:]
 
-
-
-    avg_cross_spec, cross_spec, ci_total, ref_total, meta_dict = \
-            alltogether_means(total_cross_spec, ci_total, ref_total, meta_dict, \
-            bkgd_rate, False)
-
     #########################################
     ## Turning sums over segments into means
     #########################################
 
-    # avg_cross_spec = np.mean(cross_spec, axis=2)
-    # ci_total.mean_rate /= np.float(meta_dict['n_seg'])
-    # ref_total.mean_rate /= np.float(meta_dict['n_seg'])
-    # ci_total.power /= np.float(meta_dict['n_seg'])
-    # ref_total.power /= np.float(meta_dict['n_seg'])
+    ci_total.mean_rate /= np.float(meta_dict['n_seg'])
+    ci_total.power /= np.float(meta_dict['n_seg'])
+    ref_total.power /= np.float(meta_dict['n_seg'])
+    ref_total.mean_rate /= np.float(meta_dict['n_seg'])
+    ref_total.var /= np.float(meta_dict['n_seg'])
+    ref_total.rms = np.sqrt(ref_total.var)
+    avg_cross_spec = np.mean(total_cross_spec, axis=-1)
 
-    ################################################################
-    ## Printing the cross spectrum to a file, for plotting/checking
-    ################################################################
+    #############################################################
+    ## Print the cross spectrum to a file, for plotting/checking
+    #############################################################
 
-    cs_out = np.column_stack((fftpack.fftfreq(meta_dict['n_bins'], \
+    cs_out = np.column_stack((fftpack.fftfreq(meta_dict['n_bins'],
             d=np.mean(meta_dict['dt'])), avg_cross_spec))
     np.savetxt('cs_avg.dat', cs_out)
 
-    ##################################################################
-    ## Subtracting the background count rate from the mean count rate
-    ##################################################################
+    #####################################################################
+    ## Read in the background count rate from a background spectrum, and
+    ## subtract from the mean count rate.
+    #####################################################################
+
+    if bkgd_file:
+        bkgd_rate = get_background(bkgd_file)
+    else:
+        bkgd_rate = np.zeros(meta_dict['detchans'])
 
     ci_total.mean_rate -= bkgd_rate
 
     ## Need to use a background from ref. PCU for the reference band...
     # ref_total.mean_rate -= np.mean(bkgd_rate[2:26])
 
-    #######################################################################
-    ## Saving cross spectra and power spectra for computing lags later in
+    print np.shape(avg_cross_spec)
+    print np.shape(ref_total.rms_array)
+
+    ####################################################################
+    ## Save cross spectra and power spectra for computing lags later in
     ## lag_spectra/get_lags.py
-    #######################################################################
+    ####################################################################
 
     save_for_lags(out_file, input_file, meta_dict, ci_total.mean_rate,
-           ref_total.mean_rate, avg_cross_spec, ci_total.power,
-           ref_total.power)
+            ref_total.mean_rate, avg_cross_spec, ci_total.power,
+            ref_total.power)
 
     ##############################################
-    ## Computing ccf from cs, and computing error
+    ## Compute ccf from cs, and compute error
     ##############################################
 
-    if filtering:
-        ccf_end, ccf_error = filt_cs_to_ccf_w_err(avg_cross_spec, meta_dict,
+    if meta_dict['filter']:
+        ccf_avg, ccf_error = filt_cs_to_ccf_w_err(avg_cross_spec, meta_dict,
                 ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
                 ref_total.power, True, lo_freq, hi_freq)
     else:
         # ccf_avg, ccf_error = unfilt_cs_to_ccf_w_err(total_cross_spec,
         #         meta_dict, ref_total)
 
-        ccf_avg = UNFILT_cs_to_ccf(avg_cross_spec, meta_dict, ref_total, \
-                True)
+        ccf_avg = UNFILT_cs_to_ccf(avg_cross_spec, total_cross_spec, meta_dict,
+                ref_total, True)
         ccf_error = standard_ccf_err(total_cross_spec, meta_dict, \
                 ref_total, True)
 
-    # print "ccf avg:", ccf_avg[1:3,1:3]
-
-    print "e = ", meta_dict['n_seconds'] * meta_dict['n_seg']
     print "Exposure_time = %.3f seconds" % meta_dict['exposure']
     print "Total number of segments:", meta_dict['n_seg']
     print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
