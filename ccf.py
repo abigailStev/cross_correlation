@@ -82,9 +82,9 @@ def fits_out(out_file, in_file, bkgd_file, meta_dict, mean_rate_ci,
 
     print "\nOutput sent to: %s" % out_file
 
-    print ccf[0,0]
-    print ccf[0,2]
-    print ccf[0,15]
+    # print ccf[0,0]
+    # print ccf[0,2]
+    # print ccf[0,15]
 
     out_table = Table()
     out_table.add_column(Column(data=ccf, name='CCF'))
@@ -891,15 +891,6 @@ def alltogether_means(cross_spec, ci, ref, meta_dict, bkgd_rate, boot=False):
     #         avg_cross_spec.real))
     # np.savetxt('cs_avg.dat', cs_out)
 
-    ##################################################################
-    ## Subtracting the background count rate from the mean count rate
-    ##################################################################
-
-    ci.mean_rate -= bkgd_rate
-
-    ## Need to use a background from ref pcu for the reference band...
-    # ref_total.mean_rate -= np.mean(bkgd_rate[2:26])
-
     return avg_cross_spec, cross_spec, ci, ref, meta_dict
 
 
@@ -1257,17 +1248,8 @@ def standard_ccf_err(cs_array, meta_dict, ref, noisy=True, absrms_var=None, \
 
         absrms_var, absrms_rms = var_and_rms(absrms_power.T, meta_dict['df'])
 
-    # print "Shape cs:", np.shape(cs_array)
 
     ccf_array = fftpack.ifft(cs_array, axis=0).real
-    # print "Shape ccf array:", np.shape(ccf_array)
-    # print "Shape CCF array before nan mask:", np.shape(ccf_array)
-    # ccf_array = ccf_array[:,:,~mask]
-    # print "Shape CCF array after nan mask:", np.shape(ccf_array)
-    # absrms_rms = absrms_rms[~mask]
-    # n_nonnan = meta_dict['n_seg'] - np.count_nonzero(mask)
-    # print "Number non-nan:", n_nonnan
-    # print "Number nan:", np.count_nonzero(mask)
     ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / absrms_rms)
 
     mean_ccf = np.mean(ccf_array, axis=2)
@@ -1699,9 +1681,22 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     else:
         file_description = "Cross-correlation function of multiple observations"
 
-    print ccf_avg[0,0]
-    print ccf_avg[0,2]
-    print ccf_avg[0,15]
+    # print ccf_avg[0,0]
+    # print ccf_avg[0,2]
+    # print ccf_avg[0,15]
+
+    if not test and adjust:
+        assert round(ccf_avg[0,0], 12) == 0.117937948428
+        assert round(ccf_avg[0,2], 11) == 9.22641398474
+        assert round(ccf_avg[0,15], 11) == 1.76422640304
+        print "Passed!"
+    elif test and adjust:
+        assert round(ccf_avg[0,0], 12) == 0.106747663439
+        assert round(ccf_avg[0,2], 11) == 9.56560710672
+        assert round(ccf_avg[0,15], 11) == 0.88144237181
+        print "Passed!"
+    else:
+        print "Do not have values to compare against."
 
     fits_out(out_file, input_file, bkgd_file, meta_dict, ci_total.mean_rate,
             ref_total.mean_rate, ref_total.rms, ccf_avg, ccf_error, lo_freq,
