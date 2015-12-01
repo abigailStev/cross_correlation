@@ -76,6 +76,7 @@ def fits_out(out_file, in_file, bkgd_file, meta_dict, mean_rate_ci,
     -------
     nothing, but writes to a file.
     """
+
     ## Check that the output file name has FITS file extension
     assert out_file[-4:].lower() == "fits", "ERROR: Output file must have "\
             "extension '.fits'."
@@ -512,6 +513,9 @@ def fits_in(in_file, meta_dict, test=False):
     cross spectrum per energy channel and keep running sum (later to be an
     average) of the cross spectra.
 
+    Assumes that the reference band times are the center of the bins, and the
+    CI times are at the front of the bins.
+
     I take the approach: start time <= segment < end_time, to avoid double-
     counting and/or skipping events.
 
@@ -600,25 +604,12 @@ def fits_in(in_file, meta_dict, test=False):
             detchans=meta_dict['detchans'], type='ref')
     cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], 1), \
             dtype=np.complex128)
-    # ci_whole.power = np.zeros((meta_dict['n_bins'], meta_dict['detchans']), \
-    #         dtype=np.float64)
-    # ci_whole.power_array = np.zeros((meta_dict['n_bins'], \
-    #         meta_dict['detchans'], 1), dtype=np.float64)
-    # ref_whole.power = np.zeros(meta_dict['n_bins'], dtype=np.float64)
-    # ref_whole.power_array = np.zeros((meta_dict['n_bins'], 1), \
-    #         dtype=np.float64)
-    # ci_whole.mean_rate = np.zeros(meta_dict['detchans'], dtype=np.float64)
-    # ci_whole.mean_rate_array = np.zeros((meta_dict['detchans'], 1),
-    #         dtype=np.float64)
-    # ref_whole.mean_rate = 0
-    # ref_whole.mean_rate_array = 0
     dt_whole = np.array([])
     df_whole = np.array([])
     exposure = 0
 
     start_time = data.field('TIME')[0]
     final_time = data.field('TIME')[-1]
-    seg_end_time = start_time + meta_dict['n_seconds']
 
     ###################################
     ## Selecting PCU for interest band
@@ -629,30 +620,88 @@ def fits_in(in_file, meta_dict, test=False):
     all_time_ci = np.asarray(data_pcu2.field('TIME'), dtype=np.float64)
     all_energy_ci = np.asarray(data_pcu2.field('CHANNEL'), dtype=np.float64)
 
-    ## Determining the next-most-prevalent pcu
-# 	pcus_on, occurrences = np.unique(data.field('PCUID'), return_counts=True)
-# 	## Getting rid of the PCU 2 element (since we don't want that as the ref)
-# 	pcu2 = np.where(pcus_on == 2)
-# 	pcus_on = np.delete(pcus_on, pcu2)
-# 	occurrences = np.delete(occurrences, pcu2)
-# 	## Next-most pcu is:
-# 	most_pcu = np.argmax(occurrences)
-# 	ref_pcu = pcus_on[most_pcu]
-# 	print "Ref PCU =", ref_pcu
+    ######################################
+    ## Getting reference band light curve
+    ######################################
 
-    ####################################
-    ## Selecting PCU for reference band
-    ####################################
+    if not meta_dict['ref_file']:
+        ## Determining the next-most-prevalent pcu
+        # pcus_on, occurrences = np.unique(data.field('PCUID'), return_counts=True)
+        ## Getting rid of the PCU 2 element (since we don't want that as the ref)
+        # pcu2 = np.where(pcus_on == 2)
+        # pcus_on = np.delete(pcus_on, pcu2)
+        # occurrences = np.delete(occurrences, pcu2)
+        ## Next-most pcu is:
+        # most_pcu = np.argmax(occurrences)
+        # ref_pcu = pcus_on[most_pcu]
+        # print "Ref PCU =", ref_pcu
+    	# refpcu_mask = data.field('PCUID') == ref_pcu
 
-# 	refpcu_mask = data.field('PCUID') == ref_pcu
-    refpcu_mask = data.field('PCUID') != 2
-    data_ref = data[refpcu_mask]
-    all_time_ref = np.asarray(data_ref.field('TIME'), dtype=np.float64)
-    all_energy_ref = np.asarray(data_ref.field('CHANNEL'), dtype=np.float64)
+        refpcu_mask = data.field('PCUID') != 2
+        data_ref = data[refpcu_mask]
+        all_time_ref = np.asarray(data_ref.field('TIME'), dtype=np.float64)
+        all_energy_ref = np.asarray(data_ref.field('CHANNEL'), dtype=np.float64)
+        all_rate_ref = None
+        all_err_ref = None
+
+    ###########################################################
+    ## If separate ref band file exists, read in ref band data
+    ###########################################################
+
+    else:
+        print("Ref band file : %s" % meta_dict['ref_file'])
+
+        try:
+            ref_fits_hdu = fits.open(meta_dict['ref_file'])
+        except IOError:
+            print("\tERROR: File does not exist: %s" % meta_dict['ref_file'])
+            sys.exit()
+
+        # ref_header = ref_fits_hdu[0].header	 ## Header info is in ext 0
+        ref_data = ref_fits_hdu[1].data  ## Data is in ext 1
+        ref_fits_hdu.close()
+
+        ## Correcting times to make them at the front of the bin.
+        all_time_ref = np.asarray(ref_data.field('TIME'), dtype=np.float64) \
+                - meta_dict['dt'] / 2.0
+        all_rate_ref = np.asarray(ref_data.field('RATE'), dtype=np.float64)
+        all_err_ref = np.asarray(ref_data.field('ERROR'), dtype=np.float64)
+        all_energy_ref = None
+
+        ci_final_time = final_time
+        ci_start_time = start_time
+        ref_start_time = all_time_ref[0]
+        ref_final_time = all_time_ref[-1]
+    #    print("Ref start: %.15f" % ref_start_time)
+    #    print("Ref final: %.15f" % ref_final_time)
+
+        if ci_start_time > ref_start_time:
+            index = np.min(np.where(all_time_ref > ci_start_time))
+            start_time = all_time_ref[index]
+            all_time_ref = all_time_ref[index:]
+        else:
+            start_time = ref_start_time
+
+        if ci_final_time < ref_final_time:
+            ## I don't think this has actually been tested...
+            print("WARNING: I don't think this segment time selection has "\
+                    "been tested.")
+            index = np.max(np.where(all_time_ref < ci_final_time))
+            # print "\t", index
+            final_time = all_time_ref[index]
+            all_time_ref = all_time_ref[0:index]
+        else:
+            final_time = ref_final_time
+
+    seg_end_time = start_time + meta_dict['n_seconds']
+
+#    print("Start: %.15f" % start_time)
+#    print("Final: %.15f" % final_time)
 
     ############################
     ## Looping through segments
     ############################
+
     print "Segments computed:"
 
     while (seg_end_time + (meta_dict['adjust_seg'] * meta_dict['dt'])) <= final_time:
@@ -671,32 +720,83 @@ def fits_in(in_file, meta_dict, test=False):
 
         ## Get events for reference band
         time_ref = all_time_ref[np.where(all_time_ref < seg_end_time)]
-        energy_ref = all_energy_ref[np.where(all_time_ref < seg_end_time)]
+        if not meta_dict['ref_file']:
+            energy_ref = all_energy_ref[np.where(all_time_ref < seg_end_time)]
+            rate_ref = [0]
+        else:
+            rate_ref = all_rate_ref[np.where(all_time_ref < seg_end_time)]
+            err_ref = all_err_ref[np.where(all_time_ref < seg_end_time)]
 
         ## Chop current segment off the rest of the list
         for_next_iteration_ref = np.where(all_time_ref >= seg_end_time)
         all_time_ref = all_time_ref[for_next_iteration_ref]
-        all_energy_ref = all_energy_ref[for_next_iteration_ref]
+        if not meta_dict['ref_file']:
+            all_energy_ref = all_energy_ref[for_next_iteration_ref]
+        else:
+            all_rate_ref = all_rate_ref[for_next_iteration_ref]
+            all_err_ref = all_err_ref[for_next_iteration_ref]
 
-        ###########################
-        ## At the end of a segment
-        ###########################
+        ########################################################################
+        ## At the end of a segment, populate light curve and make cross spectrum
+        ########################################################################
 
-        if len(time_ci) > 0 and len(time_ref) > 0:
+        if len(time_ci) > 0 and \
+                (len(time_ref) > 0 or
+                (meta_dict['ref_file'] and len(rate_ref) == meta_dict['n_bins'])):
 
-            cs_seg, ci_seg, ref_seg, rate_ci = each_segment(time_ci, \
-                    time_ref, energy_ci, energy_ref, meta_dict, start_time, \
-                    seg_end_time)
+            ##############################################################
+            ## Populate the light curves for interest and reference bands
+            ##############################################################
+
+            rate_ci_2d = tools.make_2Dlightcurve(np.asarray(time_ci),
+                    np.asarray(energy_ci), meta_dict['n_bins'],
+                    meta_dict['detchans'], start_time, seg_end_time)
+
+            if not meta_dict['ref_file']:
+                rate_ref_2d = tools.make_2Dlightcurve( np.asarray(time_ref),
+                        np.asarray(energy_ref), meta_dict['n_bins'],
+                        meta_dict['detchans'], start_time, seg_end_time)
+
+                ## Stack the reference band
+                rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
+                                                obs_epoch=meta_dict['obs_epoch'])
+
+            ## Save the reference band light curve to a text file
+        	# out_file="./GX339-BQPO_ref_lc.dat"
+        	# f_handle = file(out_file, 'a')
+        	# np.savetxt(f_handle, rate_ref)
+        	# f_handle.close()
+
+            ###########################
+            ## Make the cross spectrum
+            ###########################
+
+            cs_seg, ci_seg, ref_seg = make_cs(rate_ci_2d, rate_ref, meta_dict)
 
             dt_seg = (seg_end_time - start_time) / float(meta_dict['n_bins'])
             df_seg = 1.0 / (meta_dict['n_bins'] * dt_seg)
 
-            ## Computing variance and rms of the positive-frequency power in the
-            ## reference band. Only keeping segments where the variance > 0.
-            absrms_pow = raw_to_absrms(ref_seg.power[0:meta_dict['n_bins']/2+1],
-                    ref_seg.mean_rate, meta_dict['n_bins'], dt_seg, noisy=True)
+            ###################################################################
+            ## Compute variance and rms of the positive-frequency power in the
+            ## reference band.
+            ###################################################################
+
+            if meta_dict['ref_file']:
+                IR_poisson = np.sum(err_ref ** 2) / float(len(err_ref))
+                print IR_poisson
+                absrms_pow = ref_seg.power[0:meta_dict['n_bins'] / 2 + 1] * \
+                        (2.0 * dt_seg / np.float(meta_dict['n_bins']))
+
+            else:
+                absrms_pow = raw_to_absrms(ref_seg.power[0:meta_dict['n_bins'] \
+                        / 2 + 1], ref_seg.mean_rate, meta_dict['n_bins'],
+                        dt_seg, noisy=True)
 
             var, rms = var_and_rms(absrms_pow, df_seg)
+
+            ######################################################
+            ## Only keep and use segments where the variance > 0.
+            ######################################################
 
             if var >= 0.0:
 
@@ -704,17 +804,12 @@ def fits_in(in_file, meta_dict, test=False):
                 df_whole = np.append(df_whole, df_seg)
 
                 cross_spec = np.dstack((cross_spec, cs_seg))
+                ref_whole.power_array = np.hstack((ref_whole.power_array,
+                        np.reshape(ref_seg.power, (meta_dict['n_bins'], 1))))
+                ref_whole.mean_rate_array = np.append(ref_whole.mean_rate_array,
+                        ref_seg.mean_rate)
                 ref_whole.rms_array = np.append(ref_whole.rms_array,
                         np.sqrt(var))
-
-                ci_whole.power_array = np.dstack((ci_whole.power_array, \
-                        ci_seg.power))
-                ci_whole.mean_rate_array = np.hstack((ci_whole.mean_rate_array, \
-                        np.reshape(ci_seg.mean_rate, (meta_dict['detchans'],1)) ))
-                ref_whole.power_array = np.hstack((ref_whole.power_array, \
-                        np.reshape(ref_seg.power, (meta_dict['n_bins'],1)) ))
-                ref_whole.mean_rate_array = np.append(ref_whole.mean_rate_array, \
-                        ref_seg.mean_rate)
 
                 ## Sums across segments -- arrays, so it adds by index
                 exposure += (seg_end_time - start_time)
@@ -727,6 +822,8 @@ def fits_in(in_file, meta_dict, test=False):
 
                 if n_seg % print_iterator == 0:
                     print "\t", n_seg
+                print test
+                print n_seg
                 if test is True and n_seg == 1:  # For testing
                     break
 
@@ -734,13 +831,13 @@ def fits_in(in_file, meta_dict, test=False):
             seg_end_time += meta_dict['n_seconds']
 
         ## This next bit deals with gappy data
-        elif len(time_ci) == 0 and len(time_ref) == 0:
-            start_time = min(all_time_ci[0], all_time_ref[0])
-            seg_end_time = start_time + meta_dict['n_seconds']
-
         else:
-            start_time = seg_end_time
-            seg_end_time += meta_dict['n_seconds']
+            start_time = max(all_time_ci[0], all_time_ref[0])
+            seg_end_time = start_time + meta_dict['n_seconds']
+        #
+        # else:
+        #     start_time = seg_end_time
+        #     seg_end_time += meta_dict['n_seconds']
 
         ## End of 'if there are counts in this segment'
 
