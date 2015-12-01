@@ -1266,7 +1266,7 @@ def standard_ccf_err(cs_array, meta_dict, ref, noisy=True, absrms_var=None, \
 
 
 ################################################################################
-def UNFILT_cs_to_ccf(cs_avg, cs_array, meta_dict, ref, noisy, rms=None):
+def UNFILT_cs_to_ccf(cs_avg, cs_array, meta_dict, ref, noisy):
     """
     Takes the iFFT of the cross spectrum to get the cross-correlation function,
     and computes the error on the cross-correlation function.
@@ -1303,123 +1303,32 @@ def UNFILT_cs_to_ccf(cs_avg, cs_array, meta_dict, ref, noisy, rms=None):
     ######################################################
 
     ccf = fftpack.ifft(cs_avg, axis=0).real
-
     ccf_array = fftpack.ifft(cs_array, axis=0).real
-    other_ccf_avg = np.mean(ccf_array, axis=-1)
-    print np.shape(other_ccf_avg)
 
+    ccf_avg = np.mean(ccf_array, axis=-1)
+    print ccf[0,2]
+    print ccf_avg[0,2]
+    print ccf[0,15]
+    print ccf_avg[0,15]
+    assert ccf.all() == ccf_avg.all()
 
-    if rms == None:
-        ## Get the variance and rms of the reference band
-        absrms = ccf_lc.NormPSD()
-        fracrms = ccf_lc.NormPSD()
+    # ## Dividing ccf by rms of signal in reference band
+    # ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
+    #
+    # mean_ccf = np.mean(ccf_array, axis=2)
+    # mean_ccf_b = np.resize(np.repeat(mean_ccf, meta_dict['n_seg']), \
+    #         np.shape(ccf_array))
+    # ccf_resid = ccf_array - mean_ccf_b
+    #
+    # sample_var = np.sum(ccf_resid**2, axis=2) / \
+    #         np.float(meta_dict['n_seg'] - 1)  ## eq 2.3
+    # standard_error = np.sqrt(sample_var / \
+    #         np.float(meta_dict['n_seg']))  ## eq 2.4
 
-        absrms.power = raw_to_absrms(ref.pos_power, ref.mean_rate, \
-                meta_dict['n_bins'], np.mean(meta_dict['dt']), noisy)
-        fracrms.power = raw_to_fracrms(ref.pos_power, ref.mean_rate, \
-                meta_dict['n_bins'], np.mean(meta_dict['dt']), noisy)
-
-    # 	## Getting rms of reference band, to normalize the ccf
-        absrms.var, absrms.rms = var_and_rms(absrms.power, np.mean(meta_dict['df']))
-        fracrms.var, fracrms.rms = var_and_rms(fracrms.power, np.mean(meta_dict['df']))
-
-        # print "Ref band var:", absrms.var, "(abs rms)"
-        # print "Ref band rms:", absrms.rms, "(abs rms)"
-        # print "Ref band var:", fracrms.var, "(frac rms)"
-        # print "Ref band rms:", fracrms.rms, "(frac rms)"
-    else:
-        absrms = ccf_lc.NormPSD()
-        absrms.rms = rms
-
-    ## Dividing ccf by rms of signal in reference band
-    ccf *= (2.0 / np.float(meta_dict['n_bins']) / absrms.rms)
+    ccf_avg *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
+    ccf *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
 
     return ccf
-#
-
-# ################################################################################
-# def unfilt_cs_to_ccf_w_err(cs_array, meta_dict, ref):
-#     """
-#     Take the iFFT of the cross spectrum to get the cross-correlation function,
-#     and compute the error on the cross-correlation function. Compute the
-#     standard error on each ccf bin from the segment-to-segment variations.
-#     This error is not correlated between energy bins but may be correlated
-#     between time bins.
-#
-#     S. Vaughan 2013, "Scientific Inference", equations 2.3 and 2.4.
-#
-#     Parameters
-#     ----------
-#     cs_avg : np.array of complex numbers
-#         2-D array of the averaged cross-spectrum. Size = (n_bins, detchans).
-#
-#     meta_dict : dict
-#         Dictionary of necessary meta-parameters for data analysis.
-#
-#     ref : ccf_lc.Lightcurve object
-#         The reference band light curve and power.
-#
-#     Returns
-#     -------
-#     mean_ccf, standard_error : np.arrays of floats
-#         2-D arrays of the cross-correlation function of the channels of interest
-#         with the reference band, and the error on the ccf.
-#         Size = (n_bins, detchans).
-#
-#     """
-#
-#     if len(ref.power) == meta_dict['n_bins']:
-#         nyq_index = meta_dict['n_bins'] / 2
-#         ref.pos_power = ref.power[0:nyq_index+1]
-#
-#     ######################################################
-#     ## Take the IFFT of the cross spectrum to get the CCF
-#     ######################################################
-#
-#     ccf_array = fftpack.ifft(cs_array, axis=0).real
-#
-#
-#     if ref.rms_array == None:
-#         ## Get the variance and rms of the reference band
-#         absrms = ccf_lc.NormPSD()
-#         fracrms = ccf_lc.NormPSD()
-#
-#         absrms.power = raw_to_absrms(ref.pos_power, ref.mean_rate, \
-#                 meta_dict['n_bins'], np.mean(meta_dict['dt']), noisy)
-#         fracrms.power = raw_to_fracrms(ref.pos_power, ref.mean_rate, \
-#                 meta_dict['n_bins'], np.mean(meta_dict['dt']), noisy)
-#
-#     # 	## Getting rms of reference band, to normalize the ccf
-#         absrms.var, absrms.rms = var_and_rms(absrms.power, np.mean(meta_dict['df']))
-#         fracrms.var, fracrms.rms = var_and_rms(fracrms.power, np.mean(meta_dict['df']))
-#
-#         # print "Ref band var:", absrms.var, "(abs rms)"
-#         # print "Ref band rms:", absrms.rms, "(abs rms)"
-#         # print "Ref band var:", fracrms.var, "(frac rms)"
-#         # print "Ref band rms:", fracrms.rms, "(frac rms)"
-#     else:
-#         print "in here!"
-#         absrms = ccf_lc.NormPSD()
-#         absrms.rms = ref.rms_array
-#
-#     ## Dividing ccf by rms of signal in reference band
-#     ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / absrms.rms)
-#
-#     mean_ccf = np.mean(ccf_array, axis=2)
-#     mean_ccf_b = np.resize(np.repeat(mean_ccf, meta_dict['n_seg']), \
-#             np.shape(ccf_array))
-#     ccf_resid = ccf_array - mean_ccf_b
-#
-#     sample_var = np.sum(ccf_resid**2, axis=2) / \
-#             np.float(meta_dict['n_seg'] - 1)  ## eq 2.3
-#     standard_error = np.sqrt(sample_var / \
-#             np.float(meta_dict['n_seg']))  ## eq 2.4
-#
-#     ccf_avg = np.mean(ccf_array, axis=-1)
-#     print np.shape(ccf_avg)
-#
-#     return ccf_avg, standard_error
-#
 
 
 ################################################################################
@@ -1611,6 +1520,19 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ref_total.var /= np.float(meta_dict['n_seg'])
     ref_total.rms = np.sqrt(ref_total.var)
     avg_cross_spec = np.mean(total_cross_spec, axis=-1)
+
+    absrms_ref_pow = raw_to_absrms(ref_total.power[0:meta_dict['n_bins']/2+1], \
+            ref_total.mean_rate, meta_dict['n_bins'],
+            np.mean(meta_dict['dt']), noisy=True)
+
+    var, rms = var_and_rms(absrms_ref_pow, np.mean(meta_dict['df']))
+    print rms
+
+
+    print np.shape(ref_total.rms_array)
+    print np.mean(ref_total.rms_array)
+    print ref_total.rms
+
 
     #############################################################
     ## Print the cross spectrum to a file, for plotting/checking
