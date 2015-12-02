@@ -803,25 +803,21 @@ def fits_in(in_file, meta_dict, test=False):
                 dt_whole = np.append(dt_whole, dt_seg)
                 df_whole = np.append(df_whole, df_seg)
 
+                ## Append segment to arrays
                 cs_whole = np.dstack((cs_whole, cs_seg))
                 ref_whole.power_array = np.hstack((ref_whole.power_array,
                         np.reshape(ref_seg.power, (meta_dict['n_bins'], 1))))
                 ref_whole.mean_rate_array = np.append(ref_whole.mean_rate_array,
                         ref_seg.mean_rate)
-                print np.sqrt(var)
-                print rms
-                # ref_whole.rms_array = np.append(ref_whole.rms_array,
-                #         np.sqrt(var))
                 ref_whole.var_array = np.append(ref_whole.var_array, var)
 
-                ## Sums across segments -- arrays, so it adds by index
+                ## Sum across segments -- arrays, so it adds by index
                 exposure += (seg_end_time - start_time)
                 n_seg += 1
                 ci_whole.mean_rate += ci_seg.mean_rate
                 ref_whole.mean_rate += ref_seg.mean_rate
                 ci_whole.power += ci_seg.power
                 ref_whole.power += ref_seg.power
-                # ref_whole.var += var
 
                 if n_seg % print_iterator == 0:
                     print "\t", n_seg
@@ -1208,8 +1204,7 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, countrate_ci, countrate_ref,
 
 
 ################################################################################
-def standard_ccf_err(cs_array, meta_dict, ref, noisy=True, absrms_var=None, \
-        absrms_rms=None):
+def standard_ccf_err(cs_array, meta_dict, absrms_rms=None):
     """
     Computes the standard error on each ccf bin from the segment-to-segment
     variations. Use this for *UNFILTERED* CCFs. This error is not correlated
@@ -1234,20 +1229,6 @@ def standard_ccf_err(cs_array, meta_dict, ref, noisy=True, absrms_var=None, \
         The standard error on the CCF from the segment-to-segment variations.
 
     """
-    # print "Shape mean rate array:", np.shape(ref.mean_rate_array)
-    # print "Shape power array:", np.shape(ref.power_array)
-
-    if absrms_var == None and absrms_rms == None:
-        absrms_power = np.asarray([raw_to_absrms(ref.power_array[:,i], \
-                ref.mean_rate_array[i], meta_dict['n_bins'], meta_dict['dt'][i], \
-                noisy) for i in range(meta_dict['n_seg'])])
-        ## Note that here, the axes are weird, so it's size (n_seg, n_bins)
-
-        # print "Shape absrms power:", np.shape(absrms_power)
-        # print "Num seg:", meta_dict['n_seg']
-
-        absrms_var, absrms_rms = var_and_rms(absrms_power.T, meta_dict['df'])
-
 
     ccf_array = fftpack.ifft(cs_array, axis=0).real
     ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / absrms_rms)
@@ -1262,11 +1243,13 @@ def standard_ccf_err(cs_array, meta_dict, ref, noisy=True, absrms_var=None, \
     standard_error = np.sqrt(sample_var / \
             np.float(meta_dict['n_seg']))  ## eq 2.4
 
+    print standard_error[0,0], standard_error[0,2], standard_error[0,15]
+
     return standard_error
 
 
 ################################################################################
-def UNFILT_cs_to_ccf(cs_avg, cs_array, meta_dict, ref, noisy):
+def unfilt_cs_to_ccf_w_err(cs_array, meta_dict, ref):
     """
     Takes the iFFT of the cross spectrum to get the cross-correlation function,
     and computes the error on the cross-correlation function.
@@ -1302,31 +1285,29 @@ def UNFILT_cs_to_ccf(cs_avg, cs_array, meta_dict, ref, noisy):
     ## Take the IFFT of the cross spectrum to get the CCF
     ######################################################
 
-    ccf = fftpack.ifft(cs_avg, axis=0).real
     ccf_array = fftpack.ifft(cs_array, axis=0).real
 
+    ###########################################################################
+    ## Average across segments and normalize by rms of averaged reference band
+    ## absolute-rms-normalized power spectrum
+    ###########################################################################
     ccf_avg = np.mean(ccf_array, axis=-1)
-    assert ccf.all() == ccf_avg.all()
-
-    # ## Dividing ccf by rms of signal in reference band
-    # ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
-    #
-    # mean_ccf = np.mean(ccf_array, axis=2)
-    # mean_ccf_b = np.resize(np.repeat(mean_ccf, meta_dict['n_seg']), \
-    #         np.shape(ccf_array))
-    # ccf_resid = ccf_array - mean_ccf_b
-    #
-    # sample_var = np.sum(ccf_resid**2, axis=2) / \
-    #         np.float(meta_dict['n_seg'] - 1)  ## eq 2.3
-    # standard_error = np.sqrt(sample_var / \
-    #         np.float(meta_dict['n_seg']))  ## eq 2.4
-
     ccf_avg *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
-    ccf *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
+    ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / np.sqrt(ref.var_array))
 
-    print ccf_avg[0,0], ccf_avg[0,2], ccf_avg[0,15]
-    print ccf[0,0], ccf[0,2], ccf[0,15]
-    return ccf_avg
+    mean_ccf = np.mean(ccf_array, axis=2)
+    mean_ccf_b = np.resize(np.repeat(mean_ccf, meta_dict['n_seg']), \
+            np.shape(ccf_array))
+    ccf_resid = ccf_array - mean_ccf_b
+
+    sample_var = np.sum(ccf_resid**2, axis=2) / \
+            np.float(meta_dict['n_seg'] - 1)  ## eq 2.3
+    standard_error = np.sqrt(sample_var / \
+            np.float(meta_dict['n_seg']))  ## eq 2.4
+
+    print standard_error[0,0], standard_error[0,2], standard_error[0,15]
+
+    return ccf_avg, standard_error
 
 
 ################################################################################
@@ -1585,10 +1566,11 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         # ccf_avg, ccf_error = unfilt_cs_to_ccf_w_err(total_cross_spec,
         #         meta_dict, ref_total)
 
-        ccf_avg = UNFILT_cs_to_ccf(avg_cross_spec, total_cross_spec, meta_dict,
-                ref_total, True)
-        ccf_error = standard_ccf_err(total_cross_spec, meta_dict, \
-                ref_total, True)
+        ccf_avg, ccf_error = unfilt_cs_to_ccf_w_err(total_cross_spec,
+                meta_dict, ref_total)
+        ccf_err = standard_ccf_err(total_cross_spec, meta_dict,
+                absrms_rms=np.sqrt(ref_total.var_array))
+        assert ccf_error.all() == ccf_err.all()
 
     print "Exposure_time = %.3f seconds" % meta_dict['exposure']
     print "Total number of segments:", meta_dict['n_seg']
@@ -1624,8 +1606,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         print "Do not have values to compare against."
 
     fits_out(out_file, input_file, bkgd_file, meta_dict, ci_total.mean_rate,
-            ref_total.mean_rate, ref_total.rms, ccf_avg, ccf_error, lo_freq,
-            hi_freq, file_description)
+            ref_total.mean_rate, float(ref_total.rms), ccf_avg, ccf_error,
+            lo_freq, hi_freq, file_description)
 
 
 ################################################################################
