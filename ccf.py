@@ -1106,20 +1106,13 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
     meta_dict : dict
         Dictionary of necessary meta-parameters for data analysis.
 
-    countrate_ci : np.array of floats
-        1-D array of the mean count rate of each energy channel in the channels
-        of interest. Size = (detchans).
+    ci : ccf_lc.Lightcurve object
+        Channel of interest light curve, with (averaged) mean_rate and
+        (averaged, raw) power assigned.
 
-    countrate_ref : float
-        The mean count rate of the reference band.
-
-    power_ci : np.array of floats
-        2-D array of the raw power of the channels of interest (only positive
-        Fourier frequencies). Size = (n_bins/2+1, detchans).
-
-    power_ref: np.array of floats
-        1-D array of the raw power in the reference band (only positive Fourier
-        frequencies). Size = (n_bins/2+1).
+    ref : ccf_lc.Lightcurve object
+        Reference band light curve, with (averaged) mean_rate, (averaged, raw)
+        power, and rms (of averaged power in abs rms units) assigned.
 
     lo_freq : float
         The lower frequency bound for filtering the cross spectrum, in Hz. [0.0]
@@ -1503,8 +1496,7 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
 
     if meta_dict['filter']:
         ccf_avg, ccf_error = filt_cs_to_ccf_w_err(avg_cross_spec, meta_dict,
-                ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
-                ref_total.power, True, lo_freq, hi_freq)
+                ci_total, ref_total, lo_freq, hi_freq, noisy=True)
     else:
         ccf_avg, ccf_error = unfilt_cs_to_ccf_w_err(total_cross_spec,
                 meta_dict, ref_total)
