@@ -31,7 +31,7 @@ class Lightcurve(object):
                              # spectrum of the ref band
             self.rms = 0.0   # rms of the absolute-rms-normalized power spectrum
                              #  of the ref band
-            self.rms_array = 0.0
+            self.var_array = 0.0
 
 
 class NormPSD(object):
