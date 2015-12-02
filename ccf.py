@@ -416,7 +416,6 @@ def make_cs(rate_ci, rate_ref, meta_dict):
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
 
-    # return cs_seg, ci_seg.mean_rate, ref_seg.mean_rate, ci_seg.power, ref_seg.power
     return cs_seg, ci_seg, ref_seg
 
 #
@@ -704,7 +703,8 @@ def fits_in(in_file, meta_dict, test=False):
 
     print "Segments computed:"
 
-    while (seg_end_time + (meta_dict['adjust_seg'] * meta_dict['dt'])) <= final_time:
+    while (seg_end_time + (meta_dict['adjust_seg'] * meta_dict['dt'])) <= \
+            final_time:
 
         ## Adjusting segment length to artificially line up the QPOs
         seg_end_time += (meta_dict['adjust_seg'] * meta_dict['dt'])
@@ -742,7 +742,8 @@ def fits_in(in_file, meta_dict, test=False):
 
         if len(time_ci) > 0 and \
                 (len(time_ref) > 0 or
-                (meta_dict['ref_file'] and len(rate_ref) == meta_dict['n_bins'])):
+                (meta_dict['ref_file'] and \
+                len(rate_ref) == meta_dict['n_bins'])):
 
             ##############################################################
             ## Populate the light curves for interest and reference bands
@@ -759,7 +760,7 @@ def fits_in(in_file, meta_dict, test=False):
 
                 ## Stack the reference band
                 rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
-                                                obs_epoch=meta_dict['obs_epoch'])
+                        obs_epoch=meta_dict['obs_epoch'])
 
             ## Save the reference band light curve to a text file
         	# out_file="./GX339-BQPO_ref_lc.dat"
