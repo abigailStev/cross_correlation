@@ -1204,60 +1204,25 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, countrate_ci, countrate_ref,
 
 
 ################################################################################
-def standard_ccf_err(cs_array, meta_dict, absrms_rms=None):
+def unfilt_cs_to_ccf_w_err(cs_array, meta_dict, ref):
     """
-    Computes the standard error on each ccf bin from the segment-to-segment
-    variations. Use this for *UNFILTERED* CCFs. This error is not correlated
-    between energy bins but may be correlated between time bins.
+    Take the iFFT of the cross spectrum to get the cross-correlation function,
+    and compute the error on the cross-correlation function. Compute the
+    standard error on each ccf bin from the segment-to-segment variations.
+    This error is not correlated between energy bins but may be correlated
+    between time bins.
+
+    Keep in mind that if adjusting segments to line up QPOs that shift in
+    frequency between segments, the rms of the avg ref power spectrum and the
+    avg of the rmses of each segment's ref power spectrum are not the same. This
+    has been accounted for here.
 
     S. Vaughan 2013, "Scientific Inference", equations 2.3 and 2.4.
 
     Parameters
     ----------
-    cs_array : np.array of complex numbers
-        Description.
-
-    meta_dict : dictionary
-        Dictionary of necessary meta-parameters for data analysis.
-
-    ref : ccf_lc.Lightcurve object
-        Description.
-
-    Returns
-    -------
-    np.array of floats
-        The standard error on the CCF from the segment-to-segment variations.
-
-    """
-
-    ccf_array = fftpack.ifft(cs_array, axis=0).real
-    ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / absrms_rms)
-
-    mean_ccf = np.mean(ccf_array, axis=2)
-    mean_ccf_b = np.resize(np.repeat(mean_ccf, meta_dict['n_seg']), \
-            np.shape(ccf_array))
-    ccf_resid = ccf_array - mean_ccf_b
-
-    sample_var = np.sum(ccf_resid**2, axis=2) / \
-            np.float(meta_dict['n_seg'] - 1)  ## eq 2.3
-    standard_error = np.sqrt(sample_var / \
-            np.float(meta_dict['n_seg']))  ## eq 2.4
-
-    print standard_error[0,0], standard_error[0,2], standard_error[0,15]
-
-    return standard_error
-
-
-################################################################################
-def unfilt_cs_to_ccf_w_err(cs_array, meta_dict, ref):
-    """
-    Takes the iFFT of the cross spectrum to get the cross-correlation function,
-    and computes the error on the cross-correlation function.
-
-    Parameters
-    ----------
     cs_avg : np.array of complex numbers
-        2-D array (size = n_bins x detchans) of the averaged cross-spectrum.
+        2-D array of the averaged cross-spectrum. Size = (n_bins, detchans).
 
     meta_dict : dict
         Dictionary of necessary meta-parameters for data analysis.
@@ -1265,47 +1230,37 @@ def unfilt_cs_to_ccf_w_err(cs_array, meta_dict, ref):
     ref : ccf_lc.Lightcurve object
         The reference band light curve and power.
 
-    noisy : bool
-        True if there is noise in the light curve (i.e., using real data) --
-        will subtract the Poisson noise level from the power spectrum.
-
     Returns
     -------
-    np.array of floats
-        2-D array (size = n_bins x detchans) of the cross-correlation function
-        of the channels of interest with the reference band.
-
+    mean_ccf, standard_error : np.arrays of floats
+        2-D arrays of the cross-correlation function of the channels of interest
+        with the reference band, and the error on the ccf.
+        Sizes = (n_bins, detchans).
     """
 
     if len(ref.power) == meta_dict['n_bins']:
         nyq_index = meta_dict['n_bins'] / 2
         ref.pos_power = ref.power[0:nyq_index + 1]
 
-    ######################################################
     ## Take the IFFT of the cross spectrum to get the CCF
-    ######################################################
-
     ccf_array = fftpack.ifft(cs_array, axis=0).real
 
-    ###########################################################################
     ## Average across segments and normalize by rms of averaged reference band
     ## absolute-rms-normalized power spectrum
-    ###########################################################################
     ccf_avg = np.mean(ccf_array, axis=-1)
     ccf_avg *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
     ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / np.sqrt(ref.var_array))
 
+    ## Computes the standard error on each ccf bin from the segment-to-segment
+    ## variations.
     mean_ccf = np.mean(ccf_array, axis=2)
-    mean_ccf_b = np.resize(np.repeat(mean_ccf, meta_dict['n_seg']), \
-            np.shape(ccf_array))
-    ccf_resid = ccf_array - mean_ccf_b
+    ccf_resid = (ccf_array.T - mean_ccf.T).T
 
-    sample_var = np.sum(ccf_resid**2, axis=2) / \
-            np.float(meta_dict['n_seg'] - 1)  ## eq 2.3
-    standard_error = np.sqrt(sample_var / \
-            np.float(meta_dict['n_seg']))  ## eq 2.4
+    ## Eqn 2.3 from S. Vaughan 2013, "Scientific Inference"
+    sample_var = np.sum(ccf_resid**2, axis=2) / (meta_dict['n_seg'] - 1)
 
-    print standard_error[0,0], standard_error[0,2], standard_error[0,15]
+    ## Eqn 2.4 from S. Vaughan 2013, "Scientific Inference"
+    standard_error = np.sqrt(sample_var / meta_dict['n_seg'])
 
     return ccf_avg, standard_error
 
@@ -1563,14 +1518,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
                 ci_total.mean_rate, ref_total.mean_rate, ci_total.power,
                 ref_total.power, True, lo_freq, hi_freq)
     else:
-        # ccf_avg, ccf_error = unfilt_cs_to_ccf_w_err(total_cross_spec,
-        #         meta_dict, ref_total)
-
         ccf_avg, ccf_error = unfilt_cs_to_ccf_w_err(total_cross_spec,
                 meta_dict, ref_total)
-        ccf_err = standard_ccf_err(total_cross_spec, meta_dict,
-                absrms_rms=np.sqrt(ref_total.var_array))
-        assert ccf_error.all() == ccf_err.all()
 
     print "Exposure_time = %.3f seconds" % meta_dict['exposure']
     print "Total number of segments:", meta_dict['n_seg']
