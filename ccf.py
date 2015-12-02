@@ -602,7 +602,7 @@ def fits_in(in_file, meta_dict, test=False):
             detchans=meta_dict['detchans'], type='ci')
     ref_whole = ccf_lc.Lightcurve(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ref')
-    cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], 1), \
+    cs_whole = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], 1),
             dtype=np.complex128)
     dt_whole = np.array([])
     df_whole = np.array([])
@@ -1510,8 +1510,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     # ref_total.rms_array = ref_total.rms_array[1:]
     ref_total.var_array = ref_total.var_array[1:]
 
-    print "Ref_total rms array:", ref_total.rms_array
-    print "Mean of rms_arary:", np.mean(ref_total.rms_array)
+    # print "Ref_total rms array:", ref_total.rms_array
+    # print "Mean of rms_arary:", np.mean(ref_total.rms_array)
     print "Mean of var_array:", np.mean(ref_total.var_array)
     print "Sqrt of var_array:", np.sqrt(ref_total.var_array)
     print "Mean of sqrt of var_array:", np.mean(np.sqrt(ref_total.var_array))
