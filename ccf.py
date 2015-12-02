@@ -803,13 +803,16 @@ def fits_in(in_file, meta_dict, test=False):
                 dt_whole = np.append(dt_whole, dt_seg)
                 df_whole = np.append(df_whole, df_seg)
 
-                cross_spec = np.dstack((cross_spec, cs_seg))
+                cs_whole = np.dstack((cs_whole, cs_seg))
                 ref_whole.power_array = np.hstack((ref_whole.power_array,
                         np.reshape(ref_seg.power, (meta_dict['n_bins'], 1))))
                 ref_whole.mean_rate_array = np.append(ref_whole.mean_rate_array,
                         ref_seg.mean_rate)
-                ref_whole.rms_array = np.append(ref_whole.rms_array,
-                        np.sqrt(var))
+                print np.sqrt(var)
+                print rms
+                # ref_whole.rms_array = np.append(ref_whole.rms_array,
+                #         np.sqrt(var))
+                ref_whole.var_array = np.append(ref_whole.var_array, var)
 
                 ## Sums across segments -- arrays, so it adds by index
                 exposure += (seg_end_time - start_time)
@@ -818,7 +821,7 @@ def fits_in(in_file, meta_dict, test=False):
                 ref_whole.mean_rate += ref_seg.mean_rate
                 ci_whole.power += ci_seg.power
                 ref_whole.power += ref_seg.power
-                ref_whole.var += var
+                # ref_whole.var += var
 
                 if n_seg % print_iterator == 0:
                     print "\t", n_seg
@@ -842,18 +845,19 @@ def fits_in(in_file, meta_dict, test=False):
 
     ## End of while-loop
 
-    cross_spec = cross_spec[:,:,1:]
-    ref_whole.rms_array = ref_whole.rms_array[1:]
+    cs_whole = cs_whole[:,:,1:]
+    # ref_whole.rms_array = ref_whole.rms_array[1:]
+    ref_whole.var_array = ref_whole.var_array[1:]
     # ci_whole.power_array = ci_whole.power_array[:,:,1:]
     # ci_whole.mean_rate_array = ci_whole.mean_rate_array[:,1:]
     ref_whole.power_array = ref_whole.power_array[:,1:]
     ref_whole.mean_rate_array = ref_whole.mean_rate_array[1:]
     # print dt_whole
     # print df_whole
-
+    # print ref_whole.rms_array
     # print np.shape(ref_whole.rms_array)
 
-    return cross_spec, ci_whole, ref_whole, n_seg, dt_whole, df_whole, \
+    return cs_whole, ci_whole, ref_whole, n_seg, dt_whole, df_whole, \
             exposure
 
 
@@ -940,11 +944,6 @@ def save_for_lags(out_file, in_file, meta_dict, mean_rate_ci, mean_rate_ref,
     ## Getting the Fourier frequencies for the cross spectrum
     freq = fftpack.fftfreq(meta_dict['n_bins'], d=np.mean(meta_dict['dt']))
     nyq_index = meta_dict['n_bins']/2
-    # print "Nyquist frequency:", freq[nyq_index]
-    # print "One before nyquist:", freq[nyq_index-1]
-    # print "One after nyquist:", freq[nyq_index+1]
-    # print "Should be the nyquist frequency:", meta_dict['nyquist']
-    # assert np.abs(freq[nyq_index]) == meta_dict['nyquist']
 
     ## Only keeping the parts associated with positive Fourier frequencies
     freq = np.abs(freq[0:nyq_index + 1])  ## because it slices at end-1, and we
@@ -957,7 +956,8 @@ def save_for_lags(out_file, in_file, meta_dict, mean_rate_ci, mean_rate_ref,
     chan = np.arange(0, meta_dict['detchans'])
     energy_channels = np.tile(chan, len(freq))
 
-    out_file = out_file.replace("cross_correlation/out_ccf", "lag_spectra/out_lags")
+    out_file = out_file.replace("cross_correlation/out_ccf",
+            "lag_spectra/out_lags")
     out_file = out_file.replace(".", "_cs.")
     out_dir = out_file[0:out_file.rfind("/")+1]
     subprocess.call(['mkdir', '-p', out_dir])
@@ -978,8 +978,8 @@ def save_for_lags(out_file, in_file, meta_dict, mean_rate_ci, mean_rate_ref,
     prihdr.set('EXPOSURE', meta_dict['exposure'], "seconds of data used")
     prihdr.set('DETCHANS', meta_dict['detchans'], "Number of detector energy"\
             " channels")
-    prihdr.set('RATE_CI', str(mean_rate_ci.tolist()), "counts/second")
-    prihdr.set('RATE_REF', mean_rate_ref, "counts/second")
+    prihdr.set('RATE_CI', str(mean_rate_ci.tolist()), "cts/s")
+    prihdr.set('RATE_REF', mean_rate_ref, "cts/s")
     prihdu = fits.PrimaryHDU(header=prihdr)
 
     ## Making FITS table for cross spectrum
@@ -1296,7 +1296,7 @@ def UNFILT_cs_to_ccf(cs_avg, cs_array, meta_dict, ref, noisy):
 
     if len(ref.power) == meta_dict['n_bins']:
         nyq_index = meta_dict['n_bins'] / 2
-        ref.pos_power = ref.power[0:nyq_index+1]
+        ref.pos_power = ref.power[0:nyq_index + 1]
 
     ######################################################
     ## Take the IFFT of the cross spectrum to get the CCF
@@ -1306,10 +1306,6 @@ def UNFILT_cs_to_ccf(cs_avg, cs_array, meta_dict, ref, noisy):
     ccf_array = fftpack.ifft(cs_array, axis=0).real
 
     ccf_avg = np.mean(ccf_array, axis=-1)
-    print ccf[0,2]
-    print ccf_avg[0,2]
-    print ccf[0,15]
-    print ccf_avg[0,15]
     assert ccf.all() == ccf_avg.all()
 
     # ## Dividing ccf by rms of signal in reference band
@@ -1328,7 +1324,9 @@ def UNFILT_cs_to_ccf(cs_avg, cs_array, meta_dict, ref, noisy):
     ccf_avg *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
     ccf *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
 
-    return ccf
+    print ccf_avg[0,0], ccf_avg[0,2], ccf_avg[0,15]
+    print ccf[0,0], ccf[0,2], ccf[0,15]
+    return ccf_avg
 
 
 ################################################################################
@@ -1472,17 +1470,19 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         ## Read in data, compute the cross spectrum
         ############################################
 
-        cross_spec_whole, ci_whole, ref_whole, n_seg, dt_whole, df_whole, exposure = \
-                fits_in(in_file, meta_dict, test)
+        cross_spec_whole, ci_whole, ref_whole, n_seg, dt_whole, df_whole, \
+                exposure = fits_in(in_file, meta_dict, test)
 
         print "Segments for this file: %d\n" % n_seg
 
         total_cross_spec = np.dstack((total_cross_spec, cross_spec_whole))
-        ref_total.rms_array = np.append(ref_total.rms_array,
-                ref_whole.rms_array)
-        ref_total.power_array = np.hstack((ref_total.power_array, \
+        # ref_total.rms_array = np.append(ref_total.rms_array,
+        #         ref_whole.rms_array)
+        ref_total.var_array = np.append(ref_total.var_array,
+                ref_whole.var_array)
+        ref_total.power_array = np.hstack((ref_total.power_array,
                         ref_whole.power_array))
-        ref_total.mean_rate_array = np.append(ref_total.mean_rate_array, \
+        ref_total.mean_rate_array = np.append(ref_total.mean_rate_array,
                         ref_whole.mean_rate_array)
         dt_total = np.append(dt_total, dt_whole)
         df_total = np.append(df_total, df_whole)
@@ -1490,7 +1490,7 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         ref_total.mean_rate += ref_whole.mean_rate
         ci_total.power += ci_whole.power
         ref_total.power += ref_whole.power
-        ref_total.var += ref_whole.var
+        # ref_total.var += ref_whole.var
         total_exposure += exposure
         total_seg += n_seg
 
@@ -1500,14 +1500,21 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     meta_dict['df'] = df_total
     meta_dict['adjust_seg'] = adjust_segments
 
-    print "Mean dt:", np.mean(dt_total)
-    print "Mean df:", np.mean(df_total)
+    print("Mean dt: %.15f" % np.mean(dt_total))
+    print("Mean df: %.10f\n" % np.mean(df_total))
 
     ## Removing the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
     ref_total.power_array = ref_total.power_array[:,1:]
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
-    ref_total.rms_array = ref_total.rms_array[1:]
+    # ref_total.rms_array = ref_total.rms_array[1:]
+    ref_total.var_array = ref_total.var_array[1:]
+
+    print "Ref_total rms array:", ref_total.rms_array
+    print "Mean of rms_arary:", np.mean(ref_total.rms_array)
+    print "Mean of var_array:", np.mean(ref_total.var_array)
+    print "Sqrt of var_array:", np.sqrt(ref_total.var_array)
+    print "Mean of sqrt of var_array:", np.mean(np.sqrt(ref_total.var_array))
 
     #########################################
     ## Turning sums over segments into means
@@ -1517,21 +1524,21 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ci_total.power /= np.float(meta_dict['n_seg'])
     ref_total.power /= np.float(meta_dict['n_seg'])
     ref_total.mean_rate /= np.float(meta_dict['n_seg'])
-    ref_total.var /= np.float(meta_dict['n_seg'])
-    ref_total.rms = np.sqrt(ref_total.var)
+    # ref_total.var /= np.float(meta_dict['n_seg'])
+    # ref_total.rms = np.sqrt(ref_total.var)
+    ref_total.rms_array = np.sqrt(ref_total.var_array)
     avg_cross_spec = np.mean(total_cross_spec, axis=-1)
 
-    absrms_ref_pow = raw_to_absrms(ref_total.power[0:meta_dict['n_bins']/2+1], \
+    absrms_ref_pow = raw_to_absrms(ref_total.power[0:meta_dict['n_bins']/2+1],
             ref_total.mean_rate, meta_dict['n_bins'],
             np.mean(meta_dict['dt']), noisy=True)
 
-    var, rms = var_and_rms(absrms_ref_pow, np.mean(meta_dict['df']))
-    print rms
+    ref_total.var, ref_total.rms = var_and_rms(absrms_ref_pow,
+            np.mean(meta_dict['df']))
+    # print "Var and rms of avg pow:", var, rms
 
-
-    print np.shape(ref_total.rms_array)
-    print np.mean(ref_total.rms_array)
-    print ref_total.rms
+    print "Var:", ref_total.var
+    print "Rms:", ref_total.rms
 
 
     #############################################################
@@ -1554,11 +1561,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
 
     ci_total.mean_rate -= bkgd_rate
 
-    ## Need to use a background from ref. PCU for the reference band...
-    # ref_total.mean_rate -= np.mean(bkgd_rate[2:26])
-
-    print np.shape(avg_cross_spec)
-    print np.shape(ref_total.rms_array)
+    ## Need to use a background from ref PCU for the reference band...
+    # ref_total.mean_rate -= np.sum(bkgd_rate[2:26])
 
     ####################################################################
     ## Save cross spectra and power spectra for computing lags later in
@@ -1602,9 +1606,9 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     else:
         file_description = "Cross-correlation function of multiple observations"
 
-    # print ccf_avg[0,0]
-    # print ccf_avg[0,2]
-    # print ccf_avg[0,15]
+    print ccf_avg[0,0]
+    print ccf_avg[0,2]
+    print ccf_avg[0,15]
 
     if not test and adjust:
         assert round(ccf_avg[0,0], 12) == 0.117937948428
