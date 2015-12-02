@@ -1086,16 +1086,16 @@ def filter_freq(freq_space_array, dt, n_bins, detchans, lo_freq, hi_freq):
 
 
 ################################################################################
-def filt_cs_to_ccf_w_err(cs_avg, meta_dict, countrate_ci, countrate_ref,
-        power_ci, power_ref, lo_freq=0.0, hi_freq=0.0, noisy=True):
+def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
+        noisy=True):
     """
+    WARNING: Has not been tested lately!!
+
     Filter the cross-spectrum in frequency space, take the iFFT of the
     filtered cross spectrum to get the cross-correlation function, and compute
     the error on the cross-correlation function. Note that error is definitely
     NOT independent between time bins due to the filtering! But is still
     independent between energy bins.
-
-    TODO: use raw_to_absrms, and var_and_rms methods in here.
 
     Parameters
     ----------
@@ -1145,8 +1145,8 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, countrate_ci, countrate_ref,
             meta_dict['n_bins'], meta_dict['detchans'], lo_freq, hi_freq)
 
     ## Absolute rms norms of poisson noise
-    noise_ci = 2.0 * countrate_ci
-    noise_ref = 2.0 * countrate_ref
+    noise_ci = 2.0 * ci.mean_rate
+    noise_ref = 2.0 * ref.mean_rate
 
     ## If there's no noise in a (simulated) power spectrum, noise level = 0
     if not noisy:
@@ -1155,50 +1155,48 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, countrate_ci, countrate_ref,
 
     noise_ref_array = np.repeat(noise_ref, meta_dict['detchans'])
 
-    ## Extracting only the signal frequencies of the mean powers
-    signal_ci_pow = np.float64(power_ci[j_min:j_max, :])
-    signal_ref_pow = np.float64(power_ref[j_min:j_max])
+    ## Extract only the signal frequencies of the mean powers
+    signal_ci_pow = np.float64(ci.power[j_min:j_max, :])
+    signal_ref_pow = np.float64(ref.power[j_min:j_max])
 
-    ## Putting powers into absolute rms2 normalization, subtracting noise
-    signal_ci_pow = signal_ci_pow * (2.0 * meta_dict['dt'] / np.float(meta_dict['n_bins'])) - noise_ci
-    signal_ref_pow = signal_ref_pow * (2.0 * meta_dict['dt'] / np.float(meta_dict['n_bins'])) - noise_ref
+    ## Apply absolute rms2 normalization to power spectra, subtract noise
+    signal_ci_pow = raw_to_absrms(signal_ci_pow, ci.mean_rate, \
+            meta_dict['n_bins'], meta_dict['dt'], noisy=noisy)
+    signal_ref_pow = raw_to_absrms(signal_ref_pow, ref.mean_rate, \
+            meta_dict['n_bins'], meta_dict['dt'], noisy=noisy)
 
-    ## Getting rms of reference band, to normalize the ccf
-    ref_variance = np.sum(signal_ref_pow * meta_dict['df'])
-    print "Reference band variance:", ref_variance
-    rms_ref = np.sqrt(ref_variance)
-    print "Frac RMS of reference band:", rms_ref / countrate_ref
+    print "Frac RMS of reference band:", ref.rms / ref.mean_rate
     ## in frac rms units here -- should be few percent
 
-    ## Broadcasting signal_ref_pow into same shape as signal_ci_pow
+    ## Broadcast signal_ref_pow into same shape as signal_ci_pow
     signal_ref_pow = np.resize(np.repeat(signal_ref_pow, meta_dict['detchans']),
         np.shape(signal_ci_pow))
     assert np.shape(signal_ref_pow) == np.shape(signal_ci_pow)
 
+    ## Compute amplitude of noise in the cross spectrum
     temp = (noise_ci * signal_ref_pow) + (noise_ref * signal_ci_pow) + \
             (noise_ci * noise_ref)
     cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / np.float(meta_dict['n_seg']))
 
+    ## Compute amplitude of signal in the cross spectrum
     temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * meta_dict['dt'] / \
             np.float(meta_dict['n_bins']))
     cs_signal_amp = np.sum(temp1, axis=0)
 
-    ## Assuming that cs_noise_amp and cs_signal_amp are float arrays, size 64
+    ## Assume that cs_noise_amp and cs_signal_amp are float arrays, size 64
     with np.errstate(all='ignore'):
         error_ratio = np.where(cs_signal_amp != 0, cs_noise_amp / \
                 cs_signal_amp, 0)
 
-    ## Taking the IFFT of the cross spectrum to get the CCF
+    ## Take the IFFT of the cross spectrum to get the CCF
     ccf_end = fftpack.ifft(filtered_cs_avg, axis=0)
 
-    ## Dividing ccf by rms of signal in reference band
-    ccf_end *= (2.0 / np.float(meta_dict['n_bins']) / rms_ref)
+    ## Divide ccf by rms of signal in reference band
+    ccf_end *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
 
-    ## Computing the error on the ccf
+    ## Compute the error on the ccf
     ccf_rms_ci = np.sqrt(np.var(ccf_end, axis=0, ddof=1))
     ccf_error = ccf_rms_ci * error_ratio
-    print "CCF end:", np.shape(ccf_end)
-    print "CCF error:", np.shape(ccf_error)
 
     return ccf_end, ccf_error
 
@@ -1251,7 +1249,7 @@ def unfilt_cs_to_ccf_w_err(cs_array, meta_dict, ref):
     ccf_avg *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
     ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / np.sqrt(ref.var_array))
 
-    ## Computes the standard error on each ccf bin from the segment-to-segment
+    ## Compute the standard error on each ccf bin from the segment-to-segment
     ## variations.
     mean_ccf = np.mean(ccf_array, axis=2)
     ccf_resid = (ccf_array.T - mean_ccf.T).T
@@ -1339,9 +1337,9 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     assert hi_freq >= lo_freq, "ERROR: Upper bound of frequency filtering must"\
             " be equal to or greater than the lower bound."
 
-    ###########################
-    ## Reading in data file(s)
-    ###########################
+    ########################
+    ## Read in data file(s)
+    ########################
 
     if ".txt" in input_file or ".lst" in input_file or ".dat" in input_file:
         data_files = [line.strip() for line in open(input_file)]
@@ -1394,9 +1392,9 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     df_total = np.array([])
     total_exposure = 0
 
-    ##################################
-    ## Looping through all data files
-    ##################################
+    ###############################
+    ## Loop through all data files
+    ###############################
 
     for in_file, adj_seg in zip(data_files, adjust_segments):
 
@@ -1412,8 +1410,6 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         print "Segments for this file: %d\n" % n_seg
 
         total_cross_spec = np.dstack((total_cross_spec, cross_spec_whole))
-        # ref_total.rms_array = np.append(ref_total.rms_array,
-        #         ref_whole.rms_array)
         ref_total.var_array = np.append(ref_total.var_array,
                 ref_whole.var_array)
         ref_total.power_array = np.hstack((ref_total.power_array,
@@ -1426,7 +1422,6 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         ref_total.mean_rate += ref_whole.mean_rate
         ci_total.power += ci_whole.power
         ref_total.power += ref_whole.power
-        # ref_total.var += ref_whole.var
         total_exposure += exposure
         total_seg += n_seg
 
@@ -1439,42 +1434,35 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     print("Mean dt: %.15f" % np.mean(dt_total))
     print("Mean df: %.10f\n" % np.mean(df_total))
 
-    ## Removing the first zeros from stacked arrays
+    ## Remove the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
     ref_total.power_array = ref_total.power_array[:,1:]
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
-    # ref_total.rms_array = ref_total.rms_array[1:]
     ref_total.var_array = ref_total.var_array[1:]
 
-    # print "Ref_total rms array:", ref_total.rms_array
-    # print "Mean of rms_arary:", np.mean(ref_total.rms_array)
     print "Mean of var_array:", np.mean(ref_total.var_array)
     print "Sqrt of var_array:", np.sqrt(ref_total.var_array)
     print "Mean of sqrt of var_array:", np.mean(np.sqrt(ref_total.var_array))
 
-    #########################################
-    ## Turning sums over segments into means
-    #########################################
+    ######################################
+    ## Turn sums over segments into means
+    ######################################
 
     ci_total.mean_rate /= np.float(meta_dict['n_seg'])
     ci_total.power /= np.float(meta_dict['n_seg'])
     ref_total.power /= np.float(meta_dict['n_seg'])
     ref_total.mean_rate /= np.float(meta_dict['n_seg'])
-    # ref_total.var /= np.float(meta_dict['n_seg'])
-    # ref_total.rms = np.sqrt(ref_total.var)
-    ref_total.rms_array = np.sqrt(ref_total.var_array)
     avg_cross_spec = np.mean(total_cross_spec, axis=-1)
 
+
+    ## Compute the variance and rms of the absolute-rms-normalized reference
+    ## band power spectrum
     absrms_ref_pow = raw_to_absrms(ref_total.power[0:meta_dict['n_bins']/2+1],
             ref_total.mean_rate, meta_dict['n_bins'],
             np.mean(meta_dict['dt']), noisy=True)
 
     ref_total.var, ref_total.rms = var_and_rms(absrms_ref_pow,
             np.mean(meta_dict['df']))
-    # print "Var and rms of avg pow:", var, rms
-
-    print "Var:", ref_total.var
-    print "Rms:", ref_total.rms
 
 
     #############################################################
