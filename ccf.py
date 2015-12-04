@@ -8,7 +8,21 @@ Use run_ccf.sh for an example.
 Be sure that 'tools.py' (from https://github.com/abigailStev/whizzy_scripts) is
 downloaded, and it's directory is in your PYTHONPATH bash environment variable.
 
-November 2015, Federico M. Vincentelli: Minor adjustements for application to IR data
+November 2015, Federico M. Vincentelli: Minor adjustements for application to IR
+data
+
+Files created
+-------------
+*_cs.fits : lag_spectra directory
+    Output file with Fourier frequency, cross spectrum, power spectra of the
+    channels of interest, and power spectrum of the reference band saved as an
+    astropy table in FITS extension 1. Header info is also in FITS extension 1.
+
+*.fits : cross_correlation directory
+    Output file with integer time bins, cross-correlation function, and error
+    saved as an astropy table in FITS extension 1. Header info is also in FITS
+    extension 1.
+
 """
 import argparse
 import numpy as np
@@ -81,7 +95,7 @@ def fits_out(out_file, in_file, bkgd_file, meta_dict, mean_rate_ci,
     assert out_file[-4:].lower() == "fits", "ERROR: Output file must have "\
             "extension '.fits'."
 
-    print "\nOutput sent to: %s" % out_file
+    # print "\nOutput sent to: %s" % out_file
 
     # print ccf[0,0]
     # print ccf[0,2]
@@ -806,6 +820,9 @@ def fits_in(in_file, meta_dict, test=False):
 
                 ## Append segment to arrays
                 cs_whole = np.dstack((cs_whole, cs_seg))
+                ci_whole.mean_rate_array = np.hstack((ci_whole.mean_rate_array,
+                        np.reshape(ci_seg.mean_rate, (meta_dict['detchans'],
+                        1))))
                 ref_whole.power_array = np.hstack((ref_whole.power_array,
                         np.reshape(ref_seg.power, (meta_dict['n_bins'], 1))))
                 ref_whole.mean_rate_array = np.append(ref_whole.mean_rate_array,
@@ -846,7 +863,7 @@ def fits_in(in_file, meta_dict, test=False):
     # ref_whole.rms_array = ref_whole.rms_array[1:]
     ref_whole.var_array = ref_whole.var_array[1:]
     # ci_whole.power_array = ci_whole.power_array[:,:,1:]
-    # ci_whole.mean_rate_array = ci_whole.mean_rate_array[:,1:]
+    ci_whole.mean_rate_array = ci_whole.mean_rate_array[:,1:]
     ref_whole.power_array = ref_whole.power_array[:,1:]
     ref_whole.mean_rate_array = ref_whole.mean_rate_array[1:]
     # print dt_whole
@@ -897,8 +914,7 @@ def get_background(bkgd_file="evt_bkgd_rebinned.pha"):
 
 
 ################################################################################
-def save_for_lags(out_file, in_file, meta_dict, mean_rate_ci, mean_rate_ref,
-        cs_avg, power_ci, power_ref):
+def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref):
     """
     Saving header data, the cross spectrum, CoI power spectrum, and reference
     band power spectrum to a FITS file to use in the program make_lags.py to get
@@ -916,22 +932,16 @@ def save_for_lags(out_file, in_file, meta_dict, mean_rate_ci, mean_rate_ref,
     meta_dict : dict
         Dictionary of necessary meta-parameters for data analysis.
 
-    mean_rate_ci : np.array of floats
-        1-D array of the mean count rate of each of the channels of interest.
-        Size = (detchans).
-
-    mean_rate_ref : float
-        Mean count rate of the reference band.
-
     cs_avg : np.array of complex numbers
         2-D array of the averaged cross spectrum. Size = (n_bins, detchans).
 
-    power_ci : np.array of floats
-        2-D array of the power in the channels of interest.
-        Size = (n_bins, detchans).
+    ci : ccf_lc.Lightcurve object
+        The channel of interest light curve. Must already have mean_rate and
+        pos_power assigned.
 
-    power_ref : np.array of floats
-        1-D array of the power in the reference band. Size = (n_bins)
+    ref : ccf_lc.Lightcurve object
+        The reference band light curve. Must already have mean_rate, rms, and
+        pos_power assigned.
 
     Returns
     -------
@@ -940,18 +950,13 @@ def save_for_lags(out_file, in_file, meta_dict, mean_rate_ci, mean_rate_ref,
     """
     ## Getting the Fourier frequencies for the cross spectrum
     freq = fftpack.fftfreq(meta_dict['n_bins'], d=np.mean(meta_dict['dt']))
-    nyq_index = meta_dict['n_bins']/2
+    nyq_index = meta_dict['n_bins'] / 2
 
     ## Only keeping the parts associated with positive Fourier frequencies
     freq = np.abs(freq[0:nyq_index + 1])  ## because it slices at end-1, and we
             ## want to include 'nyq_index'; abs is because the nyquist freq is
             ## both pos and neg, and we want it pos here.
-    cs_avg = cs_avg[0:nyq_index + 1, ]
-    power_ci = power_ci[0:nyq_index + 1, ]
-    power_ref = power_ref[0:nyq_index + 1]
-
-    chan = np.arange(0, meta_dict['detchans'])
-    energy_channels = np.tile(chan, len(freq))
+    cs_avg = cs_avg[0:nyq_index + 1, :]
 
     out_file = out_file.replace("cross_correlation/out_ccf",
             "lag_spectra/out_lags")
@@ -960,59 +965,84 @@ def save_for_lags(out_file, in_file, meta_dict, mean_rate_ci, mean_rate_ref,
     subprocess.call(['mkdir', '-p', out_dir])
     print "Output sent to: %s" % out_file
 
-    ## Making FITS header (extension 0)
-    prihdr = fits.Header()
-    prihdr.set('TYPE', "Cross spectrum, power spectrum ci, and power spectrum "\
-            "ref.")
-    prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
-    prihdr.set('EVTLIST', in_file)
-    prihdr.set('DT', np.mean(meta_dict['dt']), "seconds")
-    prihdr.set('DF', np.mean(meta_dict['df']), "Hz")
-    prihdr.set('N_BINS', meta_dict['n_bins'], "time bins per segment")
-    prihdr.set('SEGMENTS', meta_dict['n_seg'], "segments in the whole light"\
-            " curve")
-    prihdr.set('SEC_SEG', meta_dict['n_seconds'], "seconds per segment")
-    prihdr.set('EXPOSURE', meta_dict['exposure'], "seconds of data used")
-    prihdr.set('DETCHANS', meta_dict['detchans'], "Number of detector energy"\
-            " channels")
-    prihdr.set('RATE_CI', str(mean_rate_ci.tolist()), "cts/s")
-    prihdr.set('RATE_REF', mean_rate_ref, "cts/s")
-    prihdu = fits.PrimaryHDU(header=prihdr)
+    out_table = Table()
+    out_table.add_column(Column(data=freq, name='FREQUENCY', unit='Hz'))
+    out_table.add_column(Column(data=cs_avg, name='CROSS', unit='raw'))
+    out_table.add_column(Column(data=ci.pos_power, name='POWER_CI', unit='raw'))
+    out_table.add_column(Column(data=ref.pos_power, name='POWER_REF', unit='raw'))
 
-    ## Making FITS table for cross spectrum
-    col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
-    col2 = fits.Column(name='CROSS', unit='raw', format='C',
-            array=cs_avg.flatten('C'))
-    col3 = fits.Column(name='CHANNEL', unit='', format='I',
-            array=energy_channels)
-    cols = fits.ColDefs([col1, col2, col3])
-    tbhdu1 = fits.BinTableHDU.from_columns(cols)
+    out_table.meta['TYPE'] = "Cross spectrum and power spectra, saved for lags."
+    out_table.meta['DATE'] = str(datetime.now())
+    out_table.meta['EVTLIST'] = in_file
+    out_table.meta['DT'] = np.mean(meta_dict['dt'])
+    out_table.meta['DF'] = np.mean(meta_dict['df'])
+    out_table.meta['N_BINS'] = meta_dict['n_bins']
+    out_table.meta['SEGMENTS'] = meta_dict['n_seg']
+    out_table.meta['SEC_SEG'] = meta_dict['n_seconds']
+    out_table.meta['EXPOSURE'] = meta_dict['exposure']
+    out_table.meta['DETCHANS'] = meta_dict['detchans']
+    out_table.meta['RATE_CI'] = str(ci.mean_rate.tolist())
+    out_table.meta['RATE_REF'] = ref.mean_rate
+    out_table.meta['RMS_REF'] = float(ref.rms)
+    out_table.meta['NYQUIST'] = meta_dict['nyquist']
+    out_table.meta['FILTER'] = str(meta_dict['filter'])
+    out_table.meta['FILTFREQ'] = "%f:%f" % (lo_freq, hi_freq)
+    out_table.meta['ADJUST'] = "%s" % str(meta_dict['adjust_seg'])
+    out_table.write(out_file, overwrite=True)
 
-    ## Making FITS table for power spectrum of channels of interest
-    col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
-    col2 = fits.Column(name='POWER', unit='raw', format='D',
-            array=power_ci.flatten('C'))
-    col3 = fits.Column(name='CHANNEL', unit='', format='I',
-            array=energy_channels)
-    cols = fits.ColDefs([col1, col2, col3])
-    tbhdu2 = fits.BinTableHDU.from_columns(cols)
-
-    ## Making FITS table for power spectrum of reference band
-    col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
-    col2 = fits.Column(name='POWER', unit='raw', format='D',
-            array=power_ref)
-    cols = fits.ColDefs([col1, col2])
-    tbhdu3 = fits.BinTableHDU.from_columns(cols)
-
-    ## If the file already exists, remove it
-    assert out_file[-4:].lower() == "fits", "ERROR: Output file must have "\
-            "extension '.fits'."
-    if os.path.isfile(out_file):
-        subprocess.call(["rm", out_file])
-
-    ## Writing to a FITS file
-    thdulist = fits.HDUList([prihdu, tbhdu1, tbhdu2, tbhdu3])
-    thdulist.writeto(out_file)
+    # ## Making FITS header (extension 0)
+    # prihdr = fits.Header()
+    # prihdr.set('TYPE', "Cross spectrum, power spectrum ci, and power spectrum "\
+    #         "ref.")
+    # prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
+    # prihdr.set('EVTLIST', in_file)
+    # prihdr.set('DT', np.mean(meta_dict['dt']), "seconds")
+    # prihdr.set('DF', np.mean(meta_dict['df']), "Hz")
+    # prihdr.set('N_BINS', meta_dict['n_bins'], "time bins per segment")
+    # prihdr.set('SEGMENTS', meta_dict['n_seg'], "segments in the whole light"\
+    #         " curve")
+    # prihdr.set('SEC_SEG', meta_dict['n_seconds'], "seconds per segment")
+    # prihdr.set('EXPOSURE', meta_dict['exposure'], "seconds of data used")
+    # prihdr.set('DETCHANS', meta_dict['detchans'], "Number of detector energy"\
+    #         " channels")
+    # prihdr.set('RATE_CI', str(mean_rate_ci.tolist()), "cts/s")
+    # prihdr.set('RATE_REF', mean_rate_ref, "cts/s")
+    # prihdu = fits.PrimaryHDU(header=prihdr)
+    #
+    # ## Making FITS table for cross spectrum
+    # col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
+    # col2 = fits.Column(name='CROSS', unit='raw', format='C',
+    #         array=cs_avg.flatten('C'))
+    # col3 = fits.Column(name='CHANNEL', unit='', format='I',
+    #         array=energy_channels)
+    # cols = fits.ColDefs([col1, col2, col3])
+    # tbhdu1 = fits.BinTableHDU.from_columns(cols)
+    #
+    # ## Making FITS table for power spectrum of channels of interest
+    # col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
+    # col2 = fits.Column(name='POWER', unit='raw', format='D',
+    #         array=power_ci.flatten('C'))
+    # col3 = fits.Column(name='CHANNEL', unit='', format='I',
+    #         array=energy_channels)
+    # cols = fits.ColDefs([col1, col2, col3])
+    # tbhdu2 = fits.BinTableHDU.from_columns(cols)
+    #
+    # ## Making FITS table for power spectrum of reference band
+    # col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
+    # col2 = fits.Column(name='POWER', unit='raw', format='D',
+    #         array=power_ref)
+    # cols = fits.ColDefs([col1, col2])
+    # tbhdu3 = fits.BinTableHDU.from_columns(cols)
+    #
+    # ## If the file already exists, remove it
+    # assert out_file[-4:].lower() == "fits", "ERROR: Output file must have "\
+    #         "extension '.fits'."
+    # if os.path.isfile(out_file):
+    #     subprocess.call(["rm", out_file])
+    #
+    # ## Writing to a FITS file
+    # thdulist = fits.HDUList([prihdu, tbhdu1, tbhdu2, tbhdu3])
+    # thdulist.writeto(out_file)
 
 
 ################################################################################
@@ -1214,7 +1244,7 @@ def unfilt_cs_to_ccf_w_err(cs_array, meta_dict, ref):
     Parameters
     ----------
     cs_avg : np.array of complex numbers
-        2-D array of the averaged cross-spectrum. Size = (n_bins, detchans).
+        3-D array of the cross-spectrum. Size = (n_bins, detchans, n_seg).
 
     meta_dict : dict
         Dictionary of necessary meta-parameters for data analysis.
@@ -1224,12 +1254,14 @@ def unfilt_cs_to_ccf_w_err(cs_array, meta_dict, ref):
 
     Returns
     -------
-    mean_ccf, standard_error : np.arrays of floats
+    ccf_avg, standard_error : np.arrays of floats
         2-D arrays of the cross-correlation function of the channels of interest
         with the reference band, and the error on the ccf.
         Sizes = (n_bins, detchans).
     """
 
+    assert np.shape(cs_array) == (meta_dict['n_bins'], meta_dict['detchans'],
+            meta_dict['n_seg'])
     if len(ref.power) == meta_dict['n_bins']:
         nyq_index = meta_dict['n_bins'] / 2
         ref.pos_power = ref.power[0:nyq_index + 1]
@@ -1410,6 +1442,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
                         ref_whole.power_array))
         ref_total.mean_rate_array = np.append(ref_total.mean_rate_array,
                         ref_whole.mean_rate_array)
+        ci_total.mean_rate_array = np.hstack((ci_total.mean_rate_array,
+                        ci_whole.mean_rate_array))
         dt_total = np.append(dt_total, dt_whole)
         df_total = np.append(df_total, df_whole)
         ci_total.mean_rate += ci_whole.mean_rate
@@ -1418,6 +1452,7 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         ref_total.power += ref_whole.power
         total_exposure += exposure
         total_seg += n_seg
+
 
     meta_dict['n_seg'] = total_seg
     meta_dict['exposure'] = total_exposure
@@ -1430,13 +1465,14 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
 
     ## Remove the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
+    ci_total.mean_rate_array = ci_total.mean_rate_array[:,1:]
     ref_total.power_array = ref_total.power_array[:,1:]
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
     ref_total.var_array = ref_total.var_array[1:]
 
-    print "Mean of var_array:", np.mean(ref_total.var_array)
-    print "Sqrt of var_array:", np.sqrt(ref_total.var_array)
-    print "Mean of sqrt of var_array:", np.mean(np.sqrt(ref_total.var_array))
+    # print "Mean of var_array:", np.mean(ref_total.var_array)
+    # print "Sqrt of var_array:", np.sqrt(ref_total.var_array)
+    # print "Mean of sqrt of var_array:", np.mean(np.sqrt(ref_total.var_array))
 
     ######################################
     ## Turn sums over segments into means
@@ -1448,24 +1484,28 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ref_total.mean_rate /= np.float(meta_dict['n_seg'])
     avg_cross_spec = np.mean(total_cross_spec, axis=-1)
 
+    assert ci_total.mean_rate.all() == \
+           np.mean(ci_total.mean_rate_array, axis=-1).all()
+
+    ci_total.pos_power = ci_total.power[0:meta_dict['n_bins']/2+1, :]
+    ref_total.pos_power = ref_total.power[0:meta_dict['n_bins']/2+1]
 
     ## Compute the variance and rms of the absolute-rms-normalized reference
     ## band power spectrum
-    absrms_ref_pow = raw_to_absrms(ref_total.power[0:meta_dict['n_bins']/2+1],
+    absrms_ref_pow = raw_to_absrms(ref_total.pos_power,
             ref_total.mean_rate, meta_dict['n_bins'],
             np.mean(meta_dict['dt']), noisy=True)
 
     ref_total.var, ref_total.rms = var_and_rms(absrms_ref_pow,
             np.mean(meta_dict['df']))
 
-
     #############################################################
     ## Print the cross spectrum to a file, for plotting/checking
     #############################################################
-
-    cs_out = np.column_stack((fftpack.fftfreq(meta_dict['n_bins'],
-            d=np.mean(meta_dict['dt'])), avg_cross_spec))
-    np.savetxt('cs_avg.dat', cs_out)
+    #
+    # cs_out = np.column_stack((fftpack.fftfreq(meta_dict['n_bins'],
+    #         d=np.mean(meta_dict['dt'])), avg_cross_spec))
+    # np.savetxt('cs_avg.dat', cs_out)
 
     #####################################################################
     ## Read in the background count rate from a background spectrum, and
@@ -1487,9 +1527,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ## lag_spectra/get_lags.py
     ####################################################################
 
-    save_for_lags(out_file, input_file, meta_dict, ci_total.mean_rate,
-            ref_total.mean_rate, avg_cross_spec, ci_total.power,
-            ref_total.power)
+    save_for_lags(out_file, input_file, meta_dict, avg_cross_spec, ci_total,
+            ref_total)
 
     ##############################################
     ## Compute ccf from cs, and compute error
@@ -1522,12 +1561,12 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     print ccf_avg[0,2]
     print ccf_avg[0,15]
 
-    if not test and adjust:
+    if not test and adjust and len(data_files) == 9:
         assert round(ccf_avg[0,0], 12) == 0.117937948428
         assert round(ccf_avg[0,2], 11) == 9.22641398474
         assert round(ccf_avg[0,15], 11) == 1.76422640304
         print "Passed!"
-    elif test and adjust:
+    elif test and adjust and len(data_files) == 9:
         assert round(ccf_avg[0,0], 12) == 0.106747663439
         assert round(ccf_avg[0,2], 11) == 9.56560710672
         assert round(ccf_avg[0,15], 11) == 0.88144237181
