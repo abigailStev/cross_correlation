@@ -65,8 +65,8 @@ p_ext="eps"
 day=$(date +%y%m%d)
 #day="151123"
 ## Local file name for output files
-filename="${prefix}_${day}_t${dt}_${numsec}sec"
-#filename="${obsID}_${day}_t${dt}_${numsec}sec"
+#filename="${prefix}_${day}_t${dt}_${numsec}sec"
+filename="${obsID}_${day}_t${dt}_${numsec}sec"
 
 ## Your computer's home directory (gets automatically)
 home_dir=$(ls -d ~)
@@ -99,9 +99,8 @@ energies_file="$red_dir/energies.txt"
 rsp_matrix="$red_dir/PCU2.rsp"
 ## File name of the GTI'd event list in fits format (from rxte_reduce/
 ## good_event.sh), or
-#in_file="$red_dir/${obsID}/GTId_eventlist.fits"
-in_file="$list_dir/${prefix}_eventlists_9.lst"
-
+in_file="$red_dir/${obsID}/GTId_eventlist.fits"
+#in_file="$list_dir/${prefix}_eventlists_9.lst"
 
 ################################################################################
 ################################################################################
@@ -162,20 +161,20 @@ fi
 ## Plotting ccfs
 #################
 
-if [ -e "${ccf_out_file}.fits" ]; then
-
-	python "${ccf_exe_dir}"/plot_ccf.py "${ccf_out_file}.fits" \
-			-o "${ccf_plot_root}" --prefix "${prefix}" --ext "${p_ext}"
-	echo "${ccf_out_file}_chan_15.${p_ext}"
-	if [ -e "${ccf_out_file}_chan_15.${p_ext}" ]; then
-	    open "${ccf_out_file}_chan_15.${p_ext}"; fi
-
-#	python "${ccf_exe_dir}"/plot_multi.py "${ccf_out_file}.fits" \
-#           "$ccf_multi_plot" --prefix "${prefix}"
-
-# 	if [ -e "$ccf_multi_plot" ]; then open "$ccf_multi_plot"; fi
-
-fi
+#if [ -e "${ccf_out_file}.fits" ]; then
+#
+#	python "${ccf_exe_dir}"/plot_ccf.py "${ccf_out_file}.fits" \
+#			-o "${ccf_plot_root}" --prefix "${prefix}" --ext "${p_ext}"
+#	echo "${ccf_out_file}_chan_15.${p_ext}"
+#	if [ -e "${ccf_out_file}_chan_15.${p_ext}" ]; then
+#	    open "${ccf_out_file}_chan_15.${p_ext}"; fi
+#
+##	python "${ccf_exe_dir}"/plot_multi.py "${ccf_out_file}.fits" \
+##           "$ccf_multi_plot" --prefix "${prefix}"
+#
+## 	if [ -e "$ccf_multi_plot" ]; then open "$ccf_multi_plot"; fi
+#
+#fi
 
 ###############################################
 ## Getting the energy list from a channel list
