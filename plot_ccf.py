@@ -7,7 +7,7 @@ Enter   python plot_ccf.py -h   at the command line for help.
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-from astropy.io import fits
+from astropy.table import Table
 import matplotlib.font_manager as font_manager
 from matplotlib.ticker import MultipleLocator
 
@@ -53,7 +53,6 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
 
     font_prop = font_manager.FontProperties(size=18)
 
-    # fig, ax = plt.subplots(1,1, figsize=(12,6), dpi=300)
     fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
 
 # 	ax.plot(x_bins, ccf_amps, lw=2, c='black')
@@ -96,7 +95,7 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
     # ax.set_title(title, fontproperties=font_prop)
 
     plt.savefig(plot_file)
-# 	plt.show()
+    # plt.show()
     plt.close()
 
 
@@ -112,7 +111,8 @@ if __name__ == "__main__":
             "arguments, default values are given in brackets at end of "\
             "description.")
 
-    parser.add_argument('ccf_file', help="The CCF file, in .fits format.")
+    parser.add_argument('ccf_file', help="The CCF file, saved from an astropy "\
+            "table, in .fits format.")
 
     parser.add_argument('-o', '--plotroot', dest='plot_root', default="./ccf",
             help="The root of the filename to save the 1-D ccf plot to. Energy"\
@@ -130,40 +130,41 @@ if __name__ == "__main__":
     print("Plotting the ccf: %s_chan_xx.%s" % (args.plot_root, args.plot_ext))
 
     try:
-        file_hdu = fits.open(args.ccf_file)
+        in_table = Table.read(args.ccf_file)
     except IOError:
         print("\tERROR: File does not exist: %s" % args.ccf_file)
         exit()
 
-    table = file_hdu[1].data
-    header = file_hdu[0].header
-    file_hdu.close()
-
-    dt = float(header["DT"])
-    n_seconds = int(header['SEC_SEG'])
-    n_bins = int(header['N_BINS'])
+    ## Need to transpose it here so that it plots with time on the x-axis
+    ## and energy on the y-axis
+    ccf = in_table['CCF']
+    error = in_table['ERROR']
+    # print np.shape(ccf)
+    # print np.shape(error)
+    n_bins = in_table.meta['N_BINS']
+    n_seconds = in_table.meta['SEC_SEG']
+    dt = in_table.meta['DT']
     frac_time = int(1.0/dt)  ## each time bin represents 1/frac_time seconds
 
     for i in range(15, 16):
-        ## Make data mask for the energy channels I want
-        channel_mask = table.field('CHANNEL') == i
-        table_i = table[channel_mask]
-        ccf = table_i.field('CCF')
-        ccf_err = table_i.field('ERROR')
-        time_bins = table_i.field('TIME_BIN')
+        ccf_i = ccf[:,i]
+        ccf_err_i = error[:,i]
+        # print np.shape(ccf_i)
+        # print np.shape(ccf_err_i)
+        time_bins = np.arange(n_bins)
 
         pos_time_bins = time_bins[0:n_bins/2]
         neg_time_bins = time_bins[n_bins/2:] - n_bins
         time_bins = np.append(neg_time_bins, pos_time_bins)
 
-        pos_time_ccf = ccf[0:n_bins/2]
-        neg_time_ccf = ccf[n_bins/2:]
-        ccf = np.append(neg_time_ccf, pos_time_ccf)
+        pos_time_ccf = ccf_i[0:n_bins/2]
+        neg_time_ccf = ccf_i[n_bins/2:]
+        ccf_i = np.append(neg_time_ccf, pos_time_ccf)
 
-        pos_time_ccf_err = ccf_err[0:n_bins/2]
+        pos_time_ccf_err = ccf_err_i[0:n_bins/2]
         # neg_time_ccf_err = pos_time_ccf_err[::-1]
-        neg_time_ccf_err = ccf_err[n_bins/2:]
-        ccf_err = np.append(neg_time_ccf_err, pos_time_ccf_err)
+        neg_time_ccf_err = ccf_err_i[n_bins/2:]
+        ccf_err_i = np.append(neg_time_ccf_err, pos_time_ccf_err)
 
         if i < 10:
             plot_file = args.plot_root + "_chan_" + str(0) + str(i) + "." + \
@@ -172,10 +173,7 @@ if __name__ == "__main__":
             plot_file = args.plot_root + "_chan_" + str(i) + "." + args.plot_ext
 
 
-        make_plot(time_bins, ccf, ccf_err, n_bins, args.prefix, plot_file, i,
-                frac_time)
-    # else:
-
-        # raise Exception('ERROR: File type not recognized. Must have extension .dat or .fits.')
+        make_plot(time_bins, ccf_i, ccf_err_i, n_bins, args.prefix, plot_file,
+                i, frac_time)
 
 ################################################################################
