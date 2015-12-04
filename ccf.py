@@ -19,9 +19,8 @@ Files created
     astropy table in FITS extension 1. Header info is also in FITS extension 1.
 
 *.fits : cross_correlation directory
-    Output file with integer time bins, cross-correlation function, and error
-    saved as an astropy table in FITS extension 1. Header info is also in FITS
-    extension 1.
+    Output file with cross-correlation function and error saved as an astropy
+    table in FITS extension 1. Header info is also in FITS extension 1.
 
 """
 import argparse
