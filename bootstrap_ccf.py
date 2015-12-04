@@ -74,9 +74,9 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
     assert hi_freq >= lo_freq, "ERROR: Upper bound of frequency filtering must"\
             " be equal to or greater than the lower bound."
 
-    ###########################
-    ## Reading in data file(s)
-    ###########################
+    ########################
+    ## Read in data file(s)
+    ########################
 
     if ".txt" in input_file or ".lst" in input_file or ".dat" in input_file:
         data_files = [line.strip() for line in open(input_file)]
@@ -129,9 +129,9 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
     df_total = np.array([])
     total_exposure = 0
 
-    ##################################
-    ## Looping through all data files
-    ##################################
+    ###############################
+    ## Loop through all data files
+    ###############################
 
     for in_file, adj_seg in zip(data_files, adjust_segments):
 
@@ -142,17 +142,19 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
         ############################################
 
         cross_spec, ci_whole, ref_whole, n_seg, dt_whole, df_whole, exposure = \
-                xcor.fits_in(in_file, None, meta_dict, test)
+                xcor.fits_in(in_file, meta_dict, test)
 
         # print "Segments for this file: %d\n" % n_seg
 
         total_cross_spec = np.dstack((total_cross_spec, cross_spec))
+        ci_total.mean_rate_array = np.hstack((ci_total.mean_rate_array,
+                ci_whole.mean_rate_array))
         ref_total.power_array = np.hstack((ref_total.power_array,
                 ref_whole.power_array))
         ref_total.mean_rate_array = np.append(ref_total.mean_rate_array,
                 ref_whole.mean_rate_array)
-        ref_total.rms_array = np.append(ref_total.rms_array,
-                ref_whole.rms_array)
+        ref_total.var_array = np.append(ref_total.var_array,
+                ref_whole.var_array)
         dt_total = np.append(dt_total, dt_whole)
         df_total = np.append(df_total, df_whole)
         total_exposure += exposure
@@ -169,16 +171,15 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
     print "Mean dt:", np.mean(dt_total)
     print "Mean df:", np.mean(df_total)
 
-    ## Removing the first zeros from stacked arrays
+    print np.shape(ci_total.mean_rate_array)
+
+    ## Remove the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
+    ci_total.mean_rate_array = ci_total.mean_rate_array[:,1:]
     ref_total.power_array = ref_total.power_array[:,1:]
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
-    ref_total.rms_array = ref_total.rms_array[1:]
-
-    # print np.shape(total_cross_spec)
-    # print np.shape(ref_total.power_array)
-    # print np.shape(ref_total.mean_rate_array)
-    # print np.shape(ref_total.rms_array)
+    ref_total.var_array = ref_total.var_array[1:]
+    print np.shape(ci_total.mean_rate_array)
 
     #####################################################################
     ## Read in the background count rate from a background spectrum, and
@@ -195,13 +196,12 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
     ci_total.mean_rate -= bkgd_rate
 
     ## Need to use a background from ref_total. PCU for the reference band...
-    # ref_bkgd_rate = np.mean(bkgd_rate[2:26])
-    # ref_total.mean_rate -= ref_bkgd_rate
+    # ref_total.mean_rate -= np.sum(bkgd_rate[2:26])
 
-    ######################################################################
-    ## Bootstrapping the data to get errors changes which segments we use
-    ## Doing boot_num realizations of this
-    ######################################################################
+    ##################################################################
+    ## Bootstrap the data to get errors changes which segments we use
+    ## Do boot_num realizations of this
+    ##################################################################
 
     print "\tStart bootstrapping:", datetime.datetime.now()
 
@@ -214,30 +214,24 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
 
             out_file = out_root.replace("_b-", "_b-%d" % b)
 
-            # print "\n\tGetting random segs:", datetime.datetime.now()
             random_segs = np.random.randint(0, total_cross_spec.shape[2], \
                     meta_dict['n_seg'])  ## Draw with replacement
             if test:
                 print "Segments:", random_segs
 
-            # ci_boot = ccf_lc.Lightcurve(n_bins=meta_dict['n_bins'], \
-            #         detchans=meta_dict['detchans'], type='ci')
             ref_boot = ccf_lc.Lightcurve(n_bins=meta_dict['n_bins'], \
                     detchans=meta_dict['detchans'], type='ref')
-            # boot_cross_spec = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], \
-            #         1), dtype=np.complex128)
-
-            print "\tSelect random_segs:", datetime.datetime.now()
+            ci_boot = ccf_lc.Lightcurve(n_bins=meta_dict['n_bins'], \
+                    detchans=meta_dict['detchans'], type='ci')
+            # print "\tSelect random_segs:", datetime.datetime.now()
 
             boot_cross_spec = total_cross_spec[:,:,random_segs]
-            # ci_boot.power_array = ci_total.power_array[:,:,random_segs]
-            # ci_boot.mean_rate_array = ci_total.mean_rate_array[:,random_segs]
+            ci_boot.mean_rate_array = ci_total.mean_rate_array[:,random_segs]
             ref_boot.power_array = ref_total.power_array[:,random_segs]
-            # ## I can confirm that it's selecting random_segs correctly.
             ref_boot.mean_rate_array = ref_total.mean_rate_array[random_segs]
-            ref_boot.rms_array = ref_total.rms_array[random_segs]
+            ref_boot.var_array = ref_total.var_array[random_segs]
 
-            # ## Making sure it worked correctly
+            # ## Make sure it worked correctly
             # assert boot_cross_spec[0:3,0:3,1].all() == total_cross_spec[0:3,0:3,random_segs[1]].all(), \
             #         "ERROR: Random draw-with-replacement of segments was not "\
             #         "successful. Values of CS broke."
@@ -248,24 +242,30 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
             #         "ERROR: Random draw-with-replacement of segments was not "\
             #         "successful. Ref mean rate array values broke."
 
-            ##############################
-            ## Making means from segments
-            ##############################
-            print "\tMake means:", datetime.datetime.now()
+            ############################
+            ## Make means from segments
+            ############################
+
+            # print "\tMake means:", datetime.datetime.now()
 
             ref_boot.power = np.mean(ref_boot.power_array, axis=-1)
+            ci_boot.mean_rate = np.mean(ci_boot.mean_rate_array, axis=-1)
             ref_boot.mean_rate = np.mean(ref_boot.mean_rate_array)
-            ref_boot.rms = np.mean(ref_boot.rms_array)
 
-            # print "\tMade means from segments:", datetime.datetime.now()
-            # print np.shape(ref_boot.power)
-            # print ref_boot.mean_rate
-            # print ref_boot.rms
+            ## Compute the variance and rms of the absolute-rms-normalized
+            ## reference band power spectrum
+            absrms_ref_pow = xcor.raw_to_absrms(ref_boot.power[0: \
+                    meta_dict['n_bins']/2+1], ref_boot.mean_rate,
+                    meta_dict['n_bins'], np.mean(meta_dict['dt']), noisy=True)
 
-            ##############################################
-            ## Computing ccf from cs, and computing error
-            ##############################################
-            print "\tCompute ccf and error:", datetime.datetime.now()
+            ref_boot.var, ref_boot.rms = xcor.var_and_rms(absrms_ref_pow,
+                    np.mean(meta_dict['df']))
+
+            #####################################
+            ## Compute ccf from cs and ccf error
+            #####################################
+
+            # print "\tCompute ccf and error:", datetime.datetime.now()
 
             ccf_avg, ccf_error = xcor.unfilt_cs_to_ccf_w_err(boot_cross_spec,
                     meta_dict, ref_boot)
@@ -273,48 +273,68 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
             ##########
             ## Output
             ##########
-            print "\tOutput:", datetime.datetime.now()
 
-            xcor.fits_out(out_file, input_file, bkgd_file, meta_dict, np.zeros(1),
-                    ref_boot.mean_rate, ccf_avg, ccf_error, lo_freq, hi_freq,
+            # print "\tOutput:", datetime.datetime.now()
+
+            xcor.fits_out(out_file, input_file, bkgd_file, meta_dict,
+                    ci_boot.mean_rate, ref_boot.mean_rate, float(ref_boot.rms),
+                    ccf_avg, ccf_error, lo_freq, hi_freq,
                     "Bootstrapped ccf (from multiple observations)")
-
-            print "\tDone:", datetime.datetime.now()
 
     else:
 
-        ##############################
-        ## Making means from segments
-        ##############################
+        ############################
+        ## Make means from segments
+        ############################
 
-        avg_cross_spec = np.mean(total_cross_spec, axis=-1)
         ref_total.power = np.mean(ref_total.power_array, axis=-1)
         ref_total.mean_rate = np.mean(ref_total.mean_rate_array)
-        ref_total.rms = np.mean(ref_total.rms_array)
+        ci_total.mean_rate = np.mean(ci_total.mean_rate_array, axis=-1)
 
-        # print "\tMade means from segments:", datetime.datetime.now()
-        print np.shape(avg_cross_spec)
-        print np.shape(ref_total.power)
-        print np.shape(ref_total.mean_rate)
-        print ref_total.mean_rate
-        print np.shape(ref_total.rms)
-        print ref_total.rms
 
-        ##############################################
-        ## Computing ccf from cs, and computing error
-        ##############################################
+        ## Compute the variance and rms of the absolute-rms-normalized reference
+        ## band power spectrum
+        absrms_ref_pow = xcor.raw_to_absrms(ref_total.power[0: \
+                meta_dict['n_bins']/2+1], ref_total.mean_rate,
+                meta_dict['n_bins'], np.mean(meta_dict['dt']), noisy=True)
 
-        ccf_avg, ccf_error = xcor.unfilt_cs_to_ccf_w_err(avg_cross_spec,
+        ref_total.var, ref_total.rms = xcor.var_and_rms(absrms_ref_pow,
+                np.mean(meta_dict['df']))
+
+        #####################################
+        ## Compute ccf from cs and ccf error
+        #####################################
+
+        ccf_avg, ccf_error = xcor.unfilt_cs_to_ccf_w_err(total_cross_spec,
                 meta_dict, ref_total)
 
         ##########
         ## Output
         ##########
 
-        xcor.fits_out(out_root, input_file, bkgd_file, meta_dict, np.zeros(1),
-                ref_total.mean_rate, ccf_avg, ccf_error, lo_freq, hi_freq,
-                "Bootstrapped ccf (from multiple observations)")
+        print ccf_avg[0,0]
+        print ccf_avg[0,2]
+        print ccf_avg[0,15]
 
+        if not test and adjust:
+            assert round(ccf_avg[0,0], 12) == 0.117937948428
+            assert round(ccf_avg[0,2], 11) == 9.22641398474
+            assert round(ccf_avg[0,15], 11) == 1.76422640304
+            print "Passed!"
+        elif test and adjust:
+            assert round(ccf_avg[0,0], 12) == 0.106747663439
+            assert round(ccf_avg[0,2], 11) == 9.56560710672
+            assert round(ccf_avg[0,15], 11) == 0.88144237181
+            print "Passed!"
+        else:
+            print "Do not have values to compare against."
+
+        xcor.fits_out(out_root, input_file, bkgd_file, meta_dict,
+                ci_total.mean_rate, ref_total.mean_rate, float(ref_total.rms),
+                ccf_avg, ccf_error, lo_freq, hi_freq,
+                "CCF (from multiple observations)")
+
+    print "\tDone:", datetime.datetime.now()
 
 
 
