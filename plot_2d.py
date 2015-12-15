@@ -91,9 +91,9 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
     np.savetxt(out_file, R, comments=comment_str)
 
 
-    print np.shape(ratio)
-    print np.shape(t_bins)
-    print np.shape(energies)
+    # print np.shape(ratio)
+    # print np.shape(t_bins)
+    # print np.shape(energies)
 
     #############
     ## Plotting!
