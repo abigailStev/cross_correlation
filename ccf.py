@@ -32,8 +32,11 @@ import os
 import subprocess
 from astropy.io import fits
 from astropy.table import Table, Column
-import tools  ## in https://github.com/abigailStev/whizzy_scripts
-import ccf_lightcurves as ccf_lc
+
+## These are things I've written.
+## Their directories are in my PYTHONPATH bash environment variable.
+import tools  ## in whizzy_scripts
+import ccf_lightcurves as ccf_lc  ## in cross_correlation
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2014-2015"
@@ -87,7 +90,7 @@ def fits_out(out_file, in_file, bkgd_file, meta_dict, mean_rate_ci,
 
     Returns
     -------
-    nothing, but writes to a file.
+    Nothing, but writes to out_file.fits.
     """
 
     ## Check that the output file name has FITS file extension
@@ -913,11 +916,13 @@ def get_background(bkgd_file="evt_bkgd_rebinned.pha"):
 
 
 ################################################################################
-def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref):
+def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref, lo_freq=-1.0,
+        hi_freq=-1.0):
     """
     Saving header data, the cross spectrum, CoI power spectrum, and reference
     band power spectrum to a FITS file to use in the program make_lags.py to get
-    cross-spectral lags.
+    cross-spectral lags. Cross spectra and power spectra are raw, as in un-
+    normalized.
 
     Parameters
     ----------
@@ -941,6 +946,10 @@ def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref):
     ref : ccf_lc.Lightcurve object
         The reference band light curve. Must already have mean_rate, rms, and
         pos_power assigned.
+
+    lo_freq, hi_freq : floats
+        The lower and upper frequency bounds being filtered over, if applicable.
+        Default values are -1.
 
     Returns
     -------
@@ -966,9 +975,9 @@ def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref):
 
     out_table = Table()
     out_table.add_column(Column(data=freq, name='FREQUENCY', unit='Hz'))
-    out_table.add_column(Column(data=cs_avg, name='CROSS', unit='raw'))
-    out_table.add_column(Column(data=ci.pos_power, name='POWER_CI', unit='raw'))
-    out_table.add_column(Column(data=ref.pos_power, name='POWER_REF', unit='raw'))
+    out_table.add_column(Column(data=cs_avg, name='CROSS'))
+    out_table.add_column(Column(data=ci.pos_power, name='POWER_CI'))
+    out_table.add_column(Column(data=ref.pos_power, name='POWER_REF'))
 
     out_table.meta['TYPE'] = "Cross spectrum and power spectra, saved for lags."
     out_table.meta['DATE'] = str(datetime.now())
@@ -988,60 +997,6 @@ def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref):
     out_table.meta['FILTFREQ'] = "%f:%f" % (lo_freq, hi_freq)
     out_table.meta['ADJUST'] = "%s" % str(meta_dict['adjust_seg'])
     out_table.write(out_file, overwrite=True)
-
-    # ## Making FITS header (extension 0)
-    # prihdr = fits.Header()
-    # prihdr.set('TYPE', "Cross spectrum, power spectrum ci, and power spectrum "\
-    #         "ref.")
-    # prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
-    # prihdr.set('EVTLIST', in_file)
-    # prihdr.set('DT', np.mean(meta_dict['dt']), "seconds")
-    # prihdr.set('DF', np.mean(meta_dict['df']), "Hz")
-    # prihdr.set('N_BINS', meta_dict['n_bins'], "time bins per segment")
-    # prihdr.set('SEGMENTS', meta_dict['n_seg'], "segments in the whole light"\
-    #         " curve")
-    # prihdr.set('SEC_SEG', meta_dict['n_seconds'], "seconds per segment")
-    # prihdr.set('EXPOSURE', meta_dict['exposure'], "seconds of data used")
-    # prihdr.set('DETCHANS', meta_dict['detchans'], "Number of detector energy"\
-    #         " channels")
-    # prihdr.set('RATE_CI', str(mean_rate_ci.tolist()), "cts/s")
-    # prihdr.set('RATE_REF', mean_rate_ref, "cts/s")
-    # prihdu = fits.PrimaryHDU(header=prihdr)
-    #
-    # ## Making FITS table for cross spectrum
-    # col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
-    # col2 = fits.Column(name='CROSS', unit='raw', format='C',
-    #         array=cs_avg.flatten('C'))
-    # col3 = fits.Column(name='CHANNEL', unit='', format='I',
-    #         array=energy_channels)
-    # cols = fits.ColDefs([col1, col2, col3])
-    # tbhdu1 = fits.BinTableHDU.from_columns(cols)
-    #
-    # ## Making FITS table for power spectrum of channels of interest
-    # col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
-    # col2 = fits.Column(name='POWER', unit='raw', format='D',
-    #         array=power_ci.flatten('C'))
-    # col3 = fits.Column(name='CHANNEL', unit='', format='I',
-    #         array=energy_channels)
-    # cols = fits.ColDefs([col1, col2, col3])
-    # tbhdu2 = fits.BinTableHDU.from_columns(cols)
-    #
-    # ## Making FITS table for power spectrum of reference band
-    # col1 = fits.Column(name='FREQUENCY', format='D', array=freq)
-    # col2 = fits.Column(name='POWER', unit='raw', format='D',
-    #         array=power_ref)
-    # cols = fits.ColDefs([col1, col2])
-    # tbhdu3 = fits.BinTableHDU.from_columns(cols)
-    #
-    # ## If the file already exists, remove it
-    # assert out_file[-4:].lower() == "fits", "ERROR: Output file must have "\
-    #         "extension '.fits'."
-    # if os.path.isfile(out_file):
-    #     subprocess.call(["rm", out_file])
-    #
-    # ## Writing to a FITS file
-    # thdulist = fits.HDUList([prihdu, tbhdu1, tbhdu2, tbhdu3])
-    # thdulist.writeto(out_file)
 
 
 ################################################################################
@@ -1527,7 +1482,7 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ####################################################################
 
     save_for_lags(out_file, input_file, meta_dict, avg_cross_spec, ci_total,
-            ref_total)
+            ref_total, lo_freq, hi_freq)
 
     ##############################################
     ## Compute ccf from cs, and compute error
