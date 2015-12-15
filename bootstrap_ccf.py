@@ -171,7 +171,7 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
     print "Mean dt:", np.mean(dt_total)
     print "Mean df:", np.mean(df_total)
 
-    print np.shape(ci_total.mean_rate_array)
+    # print np.shape(ci_total.mean_rate_array)
 
     ## Remove the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
@@ -179,7 +179,7 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
     ref_total.power_array = ref_total.power_array[:,1:]
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
     ref_total.var_array = ref_total.var_array[1:]
-    print np.shape(ci_total.mean_rate_array)
+    # print np.shape(ci_total.mean_rate_array)
 
     #####################################################################
     ## Read in the background count rate from a background spectrum, and
@@ -209,7 +209,7 @@ def main(input_file, out_root, bkgd_file, n_seconds, dt_mult, test,
     if boot_num >= 1:
         for b in range(1, boot_num + 1):
 
-            if b % 5 == 0:
+            if b % 50 == 0:
                 print "\t%d" % b
 
             out_file = out_root.replace("_b-", "_b-%d" % b)
