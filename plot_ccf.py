@@ -51,7 +51,7 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
     nothing
     """
 
-    font_prop = font_manager.FontProperties(size=18)
+    font_prop = font_manager.FontProperties(size=20)
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
 
