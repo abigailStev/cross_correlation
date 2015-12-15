@@ -33,7 +33,7 @@ fi
 ## Identifying prefix (object nickname or data ID)
 prefix="GX339-BQPO"
 ## ObsID of the data, if using just one data file (otherwise, should be ignored)
-obsID="95335-01-01-01"
+#obsID="95335-01-01-01"
 
 ## Multiple of time resolution of the data for binning the light curve
 dt=64
@@ -62,11 +62,11 @@ lag_ue=15
 ## Desired plot file extension, without the dot
 p_ext="eps"
 ## Today's date (gets automatically), for writing in file names
-day=$(date +%y%m%d)
-#day="151123"
+#day=$(date +%y%m%d)
+day="151204"
 ## Local file name for output files
-#filename="${prefix}_${day}_t${dt}_${numsec}sec"
-filename="${obsID}_${day}_t${dt}_${numsec}sec"
+filename="${prefix}_${day}_t${dt}_${numsec}sec"
+#filename="${obsID}_${day}_t${dt}_${numsec}sec"
 
 ## Your computer's home directory (gets automatically)
 home_dir=$(ls -d ~)
@@ -99,8 +99,8 @@ energies_file="$red_dir/energies.txt"
 rsp_matrix="$red_dir/PCU2.rsp"
 ## File name of the GTI'd event list in fits format (from rxte_reduce/
 ## good_event.sh), or
-in_file="$red_dir/${obsID}/GTId_eventlist.fits"
-#in_file="$list_dir/${prefix}_eventlists_9.lst"
+#in_file="$red_dir/${obsID}/GTId_eventlist.fits"
+in_file="$list_dir/${prefix}_eventlists_9.lst"
 
 ################################################################################
 ################################################################################
@@ -141,26 +141,26 @@ ccf2d_fits_plot="${ccf_plot_root}_2Dccf.fits"
 ##################
 
 cd "${ccf_exe_dir}"
-
-if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
-	time python "${ccf_exe_dir}"/ccf.py "${in_file}" "${ccf_out_file}.fits" \
-		    -b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" \
-		    -a "${adjusting}"
-
-
-elif [ -e "${in_file}" ]; then
-	echo "Background file not found."
-	time python "${ccf_exe_dir}"/ccf.py "${in_file}" "${ccf_out_file}.fits" \
-		    -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" -a "${adjusting}"
-else
-	echo -e "\tERROR: ccf.py was not run. Eventlist and/or background energy "\
-            "spectrum doesn't exist."
-fi
-
-#################
-## Plotting ccfs
-#################
-
+#
+#if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
+#	time python "${ccf_exe_dir}"/ccf.py "${in_file}" "${ccf_out_file}.fits" \
+#		    -b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" \
+#		    -a "${adjusting}"
+#
+#
+#elif [ -e "${in_file}" ]; then
+#	echo "Background file not found."
+#	time python "${ccf_exe_dir}"/ccf.py "${in_file}" "${ccf_out_file}.fits" \
+#		    -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" -a "${adjusting}"
+#else
+#	echo -e "\tERROR: ccf.py was not run. Eventlist and/or background energy "\
+#            "spectrum doesn't exist."
+#fi
+#
+##################
+### Plotting ccfs
+##################
+#
 #if [ -e "${ccf_out_file}.fits" ]; then
 #
 #	python "${ccf_exe_dir}"/plot_ccf.py "${ccf_out_file}.fits" \
@@ -175,11 +175,11 @@ fi
 ## 	if [ -e "$ccf_multi_plot" ]; then open "$ccf_multi_plot"; fi
 #
 #fi
-
-###############################################
-## Getting the energy list from a channel list
-###############################################
-
+#
+################################################
+### Getting the energy list from a channel list
+################################################
+#
 #if [ ! -e "$energies_file" ]; then
 #	if [ -e "$ec_table_file" ] && [ -e "$chan_bin_file" ]; then
 #
@@ -196,36 +196,37 @@ fi
 ## Plotting the 2D ccf with colours
 ####################################
 
-#if [ -e "${ccf_out_file}.fits" ]; then
-#
-#	python "${ccf_exe_dir}"/plot_2d.py "${ccf_out_file}.fits" \
-#	        -o "${ccf2d_plot}" --prefix "${prefix}" -l "$tlen" \
-#	        -e "$energies_file"
-#
+if [ -e "${ccf_out_file}.fits" ]; then
+
+	python "${ccf_exe_dir}"/plot_2d.py "${ccf_out_file}.fits" \
+	        -o "${ccf2d_plot}" --prefix "${prefix}" -l "$tlen" \
+	        -e "$energies_file"
+
 #	if [ -e "${ccf2d_plot}" ]; then open "${ccf2d_plot}"; fi
-#fi
-#
-#fits_cmd="print int(tools.get_key_val('${ccf_out_file}', 1, 'DETCHANS'))"
-#detchans=$(python -c "import tools; ${fits_cmd}")
-#tlen2=$(( 2*tlen+1 ))
-#
-#if [ -e "${ccf_out_dir}/temp.dat" ]; then
-#	fimgcreate bitpix=-32 \
-#		naxes="${tlen2},${detchans}" \
-#		datafile="${ccf_out_dir}/temp.dat" \
-#		outfile="${ccf2d_fits_plot}" \
-#		nskip=1 \
-#		history=true \
-#		clobber=yes
-#else
-#	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
-#fi
-#
-#if [ -e "${ccf2d_fits_plot}" ]; then
-#	echo "FITS 2D ccf image: ${ccf2d_fits_plot}"
-#else
-#	echo -e "\tERROR: FIMGCREATE was not successful."
-#fi
+fi
+
+fits_cmd="print int(tools.get_key_val('${ccf_out_file}.fits', 1, 'DETCHANS'))"
+detchans=$(python -c "import tools; ${fits_cmd}")
+tlen2=$(( 2*tlen+1 ))
+
+cd "${ccf_out_dir}"
+if [ -e "./temp.dat" ]; then
+	fimgcreate bitpix=-32 \
+		naxes="${tlen2},${detchans}" \
+		datafile="./temp.dat" \
+		outfile="${ccf2d_fits_plot}" \
+		nskip=1 \
+		history=true \
+		clobber=yes
+else
+	echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
+fi
+
+if [ -e "${ccf2d_fits_plot}" ]; then
+	echo "FITS 2D ccf image: ${ccf2d_fits_plot}"
+else
+	echo -e "\tERROR: FIMGCREATE was not successful."
+fi
 
 #####################
 ## Plotting the lags
@@ -245,11 +246,11 @@ fi
 #	if [ -e "${lag_plot_root}"_lag-energy."${p_ext}" ]; then
 #	    open "${lag_plot_root}"_lag-energy."${p_ext}"
 #	fi
-##
-##	python "${lag_exe_dir}"/covariance_spectrum.py "${lag_out_file}_cs.fits" \
-##			"${lag_out_file}_cov.fits" --prefix "$prefix" --ext "${p_ext}" \
-##			--rsp "${local_rsp_matrix}" --lf "${lag_lf}" --uf "${lag_uf}"
-##
+#
+#	python "${lag_exe_dir}"/covariance_spectrum.py "${lag_out_file}_cs.fits" \
+#			"${lag_out_file}_cov.fits" --prefix "$prefix" --ext "${p_ext}" \
+#			--rsp "${local_rsp_matrix}" --lf "${lag_lf}" --uf "${lag_uf}"
+#
 #else
 #	echo -e "\tERROR: get_lags.py was not run. Cross spectrum output file does"\
 #	        " not exist."
