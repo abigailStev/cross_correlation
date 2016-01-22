@@ -147,8 +147,8 @@ if __name__ == "__main__":
     frac_time = int(1.0/dt)  ## each time bin represents 1/frac_time seconds
 
     for i in range(15, 16):
-        ccf_i = ccf[:,i]
-        ccf_err_i = error[:,i]
+        ccf_i = ccf[:, i]
+        ccf_err_i = error[:, i]
         # print np.shape(ccf_i)
         # print np.shape(ccf_err_i)
         time_bins = np.arange(n_bins)
