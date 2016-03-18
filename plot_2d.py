@@ -83,17 +83,15 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
     ######################################################
 
 # #     ratio[27:, ] = 0
-    ratio[28:,] = 0
+    if np.shape(ratio)[0] == 64:
+        ratio[28:,] = 0
+    elif np.shape(ratio)[0] == 32:
+        ratio[26:,] = 0
     out_file = os.path.dirname(plot_file) + "/temp.dat"
     # print out_file
     R = ratio.flatten('C')
     comment_str = "From %s" % tab_file
     np.savetxt(out_file, R, comments=comment_str)
-
-
-    # print np.shape(ratio)
-    # print np.shape(t_bins)
-    # print np.shape(energies)
 
     #############
     ## Plotting!
@@ -101,9 +99,10 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
     print("Plotting 2D CCF: %s" % plot_file)
 
     font_prop = font_manager.FontProperties(size=20)
+    # fig, ax = plt.subplots(1, 1, figsize=(14, 8), dpi=300, tight_layout=True)
     fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
 
-    if energies[0] != None:  ## If energies exists as a variable
+    if len(energies) > 0:  ## If energies exists as a variable
         plt.pcolor(t_bins, energies, ratio, cmap='hot')
         # plt.pcolor(t_bins, energies, ratio, cmap='hot', vmin=-0.26, vmax=0.42)
         # plt.pcolor(t_bins, energies, ratio, cmap='spring', vmin=-0.04,
@@ -117,28 +116,28 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
     cbar.set_label('Ratio of CCF to mean count rate', \
             fontproperties=font_prop)
     cb_ax = cbar.ax
-    cb_ax.tick_params(axis='y', labelsize=16)
+    cb_ax.tick_params(axis='y', labelsize=18)
     # cbar.set_ticks([-0.04, -0.03, -0.02, -0.01, 0.00, 0.01, 0.02, 0.03, 0.04])
 
-    if energies[0] != None:  ## If energies exists as a variable
+    if len(energies) > 0:  ## If energies exists as a variable
         ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
         ax.set_ylim(3, 20)
-        rect = patches.Rectangle((-t_length,energies[10]), 2*t_length, 0.41,
-                ec="none")
+        # rect = patches.Rectangle((-t_length,energies[10]), 2*t_length, 0.41,
+        #         ec="none")
     else:
         ax.set_ylabel('Energy channel', fontproperties=font_prop)
-        # ax.set_ylim(2, 31)
-        ax.set_yscale('log')
-        rect = patches.Rectangle((-t_length,10), 2*t_length, 1, ec="none")
-
-    ax.add_patch(rect)
-    zero_outline = patches.Rectangle((0, 2), 1, 26, edgecolor="black",
-            facecolor="none")
-    ax.add_patch(zero_outline)
+        ax.set_ylim(0, np.shape(ratio)[0])
+    #     rect = patches.Rectangle((-t_length,10), 2*t_length, 1, ec="none")
+    #
+    # ax.add_patch(rect)
+    # zero_outline = patches.Rectangle((0, 2), 1, 26, edgecolor="black",
+    #         facecolor="none")
+    # ax.add_patch(zero_outline)
 
     ax.set_xlim(-t_length, t_length)
-    ax.set_xlabel(r'Time ( $\times\,1/%d\,$s)' % frac_time,
-            fontproperties=font_prop)
+    # ax.set_xlabel(r'Time ($\times\,$8.15$\,$ms)', fontproperties=font_prop)
+    ax.set_xlabel('Time-delay bins ', fontproperties=font_prop)
+
     ## Setting the axes' minor ticks. It's complicated.
     x_maj_loc = ax.get_xticks()
     y_maj_loc = ax.get_yticks()
@@ -153,7 +152,6 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
 
     ax.tick_params(axis='x', labelsize=20)
     ax.tick_params(axis='y', labelsize=20)
-    # ax.set_title(prefix)
 
     # plt.show()
     plt.savefig(plot_file)
@@ -200,6 +198,8 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
 
     if chan_to_en != None:  ## If chan_to_en exists as a variable
         energies = np.loadtxt(chan_to_en)
+    else:
+        energies = []
 
     try:
         in_table = Table.read(tab_file)
