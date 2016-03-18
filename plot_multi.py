@@ -1,151 +1,153 @@
+#!/usr/bin/env python
+"""
+Plots 1-D CCFs of multiple energy channels together on one plot.
+"""
+
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
+from astropy.table import Table
+import subprocess
 import matplotlib.font_manager as font_manager
+from matplotlib.ticker import MultipleLocator
 
-__author__ = "Abigail Stevens"
-__author_email__ = "A.L.Stevens@uva.nl"
-__year__ = "2014-2015"
-__description__ = "Plots CCFs of multiple energy channels together on one plot."
-
-"""
-		plot_multi.py
-
-Written in Python 2.7.
-
-"""
+__author__ = "Abigail Stevens <A.L.Stevens@uva.nl>"
+__year__ = "2014-2016"
 
 ################################################################################
-def main(file, plot_file, prefix):
-	"""
+def main(ccf_file, plot_file, prefix):
+    """
 			main
 	
 	
-	"""
+    """
 	
-	# table_1 = np.loadtxt(file_1, comments='#')
-	# table_2 = np.loadtxt(file_2, comments='#')
-	# table_3 = np.loadtxt(file_3, comments='#')
-	# table_4 = np.loadtxt(file_4, comments='#')
-	# table_5 = np.loadtxt(file_5, comments='#')
-	# table_6 = np.loadtxt(file_6, comments='#')
-	
-	######################################
-	## Read in data from dat or fits file
-	#######################################
-	
-	if file[-3:].lower() == "dat":
+    try:
+        in_table = Table.read(ccf_file)
+    except IOError:
+        print("\tERROR: File does not exist: %s" % ccf_file)
+        exit()
 
-		table = np.loadtxt(file, comments='#')
-		
-		bins = table[:,0]
-		data_0 = table[:,1]
-		data_1 = table[:,2] # chan 1, abs 5
-		data_3 = table[:,4]
-		data_6 = table[:,7] # chan 6, abs 11
-		data_9 = table[:,10]
-		data_11 = table[:,12] # chan 11, abs 16
-		data_14 = table[:,15] # chan 14, abs 23
-		data_16 = table[:,17]
-		data_18 = table[:,19] # chan 18, abs 31
-		data_19 = table[:,20]
-		data_21 = table[:,22] # chan 21, abs 48
-		data_23 = table[:,24]
-		data_25 = table[:,26]
-		# chan is from 0 to 63 inclusive
-		# abs is from 0 to 254 inclusive
-		
-	elif file[-4:].lower() == "fits":
+    ccf = in_table['CCF']
+    error = in_table['ERROR']
+    n_bins = in_table.meta['N_BINS']
+    # dt = in_table.meta['DT']
+
+    time_bins = np.arange(n_bins)
+    pos_time_bins = time_bins[0:n_bins/2]
+    neg_time_bins = time_bins[n_bins/2:] - n_bins
+    time_bins = np.append(neg_time_bins, pos_time_bins)
+
+    ccf_3 = ccf[:, 3]
+    err_3 = error[:, 3]
+    pos_t_ccf_3 = ccf_3[0:n_bins/2]
+    neg_t_ccf_3 = ccf_3[n_bins/2:]
+    ccf_3 = np.append(neg_t_ccf_3, pos_t_ccf_3)
+    pos_t_err_3 = err_3[0:n_bins/2]
+    neg_t_err_3 = err_3[n_bins/2:]
+    err_3 = np.append(neg_t_err_3, pos_t_err_3)
+
+    ccf_9 = ccf[:, 9]
+    err_9 = error[:, 9]
+    pos_t_ccf_9 = ccf_9[0:n_bins/2]
+    neg_t_ccf_9 = ccf_9[n_bins/2:]
+    ccf_9 = np.append(neg_t_ccf_9, pos_t_ccf_9)
+    pos_t_err_9 = err_9[0:n_bins/2]
+    neg_t_err_9 = err_9[n_bins/2:]
+    err_9 = np.append(neg_t_err_9, pos_t_err_9)
+
+    ccf_15 = ccf[:, 15]
+    err_15 = error[:, 15]
+    pos_t_ccf_15 = ccf_15[0:n_bins/2]
+    neg_t_ccf_15 = ccf_15[n_bins/2:]
+    ccf_15 = np.append(neg_t_ccf_15, pos_t_ccf_15)
+    pos_t_err_15 = err_15[0:n_bins/2]
+    neg_t_err_15 = err_15[n_bins/2:]
+    err_15 = np.append(neg_t_err_15, pos_t_err_15)
+
+    ccf_24 = ccf[:, 24]
+    err_24 = error[:, 24]
+    pos_t_ccf_24 = ccf_24[0:n_bins/2]
+    neg_t_ccf_24 = ccf_24[n_bins/2:]
+    ccf_24 = np.append(neg_t_ccf_24, pos_t_ccf_24)
+    pos_t_err_24 = err_24[0:n_bins/2]
+    neg_t_err_24 = err_24[n_bins/2:]
+    err_24 = np.append(neg_t_err_24, pos_t_err_24)
 	
-		try:
-			file_hdu = fits.open(file)
-		except IOError:
-			print "\tERROR: File does not exist: %s" % file
-			exit()
-		table = file_hdu[1].data
-		file_hdu.close()
-		
-		bins = table[table.field('CHANNEL') == 0].field('TIME_BIN')
-		data_0 = table[table.field('CHANNEL') == 1].field('CCF')
-		data_1 = table[table.field('CHANNEL') == 2].field('CCF') # chan 1, abs 5
-		data_3 = table[table.field('CHANNEL') == 4].field('CCF')
-		data_6 = table[table.field('CHANNEL') == 7].field('CCF') # chan 6, abs 11
-		data_9 = table[table.field('CHANNEL') == 10].field('CCF') 
-		data_11 = table[table.field('CHANNEL') == 12].field('CCF') # chan 11, abs 16
-		data_14 = table[table.field('CHANNEL') == 15].field('CCF') # chan 14, abs 23
-		data_16 = table[table.field('CHANNEL') == 17].field('CCF')
-		data_18 = table[table.field('CHANNEL') == 19].field('CCF') # chan 18, abs 31
-		data_19 = table[table.field('CHANNEL') == 20].field('CCF')
-		data_21 = table[table.field('CHANNEL') == 22].field('CCF') # chan 21, abs 48
-		data_23 = table[table.field('CHANNEL') == 24].field('CCF')
-		data_25 = table[table.field('CHANNEL') == 26].field('CCF')
-		
-	else:
-		raise Exception("ERROR: File type not recognized. Must have extension \
-.dat or .fits.")
-	
-	#############
+    #############
 	## Plotting!
 	#############
 	
-	font_prop = font_manager.FontProperties(size=16)
-	fig, ax = plt.subplots()
-	ax.plot(bins, data_0, linewidth=2, label="Chan 0")
-	ax.plot(bins, data_1, linewidth=2, label="Chan 1") #label="2.5 keV")
-	ax.plot(bins, data_3, linewidth=2, label="Chan 3")
-	ax.plot(bins, data_6, linewidth=2, label="Chan 6") #label="5 keV")
-	ax.plot(bins, data_9, linewidth=2, label="Chan 9")
-	ax.plot(bins, data_11, linewidth=2, label="Chan 11") #label="7 keV")
-	ax.plot(bins, data_14, linewidth=2, label="Chan 14") #label="10 keV")
-	ax.plot(bins, data_16, linewidth=2, ls='-.', label="Chan 16")
-	ax.plot(bins, data_18, linewidth=2, ls='-.', label="Chan 18") #label="13 keV")
-	ax.plot(bins, data_19, linewidth=2, ls='-.', label="Chan 19")
-	ax.plot(bins, data_21, linewidth=2, ls='-.', label="Chan 21") #label="20 keV")
-	ax.plot(bins, data_23, linewidth=2, ls='-.', label="Chan 23")
-	ax.plot(bins, data_25, linewidth=2, ls='-.', label="Chan 25")
+    font_prop = font_manager.FontProperties(size=20)
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6), tight_layout=True, dpi=300)
 
-	ax.set_xlabel('Arbitrary time bins', fontproperties=font_prop)
-	ax.set_ylabel('Deviation from mean (photons / s)', \
-		fontproperties=font_prop)
-	ax.set_xlim(0, 4000)
-# 	ax.set_xlim(0, 200)
-# 	ax.set_ylim(-0.0005, 0.0005)
-# 	ax.set_ylim(-2.5, 3)
-# 	ax.set_xscale('symlog')  ## this works much better than 'log'
-# 	ax.set_yscale('symlog')
-	ax.set_title("%s, CCF per energy channel" % prefix, fontproperties=font_prop)
+    ax.vlines(0.0, -20, 20.0, linestyle='dotted', color='black', lw=1.5)
+    ax.hlines(0.0, -100, 100, linestyle='dashed', color='black', lw=1.5)
+    ax.errorbar(time_bins, ccf_3, yerr=err_3, linewidth=2, color='orange',
+                elinewidth=2, capsize=2, label="3.5 keV")
+    ax.errorbar(time_bins, ccf_9, yerr=err_9, linewidth=2, elinewidth=2,
+                capsize=2, label="6 keV")
+    ax.errorbar(time_bins, ccf_15, yerr=err_15, linewidth=2, elinewidth=2,
+                capsize=2, label="10.5 keV")
+    ax.errorbar(time_bins, ccf_24, yerr=err_24, linewidth=2, elinewidth=2,
+                capsize=2, label="18 keV")
 
-	## The following legend code was found on stack overflow I think
-	legend = ax.legend(loc='upper right')
-	for label in legend.get_texts():
-		label.set_fontsize('small')
-	for label in legend.get_lines():
-		label.set_linewidth(2)  # the legend line width
+    # ax.set_xlabel(r'Time ($\times\,$8.15$\,$ms)', fontproperties=font_prop)
+    ax.set_xlabel('Time-delay bins', fontproperties=font_prop)
+    ax.set_ylabel('Deviation from mean (cts$\;$s$^{-1}$)', \
+    	fontproperties=font_prop)
+    ax.set_xlim(-50, 50)
+    ax.set_ylim(-4, 16)
+
+    ## Setting the axes' minor ticks. It's complicated.
+    x_maj_loc = ax.get_xticks()
+    # x_maj_loc = [0, 50, 100]
+    # ax.set_xticks(x_maj_loc)
+    y_maj_loc = ax.get_yticks()
+
+    x_min_mult = 0.25 * (x_maj_loc[1] - x_maj_loc[0])
+    y_min_mult = 1.0
+    xLocator = MultipleLocator(x_min_mult)  ## loc of minor ticks on x-axis
+    yLocator = MultipleLocator(y_min_mult)  ## loc of minor ticks on y-axis
+    ax.xaxis.set_minor_locator(xLocator)
+    ax.yaxis.set_minor_locator(yLocator)
+
+    ax.tick_params(axis='x', labelsize=20)
+    ax.tick_params(axis='y', labelsize=20)
+#     ax.set_title("%s, CCF per energy channel" % prefix, fontproperties=font_prop)
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels, loc='upper right', fontsize=18,
+            borderpad=0.5, labelspacing=0.5, borderaxespad=0.5)
 	
-	fig.set_tight_layout(True)
-	plt.savefig(plot_file, dpi=140)
-# 	plt.show()
-	plt.close()
-
-## End of function 'main'
+    plt.savefig(plot_file)
+    # plt.show()
+    plt.close()
+    # subprocess.call(['cp', plot_file, \
+    #         "/Users/abigailstevens/Dropbox/Research/CCF_paper1/"])
 
 
 ################################################################################
 if __name__ == "__main__":
 	
-	parser = argparse.ArgumentParser(usage="python plot_multi.py ccf_table plot_file [-p prefix]", description="Plots CCFs of multiple energy channels on one \
-plot.")
+    parser = argparse.ArgumentParser(usage="python plot_multiccfs.py ccf_table"\
+            " plot_file [-p prefix]", description="Plots CCFs of multiple "\
+            "energy channels on one plot.")
 	
-	parser.add_argument('ccf_table', help="Name of file with CCF amplitudes in \
-a table.")
+    parser.add_argument('ccf_table', help="Name of file with CCF amplitudes in"\
+            "a table.")
 	
-	parser.add_argument('plot_file', help="The output file name for the plot.")
+    parser.add_argument('plot_file', help="The output file name for the plot.")
 	
-	parser.add_argument('-p', '--prefix', dest='prefix', default="--", help="The identifying prefix of the data (object nickname or proposal ID). [--]")
+    parser.add_argument('-p', '--prefix', dest='prefix', default="--",
+            help="The identifying prefix of the data (object nickname or "\
+            "proposal ID). [--]")
 
-	args = parser.parse_args()
+    args = parser.parse_args()
 
-	main(args.ccf_table, args.plot_file, args.prefix)
+    # print("Input file: %s" % args.ccf_table)
+
+    main(args.ccf_table, args.plot_file, args.prefix)
 	
 ################################################################################
