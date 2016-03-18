@@ -99,15 +99,9 @@ def fits_out(out_file, in_file, bkgd_file, meta_dict, mean_rate_ci,
 
     # print "\nOutput sent to: %s" % out_file
 
-    # print ccf[0,0]
-    # print ccf[0,2]
-    # print ccf[0,15]
-
     out_table = Table()
     out_table.add_column(Column(data=ccf, name='CCF'))
     out_table.add_column(Column(data=ccf_error, name='ERROR'))
-    # print np.shape(out_table)
-    # print out_table
 
     out_table.meta['TYPE'] = file_desc
     out_table.meta['DATE'] = str(datetime.now())
@@ -123,6 +117,7 @@ def fits_out(out_file, in_file, bkgd_file, meta_dict, mean_rate_ci,
     out_table.meta['RATE_REF'] = mean_rate_ref
     out_table.meta['RMS_REF'] = rms_ref
     out_table.meta['NYQUIST'] = meta_dict['nyquist']
+    out_table.meta['DF'] = np.mean(meta_dict['df'])
     out_table.meta['FILTER'] = str(meta_dict['filter'])
     out_table.meta['FILTFREQ'] = "%f:%f" % (lo_freq, hi_freq)
     out_table.meta['ADJUST'] = "%s" % str(meta_dict['adjust_seg'])
@@ -350,19 +345,20 @@ def stack_reference_band(rate_ref_2d, instrument="PCA", obs_epoch=5):
             rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
             # channel 3 to 28 inclusive
         else:
-            rate_ref = np.sum(rate_ref_2d, axis=1) # Summing all of it.
-            raise Warning("Reference band is not being properly stacked. Need "\
-                          "to put in channel information for your specific "\
-                          "RXTE PCA epoch.")
+            # rate_ref = np.sum(rate_ref_2d, axis=1)  # Summing all of it.
+            rate_ref = np.sum(rate_ref_2d[:, 3:30], axis=1)  # EPOCH 5
+            # print "Reference band is not being properly stacked. Need "\
+            #               "to put in channel information for your specific "\
+            #               "RXTE PCA epoch."
 
     elif instrument.lower() == "NICER":
         rate_ref = np.sum(rate_ref_2d[:, 5:100], axis=1)
 
     else:
         rate_ref = np.sum(rate_ref_2d, axis=1) # Summing all of it.
-        raise Warning("Reference band is not being properly stacked. Need "\
+        print "Reference band is not being properly stacked. Need "\
                           "to put in channel information for your specific "\
-                          "instrument.")
+                          "instrument."
 
     return rate_ref
 
@@ -598,15 +594,36 @@ def fits_in(in_file, meta_dict, test=False):
     ## Check if the FITS file exists; if so, load the data
     #######################################################
 
+    time = np.asarray([])
+    channel = np.asarray([])
+    pcuid = np.asarray([])
+
     try:
-        fits_hdu = fits.open(in_file)
+        data_table = Table.read(in_file)
+        time = data_table['TIME']
+        channel = data_table['CHANNEL']
+        pcuid = data_table['PCUID']
     except IOError:
         print("\tERROR: File does not exist: %s" % in_file)
-        sys.exit()
+        exit()
 
-    header = fits_hdu[0].header	 ## Header info is in ext 0, data is in ext 1
-    data = fits_hdu[1].data
-    fits_hdu.close()
+    try:
+        fits_hdu = fits.open(in_file)
+        time = fits_hdu[1].data.field('TIME')  ## Data is in ext 1
+        channel = fits_hdu[1].data.field('CHANNEL')
+        pcuid = fits_hdu[1].data.field('PCUID')
+        fits_hdu.close()
+    except IOError:
+        print "\tERROR: File does not exist: %s" % in_file
+        exit()
+    # try:
+    #     fits_hdu = fits.open(in_file)
+    # except IOError:
+    #     print("\tERROR: File does not exist: %s" % in_file)
+    #     sys.exit()
+    #
+    # data = fits_hdu[1].data
+    # fits_hdu.close()
 
     ###################
     ## Initializations
@@ -623,17 +640,19 @@ def fits_in(in_file, meta_dict, test=False):
     df_whole = np.array([])
     exposure = 0
 
-    start_time = data.field('TIME')[0]
-    final_time = data.field('TIME')[-1]
+    start_time = time[0]
+    final_time = time[-1]
 
     ###################################
     ## Selecting PCU for interest band
     ###################################
 
-    PCU2_mask = data.field('PCUID') == 2
-    data_pcu2 = data[PCU2_mask]
-    all_time_ci = np.asarray(data_pcu2.field('TIME'), dtype=np.float64)
-    all_energy_ci = np.asarray(data_pcu2.field('CHANNEL'), dtype=np.float64)
+    PCU2_mask = pcuid == 2
+    time_pcu2 = time[PCU2_mask]
+    chan_pcu2 = channel[PCU2_mask]
+
+    all_time_ci = np.asarray(time_pcu2, dtype=np.float64)
+    all_energy_ci = np.asarray(chan_pcu2, dtype=np.float64)
 
     ######################################
     ## Getting reference band light curve
@@ -652,10 +671,9 @@ def fits_in(in_file, meta_dict, test=False):
         # print "Ref PCU =", ref_pcu
     	# refpcu_mask = data.field('PCUID') == ref_pcu
 
-        refpcu_mask = data.field('PCUID') != 2
-        data_ref = data[refpcu_mask]
-        all_time_ref = np.asarray(data_ref.field('TIME'), dtype=np.float64)
-        all_energy_ref = np.asarray(data_ref.field('CHANNEL'), dtype=np.float64)
+        refpcu_mask = pcuid != 2
+        all_time_ref = np.asarray(time[refpcu_mask], dtype=np.float64)
+        all_energy_ref = np.asarray(channel[refpcu_mask], dtype=np.float64)
         all_rate_ref = None
         all_err_ref = None
 
@@ -1337,9 +1355,15 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ## Initialize; 'whole' is over one data file
     #############################################
 
-    t_res = np.float(tools.get_key_val(data_files[0], 0, 'TIMEDEL'))
+    try:
+        t_res = float(tools.get_key_val(data_files[0], 0, 'TIMEDEL'))
+    except KeyError:
+        t_res = float(tools.get_key_val(data_files[0], 1, 'TIMEDEL'))
+
     try:
         detchans = int(tools.get_key_val(data_files[0], 0, 'DETCHANS'))
+    except KeyError:
+        detchans = int(tools.get_key_val(data_files[0], 1, 'DETCHANS'))
     except IOError:
         detchans = 64
 
@@ -1413,9 +1437,10 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     meta_dict['dt'] = dt_total
     meta_dict['df'] = df_total
     meta_dict['adjust_seg'] = adjust_segments
-
+    meta_dict['nyquist'] = 1. / (2. * np.mean(dt_total))
     print("Mean dt: %.15f" % np.mean(dt_total))
     print("Mean df: %.10f\n" % np.mean(df_total))
+    print("Total segments: %d" % meta_dict['n_seg'])
 
     ## Remove the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
