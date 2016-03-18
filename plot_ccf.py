@@ -11,13 +11,15 @@ from astropy.table import Table
 import matplotlib.font_manager as font_manager
 from matplotlib.ticker import MultipleLocator
 
+import tools
+
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2014-2015"
 
 
 ################################################################################
 def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
-        frac_time):
+        frac_time, t_length=30):
     """
     Actually makes the plot.
 
@@ -46,6 +48,9 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
     frac_time : int
         The denominator of the fraction, in seconds, of the each x_bins bin.
 
+    t_length : int
+        The number of time bins to plot on either side of 0. [30]
+
     Returns
     -------
     nothing
@@ -53,28 +58,26 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
 
     font_prop = font_manager.FontProperties(size=20)
 
-    fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
-
-# 	ax.plot(x_bins, ccf_amps, lw=2, c='black')
-    ax.vlines(0.0, -1.5, 3.0, linestyle='dotted', color='gray', lw=1.5)
-    ax.hlines(0.0, -30, 30, linestyle='dashed', color='gray', lw=1.5)
-    ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=2, c='black',
-            drawstyle='steps-mid', elinewidth=1.5, capsize=1.5)
-    # ax.plot([-5], [ccf_amps[n_bins/2-5]], "o", mfc='red', mew=1, mec='black',
-    #         ms=20)
-    # ax.plot([1], [ccf_amps[n_bins/2+1]],"*",  mfc='orange', mew=1, mec='black',
-    #         ms=30)
-    # ax.plot([6], [ccf_amps[n_bins/2+6]], "^", mfc='green', mew=1, mec='black',
-    #         ms=20)
-    # ax.plot([14], [ccf_amps[n_bins/2+14]], 's', mfc='blue', mew=1, mec='black',
-    #         ms=20)
-    ax.set_xlabel(r'Time ($\times\,1/%d\,$s)' % frac_time, \
-            fontproperties=font_prop)
-    ax.set_ylabel(r'Deviation from mean (cts / s)', \
-            fontproperties=font_prop)
-    # ax.set_xlim(0, 100)
-    ax.set_xlim(-30, 30)
-    ax.set_ylim(-1.5, 3.0)
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6), dpi=300, tight_layout=True)
+    ax.plot(x_bins, ccf_amps, lw=2, c='black')
+#     ax.vlines(0.0, -1.5, 3.0, linestyle='dotted', color='black', lw=1.5)
+    # ax.hlines(0.0, -t_length, t_length, linestyle='dashed', color='black',
+    #           lw=1.5)
+    # ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=2, c='black',
+    #             drawstyle='steps-mid', elinewidth=1.5, capsize=1.5)
+    # ax.plot([-10], [ccf_amps[n_bins/2-10]], "o", mfc='red', mew=1, mec='black',
+    #         ms=25)
+    # ax.plot([-5], [ccf_amps[n_bins/2-5]],"*", mfc='orange', mew=1, mec='black',
+    #         ms=35)
+    # ax.plot([1], [ccf_amps[n_bins/2+1]], "^", mfc='green', mew=1, mec='black',
+    #         ms=25)
+    # ax.plot([6], [ccf_amps[n_bins/2+6]], 's', mfc='blue', mew=1, mec='black',
+    #         ms=25)
+    # ax.set_xlabel(r'Time ($\times\,$8.15 ms)', fontproperties=font_prop)
+    ax.set_ylabel(r'Deviation from mean (cts / s)', fontproperties=font_prop)
+    # ax.set_xlim(-t_length, t_length)
+    ax.set_xlim(0, t_length)
+    # ax.set_ylim(-1.5, 3.0)
 
     ## Setting the axes' minor ticks. It's complicated.
     x_maj_loc = ax.get_xticks()
@@ -125,6 +128,10 @@ if __name__ == "__main__":
     parser.add_argument('-e', '--ext', dest='plot_ext', default='eps',
             help="File extension for the plot. Do not include the '.' [eps]")
 
+    parser.add_argument('-l', '--length', dest='t_length', default=30,
+            type=tools.type_positive_int,
+            help="Number of time bins to plot on either side of 0. [30]")
+
     args = parser.parse_args()
 
     print("Plotting the ccf: %s_chan_xx.%s" % (args.plot_root, args.plot_ext))
@@ -135,8 +142,6 @@ if __name__ == "__main__":
         print("\tERROR: File does not exist: %s" % args.ccf_file)
         exit()
 
-    ## Need to transpose it here so that it plots with time on the x-axis
-    ## and energy on the y-axis
     ccf = in_table['CCF']
     error = in_table['ERROR']
     # print np.shape(ccf)
@@ -170,10 +175,10 @@ if __name__ == "__main__":
             plot_file = args.plot_root + "_chan_" + str(0) + str(i) + "." + \
                         args.plot_ext
         else:
-            plot_file = args.plot_root + "_chan_" + str(i) + "." + args.plot_ext
+            plot_file = args.plot_root + "_chan_" + str(i) + "_longer." + args.plot_ext
 
 
         make_plot(time_bins, ccf_i, ccf_err_i, n_bins, args.prefix, plot_file,
-                i, frac_time)
+                i, frac_time, args.t_length)
 
 ################################################################################
