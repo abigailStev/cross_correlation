@@ -798,11 +798,8 @@ def fits_in(in_file, meta_dict, test=False):
                         meta_dict['detchans'], start_time, seg_end_time)
 
                 ## Stack the reference band
-                # rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
-                #         obs_epoch=meta_dict['obs_epoch'])
                 rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
-                        obs_epoch=0)
-                # print rate_ref
+                        obs_epoch=meta_dict['obs_epoch'])
 
             ## Save the reference band light curve to a text file
         	# out_file="./GX339-BQPO_ref_lc.dat"
@@ -835,14 +832,11 @@ def fits_in(in_file, meta_dict, test=False):
                         / 2 + 1], ref_seg.mean_rate, meta_dict['n_bins'],
                         dt_seg, noisy=True)
 
-            # print absrms_pow
-
             var, rms = var_and_rms(absrms_pow, df_seg)
 
             ######################################################
             ## Only keep and use segments where the variance > 0.
             ######################################################
-            # print ref_seg.mean_rate
 
             if var >= 0.0:
 
