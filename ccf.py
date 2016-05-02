@@ -39,7 +39,7 @@ import tools  ## in whizzy_scripts
 import ccf_lightcurves as ccf_lc  ## in cross_correlation
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
-__year__ = "2014-2015"
+__year__ = "2014-2016"
 
 
 ################################################################################
@@ -340,16 +340,17 @@ def stack_reference_band(rate_ref_2d, instrument="PCA", obs_epoch=5):
         if obs_epoch == 5:
             rate_ref = np.sum(rate_ref_2d[:, 2:26], axis=1)  # EPOCH 5
             # channel 2 to 25 inclusive
-            #
         elif obs_epoch == 3:
             rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
             # channel 3 to 28 inclusive
+        elif obs_epoch == 0:
+            rate_ref = np.sum(rate_ref_2d, axis=1)  # SUMMING ALL
         else:
             # rate_ref = np.sum(rate_ref_2d, axis=1)  # Summing all of it.
             rate_ref = np.sum(rate_ref_2d[:, 3:30], axis=1)  # EPOCH 5
-            # print "Reference band is not being properly stacked. Need "\
-            #               "to put in channel information for your specific "\
-            #               "RXTE PCA epoch."
+            print "Reference band is not being properly stacked. Need "\
+                          "to put in channel information for your specific "\
+                          "RXTE PCA epoch."
 
     elif instrument.lower() == "NICER":
         rate_ref = np.sum(rate_ref_2d[:, 5:100], axis=1)
@@ -598,15 +599,17 @@ def fits_in(in_file, meta_dict, test=False):
     channel = np.asarray([])
     pcuid = np.asarray([])
 
-    try:
-        data_table = Table.read(in_file)
-        time = data_table['TIME']
-        channel = data_table['CHANNEL']
-        pcuid = data_table['PCUID']
-    except IOError:
-        print("\tERROR: File does not exist: %s" % in_file)
-        exit()
+    ## Reading an event list from an astropy table FITS file
+    # try:
+    #     data_table = Table.read(in_file)
+    #     time = data_table['TIME']
+    #     channel = data_table['CHANNEL']
+    #     pcuid = data_table['PCUID']
+    # except IOError:
+    #     print("\tERROR: File does not exist: %s" % in_file)
+    #     exit()
 
+    ## Reading an event list from a normal FITS table
     try:
         fits_hdu = fits.open(in_file)
         time = fits_hdu[1].data.field('TIME')  ## Data is in ext 1
@@ -616,6 +619,7 @@ def fits_in(in_file, meta_dict, test=False):
     except IOError:
         print "\tERROR: File does not exist: %s" % in_file
         exit()
+
     # try:
     #     fits_hdu = fits.open(in_file)
     # except IOError:
@@ -639,7 +643,8 @@ def fits_in(in_file, meta_dict, test=False):
     dt_whole = np.array([])
     df_whole = np.array([])
     exposure = 0
-
+    # print set(pcuid)
+    # exit()
     start_time = time[0]
     final_time = time[-1]
 
@@ -793,8 +798,11 @@ def fits_in(in_file, meta_dict, test=False):
                         meta_dict['detchans'], start_time, seg_end_time)
 
                 ## Stack the reference band
+                # rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
+                #         obs_epoch=meta_dict['obs_epoch'])
                 rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
-                        obs_epoch=meta_dict['obs_epoch'])
+                        obs_epoch=0)
+                # print rate_ref
 
             ## Save the reference band light curve to a text file
         	# out_file="./GX339-BQPO_ref_lc.dat"
@@ -827,16 +835,24 @@ def fits_in(in_file, meta_dict, test=False):
                         / 2 + 1], ref_seg.mean_rate, meta_dict['n_bins'],
                         dt_seg, noisy=True)
 
+            # print absrms_pow
+
             var, rms = var_and_rms(absrms_pow, df_seg)
 
             ######################################################
             ## Only keep and use segments where the variance > 0.
             ######################################################
+            # print ref_seg.mean_rate
 
             if var >= 0.0:
 
                 dt_whole = np.append(dt_whole, dt_seg)
                 df_whole = np.append(df_whole, df_seg)
+                print "%.3f\t%.1f\t%.1f" % \
+                      (np.sum(ci_seg.mean_rate[15:27]) / \
+                       np.sum(ci_seg.mean_rate[2:7]),
+                      np.sum(ci_seg.mean_rate[15:27]),
+                      np.sum(ci_seg.mean_rate[2:7]))
 
                 ## Append segment to arrays
                 cs_whole = np.dstack((cs_whole, cs_seg))
@@ -862,6 +878,13 @@ def fits_in(in_file, meta_dict, test=False):
 
                 if test is True and n_seg == 1:  # For testing
                     break
+            else:
+                # print "Neg var"
+                print " ! %.3f\t%.1f\t%.1f !" % \
+                      (np.sum(ci_seg.mean_rate[15:27]) / \
+                       np.sum(ci_seg.mean_rate[2:7]),
+                      np.sum(ci_seg.mean_rate[15:27]),
+                      np.sum(ci_seg.mean_rate[2:7]))
 
             start_time = seg_end_time
             seg_end_time += meta_dict['n_seconds']
@@ -1346,8 +1369,19 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     else:
         data_files = [input_file]
 
-    if adjust is True and len(data_files) == 9:
-        adjust_segments = [932, 216, 184, 570, 93, 346, 860, 533, -324]
+    if adjust is True:
+        # adjust_segments = [932, 216, 184, 570, 93, 346, 860, 533, -324]
+        out_dir = os.path.dirname(out_file)
+        basename = os.path.basename(out_file)
+        prefix = basename.split('_')[0]
+        adjust_file = out_dir+"/"+prefix+"_t"+str(dt_mult)+"_"+str(n_seconds)+\
+						   "sec_adjustby.txt"
+        if os.path.isfile(adjust_file):
+            adjust_segments = [int(line.strip()) for line in open(adjust_file)]
+        else:
+            print("adjustby.txt file does not exist. NOT adjusting segments to"\
+                  " line up QPO.")
+            adjust_segments = np.zeros(len(data_files))
     else:
         adjust_segments = np.zeros(len(data_files))
 
