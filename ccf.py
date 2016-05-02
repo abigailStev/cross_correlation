@@ -23,6 +23,7 @@ Files created
     table in FITS extension 1. Header info is also in FITS extension 1.
 
 """
+from __future__ import print_function
 import argparse
 import numpy as np
 import sys
@@ -97,7 +98,7 @@ def fits_out(out_file, in_file, bkgd_file, meta_dict, mean_rate_ci,
     assert out_file[-4:].lower() == "fits", "ERROR: Output file must have "\
             "extension '.fits'."
 
-    # print "\nOutput sent to: %s" % out_file
+    # print("\nOutput sent to: %s" % out_file)
 
     out_table = Table()
     out_table.add_column(Column(data=ccf, name='CCF'))
@@ -165,9 +166,9 @@ def raw_to_absrms(power, mean_rate, n_bins, dt, noisy=True):
         noise = 2.0 * mean_rate
     else:
         noise = 0.0
-    # print "Power shape:", np.shape(power)
-    # print "DT shape:", np.shape(dt)
-    # print "Noise shape:", np.shape(noise)
+    # print("Power shape:", np.shape(power))
+    # print("DT shape:", np.shape(dt))
+    # print("Noise shape:", np.shape(noise))
     return power * (2.0 * dt / np.float(n_bins)) - noise
 
 
@@ -283,17 +284,17 @@ def var_and_rms(power, df):
 
     """
 
-    # print "Shape power:", np.shape(power)
-    # print "Nonzero power:", power[np.where(power<=0.0)]
+    # print("Shape power:", np.shape(power))
+    # print("Nonzero power:", power[np.where(power<=0.0)])
     variance = np.sum(power * df, axis=0)
-    # print np.shape(variance)
-    # print "Variance:", variance
+    # print(np.shape(variance))
+    # print("Variance:", variance)
     # if variance > 0:
     #     rms = np.sqrt(variance)
     # else:
     #     rms = np.nan
     rms = np.where(variance >= 0, np.sqrt(variance), np.nan)
-    # print "rms:", rms
+    # print("rms:", rms)
     return variance, rms
 
 
@@ -348,18 +349,18 @@ def stack_reference_band(rate_ref_2d, instrument="PCA", obs_epoch=5):
         else:
             # rate_ref = np.sum(rate_ref_2d, axis=1)  # Summing all of it.
             rate_ref = np.sum(rate_ref_2d[:, 3:30], axis=1)  # EPOCH 5
-            print "Reference band is not being properly stacked. Need "\
+            print("Reference band is not being properly stacked. Need "\
                           "to put in channel information for your specific "\
-                          "RXTE PCA epoch."
+                          "RXTE PCA epoch.")
 
     elif instrument.lower() == "NICER":
         rate_ref = np.sum(rate_ref_2d[:, 5:100], axis=1)
 
     else:
         rate_ref = np.sum(rate_ref_2d, axis=1) # Summing all of it.
-        print "Reference band is not being properly stacked. Need "\
+        print("Reference band is not being properly stacked. Need "\
                           "to put in channel information for your specific "\
-                          "instrument."
+                          "instrument.")
 
     return rate_ref
 
@@ -617,7 +618,7 @@ def fits_in(in_file, meta_dict, test=False):
         pcuid = fits_hdu[1].data.field('PCUID')
         fits_hdu.close()
     except IOError:
-        print "\tERROR: File does not exist: %s" % in_file
+        print("\tERROR: File does not exist: %s" % in_file)
         exit()
 
     # try:
@@ -643,7 +644,7 @@ def fits_in(in_file, meta_dict, test=False):
     dt_whole = np.array([])
     df_whole = np.array([])
     exposure = 0
-    # print set(pcuid)
+    # print(set(pcuid))
     # exit()
     start_time = time[0]
     final_time = time[-1]
@@ -673,7 +674,7 @@ def fits_in(in_file, meta_dict, test=False):
         ## Next-most pcu is:
         # most_pcu = np.argmax(occurrences)
         # ref_pcu = pcus_on[most_pcu]
-        # print "Ref PCU =", ref_pcu
+        # print("Ref PCU =", ref_pcu)
     	# refpcu_mask = data.field('PCUID') == ref_pcu
 
         refpcu_mask = pcuid != 2
@@ -725,7 +726,7 @@ def fits_in(in_file, meta_dict, test=False):
             print("WARNING: I don't think this segment time selection has "\
                     "been tested.")
             index = np.max(np.where(all_time_ref < ci_final_time))
-            # print "\t", index
+            # print("\t", index)
             final_time = all_time_ref[index]
             all_time_ref = all_time_ref[0:index]
         else:
@@ -740,7 +741,7 @@ def fits_in(in_file, meta_dict, test=False):
     ## Looping through segments
     ############################
 
-    print "Segments computed:"
+    print("Segments computed:")
 
     while (seg_end_time + (meta_dict['adjust_seg'] * meta_dict['dt'])) <= \
             final_time:
@@ -823,7 +824,7 @@ def fits_in(in_file, meta_dict, test=False):
 
             if meta_dict['ref_file']:
                 IR_poisson = np.sum(err_ref ** 2) / float(len(err_ref))
-                print IR_poisson
+                print(IR_poisson)
                 absrms_pow = ref_seg.power[0:meta_dict['n_bins'] / 2 + 1] * \
                         (2.0 * dt_seg / np.float(meta_dict['n_bins']))
 
@@ -842,11 +843,11 @@ def fits_in(in_file, meta_dict, test=False):
 
                 dt_whole = np.append(dt_whole, dt_seg)
                 df_whole = np.append(df_whole, df_seg)
-                print "%.3f\t%.1f\t%.1f" % \
+                print("%.3f\t%.1f\t%.1f" % \
                       (np.sum(ci_seg.mean_rate[15:27]) / \
                        np.sum(ci_seg.mean_rate[2:7]),
                       np.sum(ci_seg.mean_rate[15:27]),
-                      np.sum(ci_seg.mean_rate[2:7]))
+                      np.sum(ci_seg.mean_rate[2:7])))
 
                 ## Append segment to arrays
                 cs_whole = np.dstack((cs_whole, cs_seg))
@@ -868,17 +869,17 @@ def fits_in(in_file, meta_dict, test=False):
                 ref_whole.power += ref_seg.power
 
                 if n_seg % print_iterator == 0:
-                    print "\t", n_seg
+                    print("\t", n_seg)
 
                 if test is True and n_seg == 1:  # For testing
                     break
             else:
-                # print "Neg var"
-                print " ! %.3f\t%.1f\t%.1f !" % \
+                # print("Neg var")
+                print(" ! %.3f\t%.1f\t%.1f !" % \
                       (np.sum(ci_seg.mean_rate[15:27]) / \
                        np.sum(ci_seg.mean_rate[2:7]),
                       np.sum(ci_seg.mean_rate[15:27]),
-                      np.sum(ci_seg.mean_rate[2:7]))
+                      np.sum(ci_seg.mean_rate[2:7])))
 
             start_time = seg_end_time
             seg_end_time += meta_dict['n_seconds']
@@ -903,10 +904,10 @@ def fits_in(in_file, meta_dict, test=False):
     ci_whole.mean_rate_array = ci_whole.mean_rate_array[:,1:]
     ref_whole.power_array = ref_whole.power_array[:,1:]
     ref_whole.mean_rate_array = ref_whole.mean_rate_array[1:]
-    # print dt_whole
-    # print df_whole
-    # print ref_whole.rms_array
-    # print np.shape(ref_whole.rms_array)
+    # print(dt_whole)
+    # print(df_whole)
+    # print(ref_whole.rms_array)
+    # print(np.shape(ref_whole.rms_array))
 
     return cs_whole, ci_whole, ref_whole, n_seg, dt_whole, df_whole, \
             exposure
@@ -935,7 +936,7 @@ def get_background(bkgd_file="evt_bkgd_rebinned.pha"):
     try:
         fits_hdu = fits.open(bkgd_file)
     except IOError:
-        print "\tERROR: File does not exist: %s" % bkgd_file
+        print("\tERROR: File does not exist: %s" % bkgd_file)
         sys.exit()
 
     header = fits_hdu[1].header
@@ -1006,7 +1007,7 @@ def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref, lo_freq=-1.0,
     out_file = out_file.replace(".", "_cs.")
     out_dir = out_file[0:out_file.rfind("/")+1]
     subprocess.call(['mkdir', '-p', out_dir])
-    print "Output sent to: %s" % out_file
+    print("Output sent to: %s" % out_file)
 
     out_table = Table()
     out_table.add_column(Column(data=freq, name='FREQUENCY', unit='Hz'))
@@ -1085,8 +1086,8 @@ def filter_freq(freq_space_array, dt, n_bins, detchans, lo_freq, hi_freq):
     j_min = list(min_freq_mask).index(False)
     j_max = list(max_freq_mask).index(True)
 
-    # print "j min =", j_min
-    # print "j max =", j_max
+    # print("j min =", j_min)
+    # print("j max =", j_max)
 
     ## Make zeroed arrays to replace with
     zero_front = np.zeros((j_min, detchans), dtype=np.complex128)
@@ -1178,7 +1179,7 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
     signal_ref_pow = raw_to_absrms(signal_ref_pow, ref.mean_rate, \
             meta_dict['n_bins'], meta_dict['dt'], noisy=noisy)
 
-    print "Frac RMS of reference band:", ref.rms / ref.mean_rate
+    # print("Frac RMS of reference band:", ref.rms / ref.mean_rate)
     ## in frac rms units here -- should be few percent
 
     ## Broadcast signal_ref_pow into same shape as signal_ci_pow
@@ -1406,12 +1407,12 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
                  'exposure': 0,
                  'ref_file': ref_band}
 
-    print "\nDT = %f" % meta_dict['dt']
-    print "N_bins = %d" % meta_dict['n_bins']
-    print "Nyquist freq =", meta_dict['nyquist']
-    print "Testing?", test
-    print "Filtering?", meta_dict['filter']
-    print "Adjusting QPO?", adjust
+    print("\nDT = %f" % meta_dict['dt'])
+    print("N_bins = %d" % meta_dict['n_bins'])
+    print("Nyquist freq =", meta_dict['nyquist'])
+    print("Testing?", test)
+    print("Filtering?", meta_dict['filter'])
+    print("Adjusting QPO?", adjust)
 
     ci_total = ccf_lc.Lightcurve(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ci')
@@ -1439,7 +1440,7 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         cross_spec_whole, ci_whole, ref_whole, n_seg, dt_whole, df_whole, \
                 exposure = fits_in(in_file, meta_dict, test)
 
-        print "Segments for this file: %d\n" % n_seg
+        print("Segments for this file: %d\n" % n_seg)
 
         total_cross_spec = np.dstack((total_cross_spec, cross_spec_whole))
         ref_total.var_array = np.append(ref_total.var_array,
@@ -1468,7 +1469,7 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     meta_dict['nyquist'] = 1. / (2. * np.mean(dt_total))
     print("Mean dt: %.15f" % np.mean(dt_total))
     print("Mean df: %.10f\n" % np.mean(df_total))
-    print("Total segments: %d" % meta_dict['n_seg'])
+    # print("Total segments: %d" % meta_dict['n_seg'])
 
     ## Remove the first zeros from stacked arrays
     total_cross_spec = total_cross_spec[:,:,1:]
@@ -1477,9 +1478,9 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
     ref_total.var_array = ref_total.var_array[1:]
 
-    # print "Mean of var_array:", np.mean(ref_total.var_array)
-    # print "Sqrt of var_array:", np.sqrt(ref_total.var_array)
-    # print "Mean of sqrt of var_array:", np.mean(np.sqrt(ref_total.var_array))
+    # print("Mean of var_array:", np.mean(ref_total.var_array))
+    # print("Sqrt of var_array:", np.sqrt(ref_total.var_array))
+    # print("Mean of sqrt of var_array:", np.mean(np.sqrt(ref_total.var_array)))
 
     ######################################
     ## Turn sums over segments into means
@@ -1548,12 +1549,12 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         ccf_avg, ccf_error = unfilt_cs_to_ccf_w_err(total_cross_spec,
                 meta_dict, ref_total)
 
-    print "Exposure_time = %.3f seconds" % meta_dict['exposure']
-    print "Total number of segments:", meta_dict['n_seg']
-    print "Mean rate for all of ci:", np.sum(ci_total.mean_rate)
-    print "Mean rate for ci chan 6:", ci_total.mean_rate[6]
-    print "Mean rate for ci chan 15:", ci_total.mean_rate[15]
-    print "Mean rate for ref:", ref_total.mean_rate
+    print("Exposure_time = %.3f seconds" % meta_dict['exposure'])
+    print("Total number of segments:", meta_dict['n_seg'])
+    print("Mean rate for all of ci:", np.sum(ci_total.mean_rate))
+    print("Mean rate for ci chan 6:", ci_total.mean_rate[6])
+    print("Mean rate for ci chan 15:", ci_total.mean_rate[15])
+    print("Mean rate for ref:", ref_total.mean_rate)
 
     ##########
     ## Output
@@ -1564,22 +1565,22 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     else:
         file_description = "Cross-correlation function of multiple observations"
 
-    print ccf_avg[0,0]
-    print ccf_avg[0,2]
-    print ccf_avg[0,15]
+    # print(ccf_avg[0,0])
+    # print(ccf_avg[0,2])
+    # print(ccf_avg[0,15])
 
     if not test and adjust and len(data_files) == 9:
         assert round(ccf_avg[0,0], 12) == 0.117937948428
         assert round(ccf_avg[0,2], 11) == 9.22641398474
         assert round(ccf_avg[0,15], 11) == 1.76422640304
-        print "Passed!"
+        print("Passed!")
     elif test and adjust and len(data_files) == 9:
         assert round(ccf_avg[0,0], 12) == 0.106747663439
         assert round(ccf_avg[0,2], 11) == 9.56560710672
         assert round(ccf_avg[0,15], 11) == 0.88144237181
-        print "Passed!"
+        print("Passed!")
     else:
-        print "Do not have values to compare against."
+        print("Do not have values to compare against.")
 
     fits_out(out_file, input_file, bkgd_file, meta_dict, ci_total.mean_rate,
             ref_total.mean_rate, float(ref_total.rms), ccf_avg, ccf_error,
