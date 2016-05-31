@@ -33,6 +33,8 @@ import os
 import subprocess
 from astropy.io import fits
 from astropy.table import Table, Column
+from astropy.modeling import powerlaws, models, fitting
+import matplotlib.pyplot as plt
 
 ## These are things I've written.
 ## Their directories are in my PYTHONPATH bash environment variable.
@@ -41,6 +43,16 @@ import ccf_lightcurves as ccf_lc  ## in cross_correlation
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2014-2016"
+
+
+################################################################################
+def find_nearest(array, value):
+    idx = np.searchsorted(array, value, side="left")
+    if idx == len(array) or np.fabs(value - array[idx-1]) < \
+            np.fabs(value - array[idx]):
+        return array[idx-1], idx-1
+    else:
+        return array[idx], idx
 
 
 ################################################################################
@@ -126,6 +138,107 @@ def fits_out(out_file, in_file, bkgd_file, meta_dict, mean_rate_ci,
     #     out_table.meta['REF_FILE'] = meta_dict['ref_file']
 
     out_table.write(out_file, overwrite=True)
+
+
+################################################################################
+def rebin(freq, power, err_power, rebin_const):
+    """
+    Re-bin the power spectrum in frequency space by some re-binning constant
+    (rebin_const > 1).
+
+    Parameters
+    ----------
+    freq : np.array of floats
+        1-D array of the Fourier frequencies.
+
+    power : np.array of floats
+        1-D array of the power at each Fourier frequency, with any/arbitrary
+        normalization.
+
+    err_power : np.array of floats
+        1-D array of the error on the power at each Fourier frequency, with the
+        same normalization as the power.
+
+    rebin_const : float
+        The constant by which the data were geometrically re-binned.
+
+    Returns
+    -------
+    rb_freq : np.array of floats
+        1-D array of the re-binned Fourier frequencies.
+
+    rb_power : np.array of floats
+        1-D array of the power at the re-binned Fourier frequencies, with the
+        same normalization as the input power array.
+
+    rb_err : np.array of floats
+        1-D array of the error on the power at the re-binned Fourier
+        frequencies, with the same normalization as the input error on power.
+
+    freq_min : np.array of floats
+        1-D array of the lower bounds of each re-binned frequency bin.
+
+    freq_max : np.array of floats
+        1-D array of the upper bounds of each re-binned frequency bin.
+
+    """
+    assert rebin_const >= 1.0
+
+    ## Initialize variables
+    rb_power = np.asarray([])  # List of re-binned power
+    rb_freq = np.asarray([])   # List of re-binned frequencies
+    rb_err = np.asarray([])	   # List of error in re-binned power
+    real_index = 1.0		   # The unrounded next index in power
+    int_index = 1			   # The int of real_index, added to current_m every
+                               #  iteration
+    current_m = 1			   # Current index in power
+    prev_m = 0				   # Previous index m
+    bin_power = 0.0			   # The power of the current re-binned bin
+    bin_freq = 0.0			   # The frequency of the current re-binned bin
+    err_bin_power2 = 0.0	   # The error squared on 'bin_power'
+    bin_range = 0.0			   # The range of un-binned bins covered by this
+                               #  re-binned bin
+    freq_min = np.asarray([])
+    freq_max = np.asarray([])
+
+    ## Loop through the length of the array power, new bin by new bin, to
+    ## compute the average power and frequency of that new geometric bin.
+    ## Equations for frequency, power, and error are from A. Ingram's PhD thesis
+    while current_m < len(power):
+
+        ## Determine the range of indices this specific geometric bin covers
+        bin_range = np.absolute(current_m - prev_m)
+        ## Want mean power of data points contained within one geometric bin
+        bin_power = np.mean(power[prev_m:current_m])
+        ## Compute error in bin -- equation from Adam Ingram's thesis
+        err_bin_power2 = np.sqrt(np.sum(err_power[prev_m:current_m] ** 2)) / \
+            float(bin_range)
+
+        ## Compute the mean frequency of a geometric bin
+        bin_freq = np.mean(freq[prev_m:current_m])
+
+        ## Append values to arrays
+        rb_power = np.append(rb_power, bin_power)
+        rb_freq = np.append(rb_freq, bin_freq)
+        rb_err = np.append(rb_err, err_bin_power2)
+        freq_min = np.append(freq_min, freq[prev_m])
+        freq_max = np.append(freq_max, freq[current_m])
+
+        ## Increment for the next iteration of the loop
+        ## Since the for-loop goes from prev_m to current_m-1 (since that's how
+        ## the range function and array slicing works) it's ok that we set
+        ## prev_m = current_m here for the next round. This will not cause any
+        ## double-counting bins or skipping bins.
+        prev_m = current_m
+        real_index *= rebin_const
+        int_index = int(round(real_index))
+        current_m += int_index
+        bin_range = None
+        bin_freq = None
+        bin_power = None
+        err_bin_power2 = None
+
+    return rb_freq, rb_power, rb_err, freq_min, freq_max
 
 
 ################################################################################
@@ -427,9 +540,18 @@ def make_cs(rate_ci, rate_ref, meta_dict):
     fft_data_ref = np.resize(np.repeat(fft_data_ref, meta_dict['detchans']), \
         (meta_dict['n_bins'], meta_dict['detchans']))
 
+    print(fft_data_ref[528,3])
+    print(fft_data_ci[254,3])
+    fft_data_ref[528:561,:].imag = fft_data_ci[254:287,:].imag
+    print(fft_data_ref[528,3])
+    print("\n")
+    print(fft_data_ref[-529,3])
+    print(fft_data_ci[-255,3])
+    fft_data_ref[-561:-528,:].imag = fft_data_ci[-287:-254,:].imag
+    print(fft_data_ref[-529,3])
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
-
+    exit()
     return cs_seg, ci_seg, ref_seg
 
 #
@@ -843,11 +965,11 @@ def fits_in(in_file, meta_dict, test=False):
 
                 dt_whole = np.append(dt_whole, dt_seg)
                 df_whole = np.append(df_whole, df_seg)
-                print("%.3f\t%.1f\t%.1f" % \
-                      (np.sum(ci_seg.mean_rate[15:27]) / \
-                       np.sum(ci_seg.mean_rate[2:7]),
-                      np.sum(ci_seg.mean_rate[15:27]),
-                      np.sum(ci_seg.mean_rate[2:7])))
+                # print("%.3f\t%.1f\t%.1f" % \
+                #       (np.sum(ci_seg.mean_rate[15:27]) / \
+                #        np.sum(ci_seg.mean_rate[2:7]),
+                #       np.sum(ci_seg.mean_rate[15:27]),
+                #       np.sum(ci_seg.mean_rate[2:7])))
 
                 ## Append segment to arrays
                 cs_whole = np.dstack((cs_whole, cs_seg))
@@ -874,12 +996,16 @@ def fits_in(in_file, meta_dict, test=False):
                 if test is True and n_seg == 1:  # For testing
                     break
             else:
-                # print("Neg var")
-                print(" ! %.3f\t%.1f\t%.1f !" % \
-                      (np.sum(ci_seg.mean_rate[15:27]) / \
-                       np.sum(ci_seg.mean_rate[2:7]),
-                      np.sum(ci_seg.mean_rate[15:27]),
-                      np.sum(ci_seg.mean_rate[2:7])))
+                print("Neg var")
+                print(var)
+                print("Start: %.15f" % start_time)
+                print("End: %.15f" % seg_end_time)
+                print("dt seg: %.15f" % dt_seg)
+                # print(" ! %.3f\t%.1f\t%.1f !" % \
+                #       (np.sum(ci_seg.mean_rate[15:27]) / \
+                #        np.sum(ci_seg.mean_rate[2:7]),
+                #       np.sum(ci_seg.mean_rate[15:27]),
+                #       np.sum(ci_seg.mean_rate[2:7])))
 
             start_time = seg_end_time
             seg_end_time += meta_dict['n_seconds']
@@ -992,7 +1118,7 @@ def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref, lo_freq=-1.0,
     nothing, but writes to a file.
 
     """
-    ## Getting the Fourier frequencies for the cross spectrum
+    ## Computing the Fourier frequencies
     freq = fftpack.fftfreq(meta_dict['n_bins'], d=np.mean(meta_dict['dt']))
     nyq_index = meta_dict['n_bins'] / 2
 
@@ -1036,26 +1162,30 @@ def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref, lo_freq=-1.0,
 
 
 ################################################################################
-def filter_freq(freq_space_array, dt, n_bins, detchans, lo_freq, hi_freq):
+def tophat_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq):
     """
-    Apply a filter to the averaged cross-spectrum per energy channel (in
+    Apply a tophat filter to the averaged cross-spectrum per energy channel (in
     frequency space). Any cross spectrum amplitudes above or below pulse_freq
     get zeroed out.
 
     Parameters
     ----------
-    freq_space_array : np.array of complex numbers
+    cs_avg : np.array of complex numbers
         2-D array of the cross spectrum, in frequency space, to be filtered.
         Size = (n_bins, detchans).
 
-    dt : float
-        Timestep between bins in the light curve, in seconds.
+    ref : ccf_lc.Lightcurve object
+        The reference band light curve. Must already have power assigned.
 
-    n_bins : int
-        The number of bins in one Fourier segment of the light curve.
+    ci : ccf_lc.Lightcurve object
+        The channel of interest light curve. Must already have power assigned.
 
-    detchans : int
-        Number of energy channels of the detector's data mode.
+    freq : np.array of floats
+        1-D array of the positive Fourier frequencies, including Nyquist.
+        Size = (n_bins/2).
+
+    meta_dict : dict
+        Dictionary of necessary meta-parameters for data analysis.
 
     lo_freq : float
         The lower frequency bound for filtering the cross spectrum, in Hz. [0.0]
@@ -1065,20 +1195,19 @@ def filter_freq(freq_space_array, dt, n_bins, detchans, lo_freq, hi_freq):
 
     Returns
     -------
-    filt_freq_space_array : np.array of complex numbers
+    full_filt_cs_avg : np.array of complex numbers
         2-D array of the cross spectrum, zeroed out at non-filtered frequencies.
+        Size = (n_bins, detchans)
 
-    j_min : int
-        Index of the minimum frequency for filtering the averaged cross spectrum
-        (out of 0 to n_bins).
+    signal_ci_pow : np.array of floats
+        2-D array of the filtered power spectrum in the channels of interest.
+        Size = (n_bins, detchans)
 
-    j_max : int
-        Index of the maximum frequency for filtering the averaged cross spectrum
-        (out of 0 to n_bins).
+    signal_ref_pow : np.array of floats
+        1-D array of the filtered power spectrum in the reference band.
+        Size = (n_bins)
 
     """
-    ## Compute the Fourier frequencies
-    freq = fftpack.fftfreq(n_bins, d=dt)
 
     ## Get the indices of the beginning and end of the signal
     min_freq_mask = freq < lo_freq  # we want the last 'True' element
@@ -1086,29 +1215,145 @@ def filter_freq(freq_space_array, dt, n_bins, detchans, lo_freq, hi_freq):
     j_min = list(min_freq_mask).index(False)
     j_max = list(max_freq_mask).index(True)
 
-    # print("j min =", j_min)
-    # print("j max =", j_max)
-
     ## Make zeroed arrays to replace with
-    zero_front = np.zeros((j_min, detchans), dtype=np.complex128)
-    zero_end = np.zeros((len(freq_space_array) - j_max, detchans),
+    zero_front = np.zeros((j_min, meta_dict['detchans']), dtype=np.complex128)
+    zero_end = np.zeros((meta_dict['n_bins']/2 - j_max, meta_dict['detchans']),
             dtype=np.complex128)
 
     ## Concatenate the arrays together
-    filt_freq_space_array = np.concatenate((zero_front,
-            freq_space_array[j_min:j_max, :], zero_end), axis=0)
-
+    filt_cs_avg = np.concatenate((zero_front,
+            cs_avg[j_min:j_max, :], zero_end), axis=0)
+    print(np.shape(filt_cs_avg))
+    ## Want to also keep negative frequencies
+    full_filt_cs_avg = np.vstack((filt_cs_avg, filt_cs_avg[::-1,:]))
+    print(np.shape(full_filt_cs_avg))
     ## Check that the original array is the same shape as the filtered one
-    assert np.shape(freq_space_array) == np.shape(filt_freq_space_array), \
+    assert np.shape(cs_avg) == np.shape(full_filt_cs_avg), \
             "ERROR: Frequency-filtered cross spectrum does not have the same "\
             "size as the original cross spectrum. Something went wrong."
 
-    return filt_freq_space_array, j_min, j_max
+    ## Extract only the signal frequencies of the mean powers
+    signal_ci_pow = np.vstack((ci.power[j_min:j_max, :],
+                               ci.power[meta_dict['n_bins']-\
+                                        j_max:meta_dict['n_bins']-j_min, :]))
+    signal_ref_pow = np.hstack((ref.power[j_min:j_max],
+                                ref.power[meta_dict['n_bins']-\
+                                          j_max:meta_dict['n_bins']-j_min]))
+
+    return full_filt_cs_avg, signal_ci_pow, signal_ref_pow
+
+
+################################################################################
+def tie_harmonic_centroid(model):
+    """
+    Used in optimal filtering if filtering the harmonic as well.
+
+    How to use:
+    tied_parameters = {'x_0_1': tie_harmonic_centroid}
+    then within model definition, use tied=tied_parameters
+
+    Parameters
+    ----------
+    model : an astropy model
+    Returns
+    -------
+    x_0_1 : the centroid frequency of the harmonic.
+    """
+    x_0_1 = 2. * model.x_0_0
+    return x_0_1
+
+
+################################################################################
+def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
+                 harmonic=False):
+
+    print("In optimal filter")
+    # err_pow = ref.pos_power / np.sqrt(float(meta_dict['n_seg']))
+
+    freq_mask = (freq > lo_freq) & (freq < hi_freq)
+    power_ref_lim = ref.pos_power[freq_mask]
+    freq_lim = freq[freq_mask]
+
+    npn = power_ref_lim * freq_lim
+    noise_init = powerlaws.PowerLaw1D(amplitude=1E8, x_0=1., alpha=-1.,
+                                      bounds={'alpha':(-1.2, -0.8),
+                                              'x_0':(0.8, 1.2)})
+                                  #fixed={'x_0': True, 'alpha': True})
+    qpo_init = models.Lorentz1D(amplitude=1E11, x_0=4.3240, fwhm=0.4863,
+                                bounds={'fwhm': (0, 2.0),
+                                        'x_0': (lo_freq, hi_freq)})
+    #                             fixed={'fwhm': True})
+    # print("WARNING: fwhm is frozen at 0.4863.")
+    ## TODO: take FWHM from the power spectrum fit.
+
+    tied_parameters = {'x_0_2': tie_harmonic_centroid}
+
+    if harmonic is False:
+        qpo_model = noise_init + qpo_init
+    else:
+        harmonic_init = models.Lorentz1D(amplitude=1E11, x_0=hi_freq-1.,
+                                         fwhm=0.3, tied=tied_parameters,
+                                         bounds={'fwhm': (0, 2.0)})
+        qpo_model = noise_init + qpo_init + harmonic_init
+
+    np.random.seed(0)
+    fit_qpo = fitting.LevMarLSQFitter()
+    qpo_and_noise = fit_qpo(qpo_model, freq_lim, npn)
+
+    # print(qpo_and_noise)
+    if harmonic is False:
+        qpo_filter_model = models.Lorentz1D(amplitude=qpo_and_noise.amplitude_1,
+                                            x_0=qpo_and_noise.x_0_1,
+                                            fwhm=qpo_and_noise.fwhm_1)
+    else:
+        qpo_filter_model = models.Lorentz1D(amplitude=qpo_and_noise.amplitude_1,
+                                            x_0=qpo_and_noise.x_0_1,
+                                            fwhm=qpo_and_noise.fwhm_1) + \
+                           models.Lorentz1D(amplitude=qpo_and_noise.amplitude_2,
+                                            x_0=qpo_and_noise.x_0_2,
+                                            fwhm=qpo_and_noise.fwhm_2)
+
+    temp1 = qpo_and_noise.x_0_1 - qpo_and_noise.fwhm_1 / 2
+    temp2 = qpo_and_noise.x_0_1 + qpo_and_noise.fwhm_1 / 2
+    temp3 = qpo_and_noise.x_0_2 - qpo_and_noise.fwhm_2 / 2
+    temp4 = qpo_and_noise.x_0_2 + qpo_and_noise.fwhm_2 / 2
+
+    plt.figure(figsize=(10,7.5))
+    plt.plot(freq, ref.pos_power * freq, 'ko', label="Data")
+    plt.plot(freq, qpo_and_noise(freq), label="Filter", lw=2)
+    plt.vlines(temp1, ymin=0, ymax=1.1E11, color='magenta')
+    plt.vlines(temp2, ymin=0, ymax=1.1E11, color='magenta')
+    plt.vlines(temp3, ymin=0, ymax=1.1E11, color='purple')
+    plt.vlines(temp4, ymin=0, ymax=1.1E11, color='purple')
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Raw power * frequency")
+    plt.legend(loc=2)
+    plt.savefig("./optimal_filter.png")
+    # plt.show()
+
+    filter_ratio = np.where(freq != 0, qpo_filter_model(freq) / \
+                            qpo_and_noise(freq), 0.)
+
+    shortened_filter_ratio = filter_ratio[1:-1]
+    full_filt = np.append(filter_ratio, shortened_filter_ratio[::-1])
+
+    ## Filtering the reference band power spectrum
+    ref_pow_filt = ref.power * full_filt
+
+    ## Broadcasting the filter for detchans
+    full_filt = np.resize(np.repeat(full_filt, meta_dict['detchans']),
+            (meta_dict['n_bins'], meta_dict['detchans']))
+
+    ## Filtering the cross spectrum and ci power spectrum
+    cs_filt = (cs_avg.real * full_filt) + (1j * cs_avg.imag)
+    ci_pow_filt = ci.power * full_filt
+
+    return cs_filt, ci_pow_filt, ref_pow_filt
 
 
 ################################################################################
 def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
-        noisy=True):
+        filter_harmonic=False, noisy=True):
     """
     WARNING: Has not been tested lately!!
 
@@ -1141,9 +1386,16 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
     hi_freq : float
         The upper frequency bound for filtering the cross spectrum, in Hz. [0.0]
 
+    filter_harmonic : bool
+        If true, the filter will include the harmonic. The lo_freq - hi_freq
+        range must then include the harmonic! This isn't checked. If
+        filtering=False, this does nothing. But then we wouldn't get to this
+        method anyways. [False]
+
     noisy : bool
         If True, data has Poisson noise in it that must be subtracted away. If
         False, using simulated data without Poisson noise.
+
 
     Returns
     -------
@@ -1154,12 +1406,26 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
         The error on the cross-correlation function.
 
     """
-    ## Filter the cross spectrum in frequency
-    filtered_cs_avg, j_min, j_max = filter_freq(cs_avg, meta_dict['dt'], \
-            meta_dict['n_bins'], meta_dict['detchans'], lo_freq, hi_freq)
+    nyq_index = meta_dict['n_bins'] / 2
+    if len(ref.power) == meta_dict['n_bins']:
+        ref.pos_power = ref.power[0:nyq_index + 1]
 
-    ## Absolute rms norms of poisson noise
+    ## Compute the Fourier frequencies
+    freq_long = fftpack.fftfreq(meta_dict['n_bins'], d=np.mean(meta_dict['dt']))
+    freq = np.abs(freq_long[0:nyq_index + 1])
+
+    ## Apply optimal filter to cross-spectrum
+    filtered_cs_avg, signal_ci_pow, signal_ref_pow = optimal_filt(cs_avg,
+            ref, ci, freq, meta_dict, lo_freq, hi_freq,
+            harmonic=filter_harmonic)
+
+    ## Apply tophat filter to cross-spectrum
+    # filtered_cs_avg, signal_ci_pow, signal_ref_pow = tophat_filt(cs_avg, ref,
+    #         ci, freq, meta_dict, lo_freq, hi_freq)
+
+    ## Poisson noise level in absolute rms^2 norm
     noise_ci = 2.0 * ci.mean_rate
+    noise_ci[noise_ci <= 0] = 0.0
     noise_ref = 2.0 * ref.mean_rate
 
     ## If there's no noise in a (simulated) power spectrum, noise level = 0
@@ -1167,37 +1433,36 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
         noise_ci = np.zeros(meta_dict['detchans'])
         noise_ref = 0
 
-    noise_ref_array = np.repeat(noise_ref, meta_dict['detchans'])
-
-    ## Extract only the signal frequencies of the mean powers
-    signal_ci_pow = np.float64(ci.power[j_min:j_max, :])
-    signal_ref_pow = np.float64(ref.power[j_min:j_max])
-
     ## Apply absolute rms2 normalization to power spectra, subtract noise
-    signal_ci_pow = raw_to_absrms(signal_ci_pow, ci.mean_rate, \
-            meta_dict['n_bins'], meta_dict['dt'], noisy=noisy)
-    signal_ref_pow = raw_to_absrms(signal_ref_pow, ref.mean_rate, \
-            meta_dict['n_bins'], meta_dict['dt'], noisy=noisy)
+    signal_ci_pow = raw_to_absrms(signal_ci_pow, ci.mean_rate,
+            meta_dict['n_bins'], np.mean(meta_dict['dt']), noisy=noisy)
+    signal_ref_pow = raw_to_absrms(signal_ref_pow, ref.mean_rate,
+            meta_dict['n_bins'], np.mean(meta_dict['dt']), noisy=noisy)
+
+    ## If the power is negative, set it equal to zero.
+    signal_ref_pow[signal_ref_pow < 0] = 0.
+    signal_ci_pow[signal_ci_pow < 0] = 0.
 
     # print("Frac RMS of reference band:", ref.rms / ref.mean_rate)
     ## in frac rms units here -- should be few percent
 
     ## Broadcast signal_ref_pow into same shape as signal_ci_pow
     signal_ref_pow = np.resize(np.repeat(signal_ref_pow, meta_dict['detchans']),
-        np.shape(signal_ci_pow))
+            np.shape(signal_ci_pow))
     assert np.shape(signal_ref_pow) == np.shape(signal_ci_pow)
 
     ## Compute amplitude of noise in the cross spectrum
     temp = (noise_ci * signal_ref_pow) + (noise_ref * signal_ci_pow) + \
             (noise_ci * noise_ref)
+
     cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / np.float(meta_dict['n_seg']))
 
-    ## Compute amplitude of signal in the cross spectrum
-    temp1 = np.absolute(cs_avg[j_min:j_max, :]) * (2.0 * meta_dict['dt'] / \
+    ## Compute amplitude of (filtered) signal in the cross spectrum
+    temp1 = cs_avg * (2.0 * np.mean(meta_dict['dt']) /
             np.float(meta_dict['n_bins']))
     cs_signal_amp = np.sum(temp1, axis=0)
 
-    ## Assume that cs_noise_amp and cs_signal_amp are float arrays, size 64
+    ## Assume cs_noise_amp and cs_signal_amp are float arrays, size DETCHANS
     with np.errstate(all='ignore'):
         error_ratio = np.where(cs_signal_amp != 0, cs_noise_amp / \
                 cs_signal_amp, 0)
@@ -1212,7 +1477,12 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
     ccf_rms_ci = np.sqrt(np.var(ccf_end, axis=0, ddof=1))
     ccf_error = ccf_rms_ci * error_ratio
 
-    return ccf_end, ccf_error
+    ## Re-sizing the error array to have the same shape as ccf_end
+    ccf_error = np.resize(np.repeat(ccf_error, meta_dict['n_bins']),
+                          (meta_dict['detchans'], meta_dict['n_bins']))
+    ccf_error = ccf_error.T
+
+    return ccf_end.real, ccf_error.real
 
 
 ################################################################################
@@ -1282,7 +1552,7 @@ def unfilt_cs_to_ccf_w_err(cs_array, meta_dict, ref):
 ################################################################################
 def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         n_seconds=64, dt_mult=64, test=False, filtering=False, lo_freq=0.0,
-        hi_freq=0.0, adjust=False):
+        hi_freq=0.0, adjust=False, harmonic=False):
     """
     Read in one event list, split into reference band and channels of
     interest (CoI), make segments and populates them to give them length
@@ -1333,9 +1603,14 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         in effect if filtering=True. Must be hi_freq >= lo_freq (checked with
         assert statement). [0.0]
 
-    adjust_seg : int
-        How much to adjust each n_bin by to artificially shift the QPO in
-        frequency. [0]
+    adjust : bool
+        If true, the QPOs are lined up (adjusted) in frequency per obsID.
+        [False]
+
+    harmonic : bool
+        If true, the filter will include the harmonic. The lo_freq - hi_freq
+        range must then include the harmonic! This isn't checked. If
+        filtering=False, this does nothing. [False]
 
     Returns
     -------
@@ -1544,7 +1819,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
 
     if meta_dict['filter']:
         ccf_avg, ccf_error = filt_cs_to_ccf_w_err(avg_cross_spec, meta_dict,
-                ci_total, ref_total, lo_freq, hi_freq, noisy=True)
+                ci_total, ref_total, lo_freq, hi_freq, filter_harmonic=harmonic,
+                noisy=True)
     else:
         ccf_avg, ccf_error = unfilt_cs_to_ccf_w_err(total_cross_spec,
                 meta_dict, ref_total)
@@ -1644,6 +1920,11 @@ if __name__ == "__main__":
             dest='adjust', help="Int flag: 0 if not adjusting segment length, "\
             "1 if adjusting segment length to line up peak frequency of QPOs."\
             " [1]")
+
+    parser.add_argument('--harmonic', default=0, type=int, choices={0,1},
+                        dest='filter_harmonic', help="Int flag: 0 if not "\
+                        "including harmonic in filter, 1 if yes. If filter="\
+                        "'no' then this makes no difference. [0]")
     # parser.add_argument('-a', '--adjust', default=False, action='store_true',
     #         dest='adjust', help="If present, artificially adjusts the "\
     #         "frequency of the QPO by changing the segment length. [False]")
@@ -1656,6 +1937,9 @@ if __name__ == "__main__":
     adjust = False
     if args.adjust == 1:
         adjust = True
+    filter_harmonic = False
+    if args.filter_harmonic == 1:
+        filter_harmonic = True
 
     filtering = False
     lo_freq = -1
@@ -1673,6 +1957,7 @@ if __name__ == "__main__":
     main(args.infile, args.outfile, ref_band=args.ref_band_file,
             bkgd_file=args.bkgd_file, n_seconds=args.n_seconds,
             dt_mult=args.dt_mult, test=test, filtering=filtering,
-            lo_freq=lo_freq, hi_freq=hi_freq, adjust=adjust)
+            lo_freq=lo_freq, hi_freq=hi_freq, adjust=adjust,
+            harmonic=filter_harmonic)
 
 ################################################################################
