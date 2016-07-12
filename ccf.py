@@ -540,18 +540,19 @@ def make_cs(rate_ci, rate_ref, meta_dict):
     fft_data_ref = np.resize(np.repeat(fft_data_ref, meta_dict['detchans']), \
         (meta_dict['n_bins'], meta_dict['detchans']))
 
-    print(fft_data_ref[528,3])
-    print(fft_data_ci[254,3])
-    fft_data_ref[528:561,:].imag = fft_data_ci[254:287,:].imag
-    print(fft_data_ref[528,3])
-    print("\n")
-    print(fft_data_ref[-529,3])
-    print(fft_data_ci[-255,3])
-    fft_data_ref[-561:-528,:].imag = fft_data_ci[-287:-254,:].imag
-    print(fft_data_ref[-529,3])
+    ## print(fft_data_ref[528,3])
+    ## print(fft_data_ci[254,3])
+    # fft_data_ref[528:561,:] = fft_data_ci[254:287,:]
+    ## print(fft_data_ref[528,3])
+    ## print("\n")
+    ## print(fft_data_ref[-529,3])
+    ## print(fft_data_ci[-255,3])
+    # fft_data_ref[-561:-528,:] = fft_data_ci[-287:-254,:]
+    ## print(fft_data_ref[-529,3])
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
-    exit()
+    ## print(cs_seg[529:532,3])
+    ## exit()
     return cs_seg, ci_seg, ref_seg
 
 #
@@ -710,7 +711,7 @@ def fits_in(in_file, meta_dict, test=False):
     if meta_dict['n_bins'] == 32768:
         print_iterator = int(10)
     elif meta_dict['n_bins'] < 32768:
-        print_iterator = int(20)
+        print_iterator = int(10)   #TODO: change back to 20
     else:
         print_iterator = int(1)
 
@@ -992,6 +993,7 @@ def fits_in(in_file, meta_dict, test=False):
 
                 if n_seg % print_iterator == 0:
                     print("\t", n_seg)
+                    print(cs_seg[529:532,3])
 
                 if test is True and n_seg == 1:  # For testing
                     break
@@ -1267,7 +1269,6 @@ def tie_harmonic_centroid(model):
 def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
                  harmonic=False):
 
-    print("In optimal filter")
     # err_pow = ref.pos_power / np.sqrt(float(meta_dict['n_seg']))
 
     freq_mask = (freq > lo_freq) & (freq < hi_freq)
@@ -1276,8 +1277,8 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
 
     npn = power_ref_lim * freq_lim
     noise_init = powerlaws.PowerLaw1D(amplitude=1E8, x_0=1., alpha=-1.,
-                                      bounds={'alpha':(-1.2, -0.8),
-                                              'x_0':(0.8, 1.2)})
+                                      bounds={'alpha': (-1.2, -0.8),
+                                              'x_0': (0.8, 1.2)})
                                   #fixed={'x_0': True, 'alpha': True})
     qpo_init = models.Lorentz1D(amplitude=1E11, x_0=4.3240, fwhm=0.4863,
                                 bounds={'fwhm': (0, 2.0),
@@ -1286,11 +1287,10 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
     # print("WARNING: fwhm is frozen at 0.4863.")
     ## TODO: take FWHM from the power spectrum fit.
 
-    tied_parameters = {'x_0_2': tie_harmonic_centroid}
-
     if harmonic is False:
         qpo_model = noise_init + qpo_init
     else:
+        tied_parameters = {'x_0_2': tie_harmonic_centroid}
         harmonic_init = models.Lorentz1D(amplitude=1E11, x_0=hi_freq-1.,
                                          fwhm=0.3, tied=tied_parameters,
                                          bounds={'fwhm': (0, 2.0)})
@@ -1300,7 +1300,8 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
     fit_qpo = fitting.LevMarLSQFitter()
     qpo_and_noise = fit_qpo(qpo_model, freq_lim, npn)
 
-    # print(qpo_and_noise)
+    print(fit_qpo.fit_info['message'])
+
     if harmonic is False:
         qpo_filter_model = models.Lorentz1D(amplitude=qpo_and_noise.amplitude_1,
                                             x_0=qpo_and_noise.x_0_1,
@@ -1315,18 +1316,21 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
 
     temp1 = qpo_and_noise.x_0_1 - qpo_and_noise.fwhm_1 / 2
     temp2 = qpo_and_noise.x_0_1 + qpo_and_noise.fwhm_1 / 2
-    temp3 = qpo_and_noise.x_0_2 - qpo_and_noise.fwhm_2 / 2
-    temp4 = qpo_and_noise.x_0_2 + qpo_and_noise.fwhm_2 / 2
+    if harmonic is True:
+        temp3 = qpo_and_noise.x_0_2 - qpo_and_noise.fwhm_2 / 2
+        temp4 = qpo_and_noise.x_0_2 + qpo_and_noise.fwhm_2 / 2
 
     plt.figure(figsize=(10,7.5))
     plt.plot(freq, ref.pos_power * freq, 'ko', label="Data")
     plt.plot(freq, qpo_and_noise(freq), label="Filter", lw=2)
     plt.vlines(temp1, ymin=0, ymax=1.1E11, color='magenta')
     plt.vlines(temp2, ymin=0, ymax=1.1E11, color='magenta')
-    plt.vlines(temp3, ymin=0, ymax=1.1E11, color='purple')
-    plt.vlines(temp4, ymin=0, ymax=1.1E11, color='purple')
+    if harmonic is True:
+        plt.vlines(temp3, ymin=0, ymax=1.1E11, color='purple')
+        plt.vlines(temp4, ymin=0, ymax=1.1E11, color='purple')
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Raw power * frequency")
+    plt.xlim(0, freq[-1])
     plt.legend(loc=2)
     plt.savefig("./optimal_filter.png")
     # plt.show()
@@ -1355,13 +1359,16 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
 def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
         filter_harmonic=False, noisy=True):
     """
-    WARNING: Has not been tested lately!!
-
     Filter the cross-spectrum in frequency space, take the iFFT of the
     filtered cross spectrum to get the cross-correlation function, and compute
     the error on the cross-correlation function. Note that error is definitely
     NOT independent between time bins due to the filtering! But is still
     independent between energy bins.
+
+    Keep in mind that if adjusting segments to line up QPOs that shift in
+    frequency between segments, the rms of the avg ref power spectrum and the
+    avg of the rmses of each segment's ref power spectrum are not the same. This
+    has been accounted for here.
 
     Parameters
     ----------
@@ -1425,7 +1432,7 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
 
     ## Poisson noise level in absolute rms^2 norm
     noise_ci = 2.0 * ci.mean_rate
-    noise_ci[noise_ci <= 0] = 0.0
+    noise_ci[noise_ci <= 0] = 0.0  ## Can't have a negative noise
     noise_ref = 2.0 * ref.mean_rate
 
     ## If there's no noise in a (simulated) power spectrum, noise level = 0
@@ -1644,6 +1651,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         out_dir = os.path.dirname(out_file)
         basename = os.path.basename(out_file)
         prefix = basename.split('_')[0]
+        if "test" in basename:
+            prefix = basename.split('_')[1]
         adjust_file = out_dir+"/"+prefix+"_t"+str(dt_mult)+"_"+str(n_seconds)+\
 						   "sec_adjustby.txt"
         if os.path.isfile(adjust_file):
@@ -1835,6 +1844,9 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ##########
     ## Output
     ##########
+
+    print(avg_cross_spec[529:532,3])
+    print(ccf_avg[0:4,3])
 
     if len(data_files) == 1:
         file_description = "Cross-correlation function of one observation"
