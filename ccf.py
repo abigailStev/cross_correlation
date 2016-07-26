@@ -590,12 +590,12 @@ def make_cs(rate_ci, rate_ref, meta_dict):
 
     ## print(fft_data_ref[528,3])
     ## print(fft_data_ci[254,3])
-    # fft_data_ref[528:561,:] = fft_data_ref[254:287,:]
+    fft_data_ref[515:569,:] = np.repeat(fft_data_ref[257:284,:],2, axis=0)
     ## print(fft_data_ref[528,3])
     ## print("\n")
     ## print(fft_data_ref[-529,3])
     ## print(fft_data_ci[-255,3])
-    # fft_data_ref[-561:-528,:] = fft_data_ref[-287:-254,:]
+    fft_data_ref[-568:-514,:] = np.repeat(fft_data_ref[-283:-256,:],2, axis=0)
     ## print(fft_data_ref[-529,3])
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
@@ -1041,7 +1041,6 @@ def fits_in(in_file, meta_dict, test=False):
 
                 if n_seg % print_iterator == 0:
                     print("\t", n_seg)
-                    print(cs_seg[529:532,3])
 
                 if test is True and n_seg == 1:  # For testing
                     break
@@ -1331,22 +1330,22 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
     fit_noise = fitting.LevMarLSQFitter()
     hif_noise = fit_noise(noise_model, hif, npn_hif)
 
-    ## Now, only fitting nu*P(nu) minus the Poisson noise level
+    ## Now, only fitting QPO model to nu*P(nu) minus the Poisson noise level
     npn_fit = ref.pos_power * freq - hif_noise(freq)
 
     ## Defining a model for the broadband noise, as a Lorentzian
-    noise_init = bbn(amp=1.0E6, x_0=0.9, fwhm=10.)
+    noise_init = bbn(amp=1E6, x_0=0.9, fwhm=10.)
     noise_init.fwhm.min = 3.0
-    noise_init.amp.min = 1.0E3
-    noise_init.amp.max = 1.0E10
+    noise_init.amp.min = 1E3
+    noise_init.amp.max = 1E11
     noise_init.x_0.min = 0.01
-    noise_init.x_0.max = hi_freq
+    noise_init.x_0.max = 2.0
 
     ## Defining the QPO model, one for one Lorentzian (just the fundamental)
     if harmonic is False:
         qpo_init = qpo_fundamental_only(amp_f=1E11, x_0_f=4.3240, fwhm_f=0.5)
         qpo_init.amp_f.min = 1E5
-        qpo_init.amp_f.max = 1.0E13
+        qpo_init.amp_f.max = 1E13
         qpo_init.x_0_f.min = lo_freq
         qpo_init.x_0_f.max = hi_freq
         qpo_init.fwhm_f.min = 0.01
@@ -1356,12 +1355,12 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
         qpo_init = qpo_and_harmonic(amp_f=1E11, x_0_f=4.3240, fwhm_f=0.5,
                                     amp_h=1E10, fwhm_h=0.7)
         qpo_init.amp_f.min = 1E5
-        qpo_init.amp_f.max = 1.0E12
+        qpo_init.amp_f.max = 1E12
         qpo_init.x_0_f.min = lo_freq
         qpo_init.x_0_f.max = hi_freq
         qpo_init.fwhm_f.min = 0.01
         qpo_init.fwhm_f.max = 1.0
-        qpo_init.amp_h.min = 1.0E5
+        qpo_init.amp_h.min = 1E5
         qpo_init.fwhm_h.min = 0.1
         qpo_init.fwhm_h.max = 1.0
 
@@ -1401,7 +1400,7 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
 
     plt.figure(figsize=(10, 7.5))
     plt.plot(freq, ref.pos_power * freq, 'ko', label="Data")
-    plt.plot(freq, qpo_and_noise(freq) + hif_noise(freq), label="Filter", lw=2)
+    plt.plot(freq, qpo_and_noise(freq) + hif_noise(freq), label="Model", lw=2)
     plt.vlines(temp1, ymin=0, ymax=1.1E11, color='magenta')
     plt.vlines(temp2, ymin=0, ymax=1.1E11, color='magenta')
     if harmonic is True:
@@ -1414,7 +1413,7 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
     plt.xlim(1, 20)
     plt.legend(loc=2)
     plt.savefig("./optimal_filter.png")
-    plt.show()
+    # plt.show()
 
     filter_ratio = np.where(freq != 0, qpo_filter_model(freq) / \
                             (qpo_and_noise(freq) + hif_noise(freq)), 0.)
@@ -1926,8 +1925,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ## Output
     ##########
 
-    print(avg_cross_spec[529:532,3])
-    print(ccf_avg[0:4,3])
+    # print(avg_cross_spec[529:532,3])
+    # print(ccf_avg[0:4,3])
 
     if len(data_files) == 1:
         file_description = "Cross-correlation function of one observation"
