@@ -1319,8 +1319,22 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
 
     # err_pow = ref.pos_power / np.sqrt(float(meta_dict['n_seg']))
 
-    npn = ref.pos_power * freq
+    ## First, fit a power law to the Poisson noise level and subtract that off
+    hi_freq_mask = freq > 25.0
+    hif = freq[hi_freq_mask]
+    power_ref_hif = ref.pos_power[hi_freq_mask]
+    noise_model = powerlaws.PowerLaw1D(amplitude=1E10, x_0=1.0, alpha=-1.,
+                                       bounds={'alpha': (-1.2, -0.8),
+                                               'x_0': (0.8, 1.2)})
+    npn_hif = power_ref_hif * hif
+    np.random.seed(0)
+    fit_noise = fitting.LevMarLSQFitter()
+    hif_noise = fit_noise(noise_model, hif, npn_hif)
 
+    ## Now, only fitting nu*P(nu) minus the Poisson noise level
+    npn_fit = ref.pos_power * freq - hif_noise(freq)
+
+    ## Defining a model for the broadband noise, as a Lorentzian
     noise_init = bbn(amp=1.0E6, x_0=0.9, fwhm=10.)
     noise_init.fwhm.min = 3.0
     noise_init.amp.min = 1.0E3
@@ -1328,6 +1342,7 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
     noise_init.x_0.min = 0.01
     noise_init.x_0.max = hi_freq
 
+    ## Defining the QPO model, one for one Lorentzian (just the fundamental)
     if harmonic is False:
         qpo_init = qpo_fundamental_only(amp_f=1E11, x_0_f=4.3240, fwhm_f=0.5)
         qpo_init.amp_f.min = 1E5
@@ -1336,6 +1351,7 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
         qpo_init.x_0_f.max = hi_freq
         qpo_init.fwhm_f.min = 0.01
         qpo_init.fwhm_f.max = 1.0
+    ## And the other for two Lorentzians (fundamental and harmonic)
     else:
         qpo_init = qpo_and_harmonic(amp_f=1E11, x_0_f=4.3240, fwhm_f=0.5,
                                     amp_h=1E10, fwhm_h=0.7)
@@ -1349,18 +1365,23 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
         qpo_init.fwhm_h.min = 0.1
         qpo_init.fwhm_h.max = 1.0
 
+    ## Make a compound model of the BBN and QPO(s)
     qpo_model = noise_init + qpo_init
 
+    ## Fit it to the data (minus the Poisson noise level)
     np.random.seed(0)
     fit_qpo = fitting.LevMarLSQFitter()
-    qpo_and_noise = fit_qpo(qpo_model, freq, npn)
+    qpo_and_noise = fit_qpo(qpo_model, freq, npn_fit)
 
+    ## Print some information about the fit
     print(fit_qpo.fit_info['message'])
     print(qpo_and_noise[0])
     print(qpo_and_noise[1])
     print("Fundamental centroid:", qpo_and_noise.x_0_f_1.value)
     print("Fundamental Q:", qpo_and_noise.x_0_f_1.value / qpo_and_noise.fwhm_f_1.value)
 
+    ## Make a model for the filter, of just the QPO portion, with values from
+    # qpo_and_noise model above
     if harmonic is False:
         qpo_filter_model = qpo_fundamental_only(amp_f=qpo_and_noise.amp_f_1.value,
                                             x_0_f=qpo_and_noise.x_0_f_1.value,
@@ -1380,7 +1401,7 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
 
     plt.figure(figsize=(10, 7.5))
     plt.plot(freq, ref.pos_power * freq, 'ko', label="Data")
-    plt.plot(freq, qpo_and_noise(freq), label="Filter", lw=2)
+    plt.plot(freq, qpo_and_noise(freq) + hif_noise(freq), label="Filter", lw=2)
     plt.vlines(temp1, ymin=0, ymax=1.1E11, color='magenta')
     plt.vlines(temp2, ymin=0, ymax=1.1E11, color='magenta')
     if harmonic is True:
@@ -1396,7 +1417,7 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
     plt.show()
 
     filter_ratio = np.where(freq != 0, qpo_filter_model(freq) / \
-                            qpo_and_noise(freq), 0.)
+                            (qpo_and_noise(freq) + hif_noise(freq)), 0.)
 
     shortened_filter_ratio = filter_ratio[1:-1]
     full_filt = np.append(filter_ratio, shortened_filter_ratio[::-1])
