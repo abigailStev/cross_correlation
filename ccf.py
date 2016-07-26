@@ -34,6 +34,7 @@ import subprocess
 from astropy.io import fits
 from astropy.table import Table, Column
 from astropy.modeling import powerlaws, models, fitting
+from astropy.modeling.models import custom_model
 import matplotlib.pyplot as plt
 
 ## These are things I've written.
@@ -47,12 +48,59 @@ __year__ = "2014-2016"
 
 ################################################################################
 def find_nearest(array, value):
+    """
+    Thanks StackOverflow!
+
+    Parameters
+    ----------
+    array : np.array of ints or floats
+        1-D array of numbers to search through. Should already be sorted from
+        low values to high values.
+
+    value : int or float
+        The value you want to find the closest to in the array.
+
+    Returns
+    -------
+    array[idx] : int or float
+        The array value that is closest to the input value.
+
+    idx : int
+        The index of the array of the closest value.
+    """
     idx = np.searchsorted(array, value, side="left")
     if idx == len(array) or np.fabs(value - array[idx-1]) < \
             np.fabs(value - array[idx]):
         return array[idx-1], idx-1
     else:
         return array[idx], idx
+
+
+@custom_model
+def bbn(x, amp=1.0, x_0=0.9, fwhm=3.0):
+    numerator = fwhm / (np.pi * 2.0)
+    denominator = (x - x_0) ** 2 + (1.0 / 2.0 * fwhm) ** 2
+    L = (numerator / denominator) * amp * x
+    return L
+
+
+@custom_model
+def qpo_and_harmonic(x, amp_f=1., x_0_f=3., fwhm_f=0.5, amp_h=1., fwhm_h=0.8):
+    numerator1 = fwhm_f / (np.pi * 2.0)
+    denominator1 = (x - x_0_f) ** 2 + (1.0 / 2.0 * fwhm_f) ** 2
+    L1 = (numerator1 / denominator1) * amp_f * x
+    numerator2 = fwhm_h / (np.pi * 2.0)
+    denominator2 = (x - 2 * x_0_f) ** 2 + (1.0 / 2.0 * fwhm_h) ** 2
+    L2 = (numerator2 / denominator2) * amp_h * x
+    return L1 + L2
+
+
+@custom_model
+def qpo_fundamental_only(x, amp_f=1., x_0_f=3., fwhm_f=0.5):
+    numerator = fwhm_f / (np.pi * 2.0)
+    denominator = (x - x_0_f) ** 2 + (1.0 / 2.0 * fwhm_f) ** 2
+    L = (numerator / denominator) * amp_f * x
+    return L
 
 
 ################################################################################
@@ -542,12 +590,12 @@ def make_cs(rate_ci, rate_ref, meta_dict):
 
     ## print(fft_data_ref[528,3])
     ## print(fft_data_ci[254,3])
-    # fft_data_ref[528:561,:] = fft_data_ci[254:287,:]
+    # fft_data_ref[528:561,:] = fft_data_ref[254:287,:]
     ## print(fft_data_ref[528,3])
     ## print("\n")
     ## print(fft_data_ref[-529,3])
     ## print(fft_data_ci[-255,3])
-    # fft_data_ref[-561:-528,:] = fft_data_ci[-287:-254,:]
+    # fft_data_ref[-561:-528,:] = fft_data_ref[-287:-254,:]
     ## print(fft_data_ref[-529,3])
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
@@ -1160,7 +1208,7 @@ def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref, lo_freq=-1.0,
     out_table.meta['FILTER'] = str(meta_dict['filter'])
     out_table.meta['FILTFREQ'] = "%f:%f" % (lo_freq, hi_freq)
     out_table.meta['ADJUST'] = "%s" % str(meta_dict['adjust_seg'])
-    out_table.write(out_file, overwrite=True)
+    out_table.write(out_file, overwrite=True, format='fits')
 
 
 ################################################################################
@@ -1271,69 +1319,81 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
 
     # err_pow = ref.pos_power / np.sqrt(float(meta_dict['n_seg']))
 
-    freq_mask = (freq > lo_freq) & (freq < hi_freq)
-    power_ref_lim = ref.pos_power[freq_mask]
-    freq_lim = freq[freq_mask]
+    npn = ref.pos_power * freq
 
-    npn = power_ref_lim * freq_lim
-    noise_init = powerlaws.PowerLaw1D(amplitude=1E8, x_0=1., alpha=-1.,
-                                      bounds={'alpha': (-1.2, -0.8),
-                                              'x_0': (0.8, 1.2)})
-                                  #fixed={'x_0': True, 'alpha': True})
-    qpo_init = models.Lorentz1D(amplitude=1E11, x_0=4.3240, fwhm=0.4863,
-                                bounds={'fwhm': (0, 2.0),
-                                        'x_0': (lo_freq, hi_freq)})
-    #                             fixed={'fwhm': True})
-    # print("WARNING: fwhm is frozen at 0.4863.")
-    ## TODO: take FWHM from the power spectrum fit.
+    noise_init = bbn(amp=1.0E6, x_0=0.9, fwhm=10.)
+    noise_init.fwhm.min = 3.0
+    noise_init.amp.min = 1.0E3
+    noise_init.amp.max = 1.0E10
+    noise_init.x_0.min = 0.01
+    noise_init.x_0.max = hi_freq
 
     if harmonic is False:
-        qpo_model = noise_init + qpo_init
+        qpo_init = qpo_fundamental_only(amp_f=1E11, x_0_f=4.3240, fwhm_f=0.5)
+        qpo_init.amp_f.min = 1E5
+        qpo_init.amp_f.max = 1.0E13
+        qpo_init.x_0_f.min = lo_freq
+        qpo_init.x_0_f.max = hi_freq
+        qpo_init.fwhm_f.min = 0.01
+        qpo_init.fwhm_f.max = 1.0
     else:
-        tied_parameters = {'x_0_2': tie_harmonic_centroid}
-        harmonic_init = models.Lorentz1D(amplitude=1E11, x_0=hi_freq-1.,
-                                         fwhm=0.3, tied=tied_parameters,
-                                         bounds={'fwhm': (0, 2.0)})
-        qpo_model = noise_init + qpo_init + harmonic_init
+        qpo_init = qpo_and_harmonic(amp_f=1E11, x_0_f=4.3240, fwhm_f=0.5,
+                                    amp_h=1E10, fwhm_h=0.7)
+        qpo_init.amp_f.min = 1E5
+        qpo_init.amp_f.max = 1.0E12
+        qpo_init.x_0_f.min = lo_freq
+        qpo_init.x_0_f.max = hi_freq
+        qpo_init.fwhm_f.min = 0.01
+        qpo_init.fwhm_f.max = 1.0
+        qpo_init.amp_h.min = 1.0E5
+        qpo_init.fwhm_h.min = 0.1
+        qpo_init.fwhm_h.max = 1.0
+
+    qpo_model = noise_init + qpo_init
 
     np.random.seed(0)
     fit_qpo = fitting.LevMarLSQFitter()
-    qpo_and_noise = fit_qpo(qpo_model, freq_lim, npn)
+    qpo_and_noise = fit_qpo(qpo_model, freq, npn)
 
     print(fit_qpo.fit_info['message'])
+    print(qpo_and_noise[0])
+    print(qpo_and_noise[1])
+    print("Fundamental centroid:", qpo_and_noise.x_0_f_1.value)
+    print("Fundamental Q:", qpo_and_noise.x_0_f_1.value / qpo_and_noise.fwhm_f_1.value)
 
     if harmonic is False:
-        qpo_filter_model = models.Lorentz1D(amplitude=qpo_and_noise.amplitude_1,
-                                            x_0=qpo_and_noise.x_0_1,
-                                            fwhm=qpo_and_noise.fwhm_1)
+        qpo_filter_model = qpo_fundamental_only(amp_f=qpo_and_noise.amp_f_1.value,
+                                            x_0_f=qpo_and_noise.x_0_f_1.value,
+                                            fwhm_f=qpo_and_noise.fwhm_f_1.value)
     else:
-        qpo_filter_model = models.Lorentz1D(amplitude=qpo_and_noise.amplitude_1,
-                                            x_0=qpo_and_noise.x_0_1,
-                                            fwhm=qpo_and_noise.fwhm_1) + \
-                           models.Lorentz1D(amplitude=qpo_and_noise.amplitude_2,
-                                            x_0=qpo_and_noise.x_0_2,
-                                            fwhm=qpo_and_noise.fwhm_2)
+        qpo_filter_model = qpo_and_harmonic(amp_f=qpo_and_noise.amp_f_1.value,
+                                            x_0_f=qpo_and_noise.x_0_f_1.value,
+                                            fwhm_f=qpo_and_noise.fwhm_f_1.value,
+                                            amp_h=qpo_and_noise.amp_h_1.value,
+                                            fwhm_h=qpo_and_noise.fwhm_h_1.value)
 
-    temp1 = qpo_and_noise.x_0_1 - qpo_and_noise.fwhm_1 / 2
-    temp2 = qpo_and_noise.x_0_1 + qpo_and_noise.fwhm_1 / 2
-    if harmonic is True:
-        temp3 = qpo_and_noise.x_0_2 - qpo_and_noise.fwhm_2 / 2
-        temp4 = qpo_and_noise.x_0_2 + qpo_and_noise.fwhm_2 / 2
+        print("Harmonic centroid:", 2. * qpo_and_noise.x_0_f_1.value)
+        print("Harmonic Q:", 2.*qpo_and_noise.x_0_f_1.value / qpo_and_noise.fwhm_f_1.value)
 
-    plt.figure(figsize=(10,7.5))
+    temp1 = qpo_and_noise.x_0_f_1.value - qpo_and_noise.fwhm_f_1.value / 2
+    temp2 = qpo_and_noise.x_0_f_1.value + qpo_and_noise.fwhm_f_1.value / 2
+
+    plt.figure(figsize=(10, 7.5))
     plt.plot(freq, ref.pos_power * freq, 'ko', label="Data")
     plt.plot(freq, qpo_and_noise(freq), label="Filter", lw=2)
     plt.vlines(temp1, ymin=0, ymax=1.1E11, color='magenta')
     plt.vlines(temp2, ymin=0, ymax=1.1E11, color='magenta')
     if harmonic is True:
+        temp3 = 2. * qpo_and_noise.x_0_f_1.value - qpo_and_noise.fwhm_h_1.value / 2
+        temp4 = 2. * qpo_and_noise.x_0_f_1.value + qpo_and_noise.fwhm_h_1.value / 2
         plt.vlines(temp3, ymin=0, ymax=1.1E11, color='purple')
         plt.vlines(temp4, ymin=0, ymax=1.1E11, color='purple')
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Raw power * frequency")
-    plt.xlim(0, freq[-1])
+    plt.xlim(1, 20)
     plt.legend(loc=2)
     plt.savefig("./optimal_filter.png")
-    # plt.show()
+    plt.show()
 
     filter_ratio = np.where(freq != 0, qpo_filter_model(freq) / \
                             qpo_and_noise(freq), 0.)
@@ -1477,7 +1537,7 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
     ## Take the IFFT of the cross spectrum to get the CCF
     ccf_end = fftpack.ifft(filtered_cs_avg, axis=0)
 
-    ## Divide ccf by rms of signal in reference band
+    ## Divide average ccf by average rms of signal in reference band
     ccf_end *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
 
     ## Compute the error on the ccf
