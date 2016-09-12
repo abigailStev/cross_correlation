@@ -19,7 +19,7 @@ __year__ = "2014-2015"
 
 ################################################################################
 def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
-        frac_time, t_length=30):
+        delay, t_length=30):
     """
     Actually makes the plot.
 
@@ -45,11 +45,12 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
     chan : int
         The energy channel of the CCF plotted.
 
-    frac_time : int
-        The denominator of the fraction, in seconds, of the each x_bins bin.
+    delay : float
+        The time delay bin size in milliseconds, or dt*1000.
 
     t_length : int
-        The number of time bins to plot on either side of 0. [30]
+        The number of time bins to plot on either side of 0. Optional,
+        default=30.
 
     Returns
     -------
@@ -59,10 +60,13 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
     font_prop = font_manager.FontProperties(size=20)
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 6), dpi=300, tight_layout=True)
+    # fig, ax = plt.subplots(1, 1, figsize=(8,5), tight_layout=True)
+
     ax.plot(x_bins, ccf_amps, lw=2, c='black')
-#     ax.vlines(0.0, -1.5, 3.0, linestyle='dotted', color='black', lw=1.5)
-    # ax.hlines(0.0, -t_length, t_length, linestyle='dashed', color='black',
-    #           lw=1.5)
+    ax.vlines(0.0, -2., 4.0, linestyle='dotted', color='black', lw=1.5)
+    ax.hlines(0.0, -t_length, t_length, linestyle='dashed', color='black',
+              lw=1.5)
+
     # ax.errorbar(x_bins, ccf_amps, yerr=ccf_err, lw=2, c='black',
     #             drawstyle='steps-mid', elinewidth=1.5, capsize=1.5)
     # ax.plot([-10], [ccf_amps[n_bins/2-10]], "o", mfc='red', mew=1, mec='black',
@@ -74,9 +78,11 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
     # ax.plot([6], [ccf_amps[n_bins/2+6]], 's', mfc='blue', mew=1, mec='black',
     #         ms=25)
     # ax.set_xlabel(r'Time ($\times\,$8.15 ms)', fontproperties=font_prop)
+    ax.set_xlabel(r'Time-delay ($\times\,$%.2f$\,$ms)' % delay,
+                  fontproperties=font_prop)
     ax.set_ylabel(r'Deviation from mean (cts / s)', fontproperties=font_prop)
-    # ax.set_xlim(-t_length, t_length)
-    ax.set_xlim(0, t_length)
+    ax.set_xlim(-t_length, t_length)
+    # ax.set_xlim(0, t_length)
     # ax.set_ylim(-1.5, 3.0)
 
     ## Setting the axes' minor ticks. It's complicated.
@@ -94,6 +100,10 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
 
     ax.tick_params(axis='x', labelsize=18)
     ax.tick_params(axis='y', labelsize=18)
+    ax.tick_params(which='major', width=1.5, length=7)
+    ax.tick_params(which='minor', width=1.5, length=4)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(1.5)
     title="%s, Energy channel %d" % (prefix, chan)
     # ax.set_title(title, fontproperties=font_prop)
 
@@ -175,10 +185,11 @@ if __name__ == "__main__":
             plot_file = args.plot_root + "_chan_" + str(0) + str(i) + "." + \
                         args.plot_ext
         else:
-            plot_file = args.plot_root + "_chan_" + str(i) + "_longer." + args.plot_ext
+            plot_file = args.plot_root + "_chan_" + str(i) + "." + \
+                        args.plot_ext
 
 
         make_plot(time_bins, ccf_i, ccf_err_i, n_bins, args.prefix, plot_file,
-                i, frac_time, args.t_length)
+                i, dt*1000., args.t_length)
 
 ################################################################################
