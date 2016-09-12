@@ -21,7 +21,7 @@ __year__ = "2014-2015"
 
 
 ################################################################################
-def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
+def make_plot(ccf, t_bins, mean_rate_ci, t_length, delay,
         plot_file, energies=None, prefix="--", tab_file=None):
     """
     Actually makes the plots.
@@ -42,8 +42,8 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
         The number of time bins before and after zero to plot (so, 2*t_length
         get plotted along the x-axis).
 
-    frac_time : int
-        1/frac_time = dt, to be printed in the x label.
+    delay : float
+        The time delay bin size in milliseconds, or dt*1000.
 
     plot_file : str
         The name of the file to save the 2-D CCF plot to.
@@ -71,7 +71,7 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
 
     # mean_ccf = np.mean(ccf, axis=0)
     # ccf_resid = ccf - mean_ccf
-    a = np.array([mean_rate_ci, ] * (2*t_length+1)).T
+    a = np.array([mean_rate_ci, ] * (2 * t_length + 1)).T
     with np.errstate(all='ignore'):
         ratio = np.where(a != 0, ccf / a, 0)
 
@@ -88,10 +88,9 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
     elif np.shape(ratio)[0] == 32:
         ratio[26:,] = 0
     out_file = os.path.dirname(plot_file) + "/temp.dat"
-    # print out_file
-    R = ratio.flatten('C')
+    R = ratio.real.flatten('C')
     comment_str = "From %s" % tab_file
-    np.savetxt(out_file, R, comments=comment_str)
+    np.savetxt(out_file, R, fmt="%.8f", comments=comment_str)
 
     #############
     ## Plotting!
@@ -103,7 +102,8 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
     fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
 
     if len(energies) > 0:  ## If energies exists as a variable
-        plt.pcolor(t_bins, energies, ratio, cmap='hot')
+        plt.pcolor(t_bins, energies, ratio, cmap='YlGnBu_r')
+        # plt.pcolor(t_bins, energies, ratio, cmap='hot')
         # plt.pcolor(t_bins, energies, ratio, cmap='hot', vmin=-0.26, vmax=0.42)
         # plt.pcolor(t_bins, energies, ratio, cmap='spring', vmin=-0.04,
         #         vmax=0.04)
@@ -123,20 +123,24 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
         ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
         ax.set_ylim(3, 20)
         # rect = patches.Rectangle((-t_length,energies[10]), 2*t_length, 0.41,
-        #         ec="none")
+        #         facecolor="orange", ec="none")
+        rect = patches.Rectangle((-t_length, energies[10]), 2 * t_length, 0.41,
+                facecolor="blue", ec="none")
     else:
         ax.set_ylabel('Energy channel', fontproperties=font_prop)
         ax.set_ylim(0, np.shape(ratio)[0])
     #     rect = patches.Rectangle((-t_length,10), 2*t_length, 1, ec="none")
     #
-    # ax.add_patch(rect)
-    # zero_outline = patches.Rectangle((0, 2), 1, 26, edgecolor="black",
-    #         facecolor="none")
-    # ax.add_patch(zero_outline)
+    ax.add_patch(rect)
+    zero_outline = patches.Rectangle((0, 2), 1, 26, edgecolor="black",
+            facecolor="none")
+    ax.add_patch(zero_outline)
 
     ax.set_xlim(-t_length, t_length)
-    # ax.set_xlabel(r'Time ($\times\,$8.15$\,$ms)', fontproperties=font_prop)
-    ax.set_xlabel('Time-delay bins ', fontproperties=font_prop)
+    # ax.set_xlabel(r'Time-delay ($\times\,$8.15$\,$ms)', fontproperties=font_prop)
+    # ax.set_xlabel('Time-delay bins ', fontproperties=font_prop)
+    ax.set_xlabel(r'Time-delay ($\times\,$%.2f$\,$ms)' % delay,
+                  fontproperties=font_prop)
 
     ## Setting the axes' minor ticks. It's complicated.
     x_maj_loc = ax.get_xticks()
@@ -152,12 +156,13 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time,
 
     ax.tick_params(axis='x', labelsize=20)
     ax.tick_params(axis='y', labelsize=20)
-
+    ax.tick_params(which='major', width=1.5, length=7)
+    ax.tick_params(which='minor', width=1.5, length=4)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(1.5)
     # plt.show()
     plt.savefig(plot_file)
     plt.close()
-    # subprocess.call(['cp', plot_file, \
-    #       "/Users/abigailstevens/Dropbox/Research/CCF_paper1/"])
 
 
 ################################################################################
@@ -216,8 +221,6 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
     means_str = in_table.meta['RATE_CI']
     dt = in_table.meta['DT']
     print_dt = dt * 10**3  ## Putting it in milliseconds units.
-    # print "%.3f" % print_dt
-    frac_time = int(1.0 / dt)  ## Each time bin represents 1/frac_time sec
 
     mean_rate_ci = [float(num.strip()) for num in means_str[1:-1].split(',')]
 
@@ -234,8 +237,9 @@ def main(tab_file, plot_file, prefix, t_length, chan_to_en=None):
     ccf = ccf[:, n_bins/2-t_length:n_bins/2+t_length+1]
     t_bins = time_bins[n_bins/2-t_length:n_bins/2+t_length+1]
 
-    make_plot(ccf, t_bins, mean_rate_ci, t_length, frac_time, plot_file,
+    make_plot(ccf, t_bins, mean_rate_ci, t_length, print_dt, plot_file,
             energies=energies, prefix=prefix, tab_file=tab_file)
+
 
 ################################################################################
 if __name__ == "__main__":
