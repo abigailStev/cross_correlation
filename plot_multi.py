@@ -18,8 +18,18 @@ __year__ = "2014-2016"
 ################################################################################
 def main(ccf_file, plot_file, prefix):
     """
-			main
-	
+    Main method of plot_multi.py. Plots 1-D CCFs of multiple energy channels
+    together on one plot.
+
+    Parameters
+    ----------
+    ccf_file : str
+    plot_file : str
+    prefix : str
+
+    Returns
+    -------
+    nothing
 	
     """
 	
@@ -82,7 +92,7 @@ def main(ccf_file, plot_file, prefix):
     font_prop = font_manager.FontProperties(size=20)
     fig, ax = plt.subplots(1, 1, figsize=(10, 6), tight_layout=True, dpi=300)
 
-    ax.vlines(0.0, -20, 20.0, linestyle='dotted', color='black', lw=1.5)
+    ax.vlines(0.0, -20, 25.0, linestyle='dotted', color='black', lw=1.5)
     ax.hlines(0.0, -100, 100, linestyle='dashed', color='black', lw=1.5)
     ax.errorbar(time_bins, ccf_3, yerr=err_3, linewidth=2, color='orange',
                 elinewidth=2, capsize=2, label="3.5 keV")
@@ -93,12 +103,15 @@ def main(ccf_file, plot_file, prefix):
     ax.errorbar(time_bins, ccf_24, yerr=err_24, linewidth=2, elinewidth=2,
                 capsize=2, label="18 keV")
 
-    # ax.set_xlabel(r'Time ($\times\,$8.15$\,$ms)', fontproperties=font_prop)
-    ax.set_xlabel('Time-delay bins', fontproperties=font_prop)
+    # ax.set_xlabel(r'Time-delay ($\times\,$8.15$\,$ms)',
+    #               fontproperties=font_prop)
+    delay = in_table.meta['DT'] * 1000
+    ax.set_xlabel(r'Time-delay ($\times\,$%.2f$\,$ms)' % delay,
+                  fontproperties=font_prop)
     ax.set_ylabel('Deviation from mean (cts$\;$s$^{-1}$)', \
     	fontproperties=font_prop)
     ax.set_xlim(-50, 50)
-    ax.set_ylim(-4, 16)
+    ax.set_ylim(-5, 25)
 
     ## Setting the axes' minor ticks. It's complicated.
     x_maj_loc = ax.get_xticks()
@@ -115,6 +128,10 @@ def main(ccf_file, plot_file, prefix):
 
     ax.tick_params(axis='x', labelsize=20)
     ax.tick_params(axis='y', labelsize=20)
+    ax.tick_params(which='major', width=1.5, length=7)
+    ax.tick_params(which='minor', width=1.5, length=4)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(1.5)
 #     ax.set_title("%s, CCF per energy channel" % prefix, fontproperties=font_prop)
 
     handles, labels = ax.get_legend_handles_labels()
