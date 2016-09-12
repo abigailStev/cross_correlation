@@ -45,6 +45,138 @@ import ccf_lightcurves as ccf_lc  ## in cross_correlation
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2014-2016"
 
+################################################################################
+def type_positive_float(num):
+    """
+    Check if an input is a positive float, as an argparse type.
+
+    Parameters
+    ----------
+    num : int, long, float, or double
+        The number in question.
+
+    Returns
+    -------
+    n : float
+        The input number, if it's positive
+
+    Raises
+    ------
+    ArgumentTypeError if num isn't a positive float.
+
+    """
+    try:
+        n = float(num)
+    except ValueError or TypeError:
+        message = "Input is not a positive float."
+        raise argparse.ArgumentTypeError(message)
+
+    if n >= 0:
+        return n
+    else:
+        message = "%d is not a positive number." % n
+        raise argparse.ArgumentTypeError(message)
+
+################################################################################
+def power_of_two(num):
+    """
+    Check if a positive integer is a power of 2 (1 <= num < 2147483648).
+
+    Parameters
+    ----------
+    num : int
+        The number in question.
+
+    Returns
+    -------
+    bool
+        True if 'num' is a power of two, False if 'num' is not.
+
+    Raises
+    ------
+    assert error if number is below zero.
+
+    """
+    n = int(num)
+    x = 2
+    assert n > 0, "ERROR: Number must be positive."
+
+    if n == 1:
+        return True
+    else:
+        while x < n and x < 2147483648:
+            x *= 2
+        return n == x
+
+################################################################################
+def type_positive_int(num):
+    """
+    Check if an input is a positive integer, as an argparse type.
+
+    Parameters
+    ----------
+    num : int, long, float, or double
+        The number in question.
+
+    Returns
+    -------
+    n : int
+        The input number, if it's a positive integer
+
+    Raises
+    ------
+    ArgumentTypeError if n isn't a real number or a positive integer.
+
+    """
+    try:
+        n = int(num)
+    except ValueError or TypeError:
+        message = "Input is not a positive integer."
+        raise argparse.ArgumentTypeError(message)
+
+    if n >= 0:
+        return n
+    else:
+        message = "%d is not a positive integer." % n
+        raise argparse.ArgumentTypeError(message)
+
+################################################################################
+def type_power_of_two(num):
+    """
+    Check if an input is a power of 2 (1 <= num < 2147483648), as an argparse
+    type.
+
+    Parameters
+    ----------
+    num : int
+        The number in question.
+
+    Returns
+    -------
+    n : int
+        The number in question, if it's a power of two
+
+    Raises
+    ------
+    ArgumentTypeError if n isn't a power of two.
+
+    """
+    n = int(num)
+    x = 2
+    assert n > 0
+
+    if n == 1:
+        return n
+    else:
+        while x <= n and x < 2147483648:
+            if n == x:
+                return n
+            x *= 2
+
+    message = "%d is not a power of two." % n
+    raise argparse.ArgumentTypeError(message)
+
+
 
 ################################################################################
 def find_nearest(array, value):
@@ -505,6 +637,9 @@ def stack_reference_band(rate_ref_2d, instrument="PCA", obs_epoch=5):
         elif obs_epoch == 3:
             rate_ref = np.sum(rate_ref_2d[:, 3:29], axis=1)  # EPOCH 3
             # channel 3 to 28 inclusive
+        elif obs_epoch == 1:
+            rate_ref = np.sum(rate_ref_2d[:, 6:36], axis=1)  # EPOCH 1
+            # channel 6 to 35 inclusive
         elif obs_epoch == 0:
             rate_ref = np.sum(rate_ref_2d, axis=1)  # SUMMING ALL
         else:
@@ -590,12 +725,12 @@ def make_cs(rate_ci, rate_ref, meta_dict):
 
     ## print(fft_data_ref[528,3])
     ## print(fft_data_ci[254,3])
-    fft_data_ref[515:569,:] = np.repeat(fft_data_ref[257:284,:],2, axis=0)
+    #fft_data_ref[515:569,:] = np.repeat(fft_data_ref[257:284,:],2, axis=0)
     ## print(fft_data_ref[528,3])
     ## print("\n")
     ## print(fft_data_ref[-529,3])
     ## print(fft_data_ci[-255,3])
-    fft_data_ref[-568:-514,:] = np.repeat(fft_data_ref[-283:-256,:],2, axis=0)
+    #fft_data_ref[-568:-514,:] = np.repeat(fft_data_ref[-283:-256,:],2, axis=0)
     ## print(fft_data_ref[-529,3])
     ## Computing the cross spectrum from the fourier transform
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
@@ -968,7 +1103,6 @@ def fits_in(in_file, meta_dict, test=False):
                 rate_ref_2d = tools.make_2Dlightcurve( np.asarray(time_ref),
                         np.asarray(energy_ref), meta_dict['n_bins'],
                         meta_dict['detchans'], start_time, seg_end_time)
-
                 ## Stack the reference band
                 rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
                         obs_epoch=meta_dict['obs_epoch'])
@@ -1010,51 +1144,51 @@ def fits_in(in_file, meta_dict, test=False):
             ## Only keep and use segments where the variance > 0.
             ######################################################
 
-            if var >= 0.0:
+            # if var >= 0.0:
 
-                dt_whole = np.append(dt_whole, dt_seg)
-                df_whole = np.append(df_whole, df_seg)
-                # print("%.3f\t%.1f\t%.1f" % \
-                #       (np.sum(ci_seg.mean_rate[15:27]) / \
-                #        np.sum(ci_seg.mean_rate[2:7]),
-                #       np.sum(ci_seg.mean_rate[15:27]),
-                #       np.sum(ci_seg.mean_rate[2:7])))
+            dt_whole = np.append(dt_whole, dt_seg)
+            df_whole = np.append(df_whole, df_seg)
+            # print("%.3f\t%.1f\t%.1f" % \
+            #       (np.sum(ci_seg.mean_rate[15:27]) / \
+            #        np.sum(ci_seg.mean_rate[2:7]),
+            #       np.sum(ci_seg.mean_rate[15:27]),
+            #       np.sum(ci_seg.mean_rate[2:7])))
 
-                ## Append segment to arrays
-                cs_whole = np.dstack((cs_whole, cs_seg))
-                ci_whole.mean_rate_array = np.hstack((ci_whole.mean_rate_array,
-                        np.reshape(ci_seg.mean_rate, (meta_dict['detchans'],
-                        1))))
-                ref_whole.power_array = np.hstack((ref_whole.power_array,
-                        np.reshape(ref_seg.power, (meta_dict['n_bins'], 1))))
-                ref_whole.mean_rate_array = np.append(ref_whole.mean_rate_array,
-                        ref_seg.mean_rate)
-                ref_whole.var_array = np.append(ref_whole.var_array, var)
+            ## Append segment to arrays
+            cs_whole = np.dstack((cs_whole, cs_seg))
+            ci_whole.mean_rate_array = np.hstack((ci_whole.mean_rate_array,
+                    np.reshape(ci_seg.mean_rate, (meta_dict['detchans'],
+                    1))))
+            ref_whole.power_array = np.hstack((ref_whole.power_array,
+                    np.reshape(ref_seg.power, (meta_dict['n_bins'], 1))))
+            ref_whole.mean_rate_array = np.append(ref_whole.mean_rate_array,
+                    ref_seg.mean_rate)
+            ref_whole.var_array = np.append(ref_whole.var_array, var)
 
-                ## Sum across segments -- arrays, so it adds by index
-                exposure += (seg_end_time - start_time)
-                n_seg += 1
-                ci_whole.mean_rate += ci_seg.mean_rate
-                ref_whole.mean_rate += ref_seg.mean_rate
-                ci_whole.power += ci_seg.power
-                ref_whole.power += ref_seg.power
+            ## Sum across segments -- arrays, so it adds by index
+            exposure += (seg_end_time - start_time)
+            n_seg += 1
+            ci_whole.mean_rate += ci_seg.mean_rate
+            ref_whole.mean_rate += ref_seg.mean_rate
+            ci_whole.power += ci_seg.power
+            ref_whole.power += ref_seg.power
 
-                if n_seg % print_iterator == 0:
-                    print("\t", n_seg)
+            if n_seg % print_iterator == 0:
+                print("\t", n_seg)
 
-                if test is True and n_seg == 1:  # For testing
-                    break
-            else:
-                print("Neg var")
-                print(var)
-                print("Start: %.15f" % start_time)
-                print("End: %.15f" % seg_end_time)
-                print("dt seg: %.15f" % dt_seg)
-                # print(" ! %.3f\t%.1f\t%.1f !" % \
-                #       (np.sum(ci_seg.mean_rate[15:27]) / \
-                #        np.sum(ci_seg.mean_rate[2:7]),
-                #       np.sum(ci_seg.mean_rate[15:27]),
-                #       np.sum(ci_seg.mean_rate[2:7])))
+            if test is True and n_seg == 1:  # For testing
+                break
+            # else:
+            #     print("Neg var")
+            #     print(var)
+            #     print("Start: %.15f" % start_time)
+            #     print("End: %.15f" % seg_end_time)
+            #     print("dt seg: %.15f" % dt_seg)
+            #     # print(" ! %.3f\t%.1f\t%.1f !" % \
+            #     #       (np.sum(ci_seg.mean_rate[15:27]) / \
+            #     #        np.sum(ci_seg.mean_rate[2:7]),
+            #     #       np.sum(ci_seg.mean_rate[15:27]),
+            #     #       np.sum(ci_seg.mean_rate[2:7])))
 
             start_time = seg_end_time
             seg_end_time += meta_dict['n_seconds']
@@ -1382,15 +1516,16 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
     ## Make a model for the filter, of just the QPO portion, with values from
     # qpo_and_noise model above
     if harmonic is False:
-        qpo_filter_model = qpo_fundamental_only(amp_f=qpo_and_noise.amp_f_1.value,
+        qpo_f_filter_model = qpo_fundamental_only(amp_f=qpo_and_noise.amp_f_1.value,
                                             x_0_f=qpo_and_noise.x_0_f_1.value,
                                             fwhm_f=qpo_and_noise.fwhm_f_1.value)
     else:
-        qpo_filter_model = qpo_and_harmonic(amp_f=qpo_and_noise.amp_f_1.value,
+        qpo_f_filter_model = qpo_fundamental_only(amp_f=qpo_and_noise.amp_f_1.value,
                                             x_0_f=qpo_and_noise.x_0_f_1.value,
-                                            fwhm_f=qpo_and_noise.fwhm_f_1.value,
-                                            amp_h=qpo_and_noise.amp_h_1.value,
-                                            fwhm_h=qpo_and_noise.fwhm_h_1.value)
+                                            fwhm_f=qpo_and_noise.fwhm_f_1.value)
+        qpo_h_filter_model = qpo_fundamental_only(amp_f=qpo_and_noise.amp_h_1.value,
+                                            x_0_f=2.*qpo_and_noise.x_0_f_1.value,
+                                            fwhm_f=qpo_and_noise.fwhm_h_1.value)
 
         print("Harmonic centroid:", 2. * qpo_and_noise.x_0_f_1.value)
         print("Harmonic Q:", 2.*qpo_and_noise.x_0_f_1.value / qpo_and_noise.fwhm_f_1.value)
@@ -1415,24 +1550,51 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
     plt.savefig("./optimal_filter.png")
     # plt.show()
 
-    filter_ratio = np.where(freq != 0, qpo_filter_model(freq) / \
+    filter_ratio_f = np.where(freq != 0, qpo_f_filter_model(freq) / \
                             (qpo_and_noise(freq) + hif_noise(freq)), 0.)
 
-    shortened_filter_ratio = filter_ratio[1:-1]
-    full_filt = np.append(filter_ratio, shortened_filter_ratio[::-1])
+    shortened_filter_ratio_f = filter_ratio_f[1:-1]
+    full_filt_f = np.append(filter_ratio_f, shortened_filter_ratio_f[::-1])
 
     ## Filtering the reference band power spectrum
-    ref_pow_filt = ref.power * full_filt
+    ref_pow_filt_f = ref.power * full_filt_f
 
     ## Broadcasting the filter for detchans
-    full_filt = np.resize(np.repeat(full_filt, meta_dict['detchans']),
+    full_filt_f = np.resize(np.repeat(full_filt_f, meta_dict['detchans']),
             (meta_dict['n_bins'], meta_dict['detchans']))
 
     ## Filtering the cross spectrum and ci power spectrum
-    cs_filt = (cs_avg.real * full_filt) + (1j * cs_avg.imag)
-    ci_pow_filt = ci.power * full_filt
+    cs_filt_f = (cs_avg.real * full_filt_f) + (1j * cs_avg.imag)
+    ci_pow_filt_f = ci.power * full_filt_f
 
-    return cs_filt, ci_pow_filt, ref_pow_filt
+    if filter_harmonic:
+        filter_ratio_h = np.where(freq != 0, qpo_h_filter_model(freq) / \
+                                (qpo_and_noise(freq) + hif_noise(freq)), 0.)
+
+        shortened_filter_ratio_h = filter_ratio_h[1:-1]
+        full_filt_h = np.append(filter_ratio_h, shortened_filter_ratio_h[::-1])
+
+        ## Filtering the reference band power spectrum
+        ref_pow_filt_h = ref.power * full_filt_h
+
+        ## Broadcasting the filter for detchans
+        full_filt_h = np.resize(np.repeat(full_filt_h, meta_dict['detchans']),
+                                (meta_dict['n_bins'], meta_dict['detchans']))
+
+        ## Filtering the cross spectrum and ci power spectrum
+        cs_filt_h = (cs_avg.real * full_filt_h) + (1j * cs_avg.imag)
+        ci_pow_filt_h = ci.power * full_filt_h
+
+        print(np.shape(ref_pow_filt_h))
+        print(np.shape(ci_pow_filt_h))
+        print(np.shape(cs_filt_h))
+    else:
+        cs_filt_h = 0
+        ci_pow_filt_h = 0
+        ref_pow_filt_h = 0
+
+    return cs_filt_f, ci_pow_filt_f, ref_pow_filt_f, cs_filt_h, ci_pow_filt_h, \
+           ref_pow_filt_h
 
 
 ################################################################################
@@ -1502,9 +1664,11 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
     freq = np.abs(freq_long[0:nyq_index + 1])
 
     ## Apply optimal filter to cross-spectrum
-    filtered_cs_avg, signal_ci_pow, signal_ref_pow = optimal_filt(cs_avg,
-            ref, ci, freq, meta_dict, lo_freq, hi_freq,
-            harmonic=filter_harmonic)
+    filtered_cs_avg_f, signal_ci_pow_f, signal_ref_pow_f, filtered_cs_avg_h, \
+            signal_ci_pow_h, signal_ref_pow_h = optimal_filt(cs_avg, ref, ci,
+                                                             freq, meta_dict,
+                                                             lo_freq, hi_freq,
+                                                     harmonic=filter_harmonic)
 
     ## Apply tophat filter to cross-spectrum
     # filtered_cs_avg, signal_ci_pow, signal_ref_pow = tophat_filt(cs_avg, ref,
@@ -1521,53 +1685,127 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
         noise_ref = 0
 
     ## Apply absolute rms2 normalization to power spectra, subtract noise
-    signal_ci_pow = raw_to_absrms(signal_ci_pow, ci.mean_rate,
-            meta_dict['n_bins'], np.mean(meta_dict['dt']), noisy=noisy)
-    signal_ref_pow = raw_to_absrms(signal_ref_pow, ref.mean_rate,
-            meta_dict['n_bins'], np.mean(meta_dict['dt']), noisy=noisy)
+    signal_ci_pow_f = raw_to_absrms(signal_ci_pow_f, ci.mean_rate,
+                                    meta_dict['n_bins'],
+                                    np.mean(meta_dict['dt']), noisy=noisy)
+    signal_ref_pow_f = raw_to_absrms(signal_ref_pow_f, ref.mean_rate,
+                                     meta_dict['n_bins'],
+                                     np.mean(meta_dict['dt']), noisy=noisy)
 
     ## If the power is negative, set it equal to zero.
-    signal_ref_pow[signal_ref_pow < 0] = 0.
-    signal_ci_pow[signal_ci_pow < 0] = 0.
+    signal_ref_pow_f[signal_ref_pow_f < 0] = 0.
+    signal_ci_pow_f[signal_ci_pow_f < 0] = 0.
 
     # print("Frac RMS of reference band:", ref.rms / ref.mean_rate)
     ## in frac rms units here -- should be few percent
 
     ## Broadcast signal_ref_pow into same shape as signal_ci_pow
-    signal_ref_pow = np.resize(np.repeat(signal_ref_pow, meta_dict['detchans']),
-            np.shape(signal_ci_pow))
-    assert np.shape(signal_ref_pow) == np.shape(signal_ci_pow)
+    signal_ref_pow_f = np.resize(
+        np.repeat(signal_ref_pow_f, meta_dict['detchans']),
+        np.shape(signal_ci_pow_f))
+    assert np.shape(signal_ref_pow_f) == np.shape(signal_ci_pow_f)
 
     ## Compute amplitude of noise in the cross spectrum
-    temp = (noise_ci * signal_ref_pow) + (noise_ref * signal_ci_pow) + \
-            (noise_ci * noise_ref)
+    temp_f = (noise_ci * signal_ref_pow_f) + (noise_ref * signal_ci_pow_f) + \
+             (noise_ci * noise_ref)
 
-    cs_noise_amp = np.sqrt(np.sum(temp, axis=0) / np.float(meta_dict['n_seg']))
+    cs_noise_amp_f = np.sqrt(
+        np.sum(temp_f, axis=0) / np.float(meta_dict['n_seg']))
 
     ## Compute amplitude of (filtered) signal in the cross spectrum
-    temp1 = cs_avg * (2.0 * np.mean(meta_dict['dt']) /
-            np.float(meta_dict['n_bins']))
-    cs_signal_amp = np.sum(temp1, axis=0)
+    temp1_f = cs_avg * (2.0 * np.mean(meta_dict['dt']) /
+                        np.float(meta_dict['n_bins']))
+    cs_signal_amp_f = np.sum(temp1_f, axis=0)
 
     ## Assume cs_noise_amp and cs_signal_amp are float arrays, size DETCHANS
     with np.errstate(all='ignore'):
-        error_ratio = np.where(cs_signal_amp != 0, cs_noise_amp / \
-                cs_signal_amp, 0)
+        error_ratio_f = np.where(cs_signal_amp_f != 0, cs_noise_amp_f / \
+                                 cs_signal_amp_f, 0)
 
     ## Take the IFFT of the cross spectrum to get the CCF
-    ccf_end = fftpack.ifft(filtered_cs_avg, axis=0)
+    ccf_end_f = fftpack.ifft(filtered_cs_avg_f, axis=0)
 
     ## Divide average ccf by average rms of signal in reference band
-    ccf_end *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
+    ccf_end_f *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
 
     ## Compute the error on the ccf
-    ccf_rms_ci = np.sqrt(np.var(ccf_end, axis=0, ddof=1))
-    ccf_error = ccf_rms_ci * error_ratio
+    ccf_rms_ci_f = np.sqrt(np.var(ccf_end_f, axis=0, ddof=1))
+    ccf_error_f = ccf_rms_ci_f * error_ratio_f
 
     ## Re-sizing the error array to have the same shape as ccf_end
-    ccf_error = np.resize(np.repeat(ccf_error, meta_dict['n_bins']),
-                          (meta_dict['detchans'], meta_dict['n_bins']))
-    ccf_error = ccf_error.T
+    ccf_error_f = np.resize(np.repeat(ccf_error_f, meta_dict['n_bins']),
+                            (meta_dict['detchans'], meta_dict['n_bins']))
+    ccf_error_f = ccf_error_f.T
+
+    if filter_harmonic:
+
+        bin_offset = int(np.round(0.0433123 / np.mean(meta_dict['dt'])))
+        print("Whole time bin offset: %d" % bin_offset)
+
+        ## Apply absolute rms2 normalization to power spectra, subtract noise
+        signal_ci_pow_h = raw_to_absrms(signal_ci_pow_h, ci.mean_rate,
+                                        meta_dict['n_bins'],
+                                        np.mean(meta_dict['dt']), noisy=noisy)
+        signal_ref_pow_h = raw_to_absrms(signal_ref_pow_h, ref.mean_rate,
+                                         meta_dict['n_bins'],
+                                         np.mean(meta_dict['dt']), noisy=noisy)
+
+        ## If the power is negative, set it equal to zero.
+        signal_ref_pow_h[signal_ref_pow_h < 0] = 0.
+        signal_ci_pow_h[signal_ci_pow_h < 0] = 0.
+
+        # print("Frac RMS of reference band:", ref.rms / ref.mean_rate)
+        ## in frac rms units here -- should be few percent
+
+        ## Broadcast signal_ref_pow into same shape as signal_ci_pow
+        signal_ref_pow_h = np.resize(
+            np.repeat(signal_ref_pow_h, meta_dict['detchans']),
+            np.shape(signal_ci_pow_h))
+        assert np.shape(signal_ref_pow_h) == np.shape(signal_ci_pow_h)
+
+        ## Compute amplitude of noise in the cross spectrum
+        temp_h = (noise_ci * signal_ref_pow_h) + (noise_ref * signal_ci_pow_h) + \
+                 (noise_ci * noise_ref)
+
+        cs_noise_amp_h = np.sqrt(
+            np.sum(temp_h, axis=0) / np.float(meta_dict['n_seg']))
+
+        ## Compute amplitude of (filtered) signal in the cross spectrum
+        temp1_h = cs_avg * (2.0 * np.mean(meta_dict['dt']) /
+                            np.float(meta_dict['n_bins']))
+        cs_signal_amp_h = np.sum(temp1_h, axis=0)
+
+        ## Assume cs_noise_amp and cs_signal_amp are float arrays, size DETCHANS
+        with np.errstate(all='ignore'):
+            error_ratio_h = np.where(cs_signal_amp_h != 0, cs_noise_amp_h / \
+                                     cs_signal_amp_h, 0)
+
+        ## Take the IFFT of the cross spectrum to get the CCF
+        ccf_end_h = fftpack.ifft(filtered_cs_avg_h, axis=0)
+
+        ## Divide average ccf by average rms of signal in reference band
+        ccf_end_h *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
+
+        ## Compute the error on the ccf
+        ccf_rms_ci_h = np.sqrt(np.var(ccf_end_h, axis=0, ddof=1))
+        ccf_error_h = ccf_rms_ci_h * error_ratio_h
+
+        ## Re-sizing the error array to have the same shape as ccf_end
+        ccf_error_h = np.resize(np.repeat(ccf_error_h, meta_dict['n_bins']),
+                                (meta_dict['detchans'], meta_dict['n_bins']))
+        ccf_error_h = ccf_error_h.T
+
+
+        temp_ccf_h = np.vstack((ccf_end_h[-bin_offset:meta_dict['n_bins'],:],
+                                ccf_end_h[0:-bin_offset,:]))
+        print(temp_ccf_h)
+        ccf_end = ccf_end_f + temp_ccf_h
+        temp_err_h = np.vstack((ccf_error_h[-bin_offset:meta_dict['n_bins'],:],
+                                ccf_error_h[0:-bin_offset,:]))
+        ccf_error = np.sqrt(ccf_error_f**2 + temp_err_h**2)
+    else:
+        ccf_end = ccf_end_f
+        ccf_error = ccf_error_f
 
     return ccf_end.real, ccf_error.real
 
@@ -1661,13 +1899,12 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         Name of FITS optical or IR data file for reference band. This one file
         has the reference band for the whole data set. Gaps are ok. []
 
-    n_seconds : int
-        Number of seconds in each Fourier segment. Must be a power of 2,
-        positive. [64]
+    n_seconds : float
+        Number of seconds in each Fourier segment. Must be positive. [64]
 
     dt_mult : int
         Multiple of dt (dt is from data file) for timestep between bins. Must be
-        a power of 2, positive. [64]
+        positive. [64]
 
     bkgd_file : str
         Name of the background spectrum (in .pha format), with the same energy
@@ -1726,6 +1963,11 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     else:
         data_files = [input_file]
 
+    if "stevens" in os.path.expanduser('~'):
+        for i in range(len(data_files)):
+            if "stevens" not in data_files[i]:
+                data_files[i] = data_files[i].replace("abigail", "abigailstevens")
+
     if adjust is True:
         # adjust_segments = [932, 216, 184, 570, 93, 346, 860, 533, -324]
         out_dir = os.path.dirname(out_file)
@@ -1765,7 +2007,7 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
                  'n_seconds': n_seconds,
                  'df': 1.0 / np.float(n_seconds),
                  'nyquist': 1.0 / (2.0 * dt_mult * t_res),
-                 'n_bins': n_seconds * int(1.0 / (dt_mult * t_res)),
+                 'n_bins': int(n_seconds * 1.0 / (dt_mult * t_res)),
                  'detchans': detchans,
                  'filter': filtering,
                  'exposure': 0,
@@ -1840,8 +2082,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ci_total.mean_rate_array = ci_total.mean_rate_array[:,1:]
     ref_total.power_array = ref_total.power_array[:,1:]
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
-    ref_total.var_array = ref_total.var_array[1:]
 
+    # ref_total.var_array = ref_total.var_array[1:]
     # print("Mean of var_array:", np.mean(ref_total.var_array))
     # print("Sqrt of var_array:", np.sqrt(ref_total.var_array))
     # print("Mean of sqrt of var_array:", np.mean(np.sqrt(ref_total.var_array)))
@@ -1991,13 +2233,13 @@ if __name__ == "__main__":
             "format), with the same energy channel binning as the event list."\
             " [None]")
 
-    parser.add_argument('-n', '--n_seconds', type=tools.type_power_of_two,
+    parser.add_argument('-n', '--n_seconds', type=type_positive_float,
             default=64, dest='n_seconds', help="Number of seconds in each "\
-            "Fourier segment. Must be a power of 2, positive, integer. [64]")
+            "Fourier segment. Must be a positive number. [64]")
 
-    parser.add_argument('-m', '--dt_mult', type=tools.type_power_of_two,
+    parser.add_argument('-m', '--dt_mult', type=type_positive_int,
             default=64, dest='dt_mult', help="Multiple of dt (dt is from data "\
-            "file) for timestep between bins. Must be a power of 2, positive, "\
+            "file) for timestep between bins. Must be a positive "\
             "integer. [64]")
 
     parser.add_argument('-t', '--test', type=int, default=0, choices={0,1},
