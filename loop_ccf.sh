@@ -11,12 +11,11 @@
 ## Change the directory names and specifiers before the double '#' row to best
 ## suit your setup.
 ##
-## Notes: bash 3.* and Python 2.7.* (with supporting libraries) must be 
-##		  installed in order to run this script. For the gif-making to work, 
-##		  gifsicle must be installed (open source, available on e.g. MacPorts 
-##		  and HomeBrew)
+## Notes: bash 3.* and conda 4.0.7+ with python 2.7.*
+## 		  must be installed in order to run this script. For the gif-making to
+##		  work, ImageMagick must be installed (open source)
 ## 
-## Written by Abigail Stevens, A.L.Stevens at uva.nl, 2015
+## Written by Abigail Stevens, A.L.Stevens at uva.nl, 2015-2016
 ## 
 ################################################################################
 
@@ -185,9 +184,9 @@ energy spectrum doesn't exist."
 
 done
 
-###############################
-## Making the plots into a gif
-###############################
+################################################
+## Making the plots into a gif with ImageMagick
+################################################
 
 convert @"$plots_1d" "$gif_name_1d"
 if [ -e "$gif_name_1d" ]; then
