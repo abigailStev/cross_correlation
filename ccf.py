@@ -660,7 +660,6 @@ def stack_reference_band(rate_ref_2d, instrument="PCA", obs_epoch=5):
 
     return rate_ref
 
-
 ################################################################################
 def make_cs(rate_ci, rate_ref, meta_dict):
     """
@@ -736,6 +735,9 @@ def make_cs(rate_ci, rate_ref, meta_dict):
     cs_seg = np.multiply(fft_data_ci, np.conj(fft_data_ref))
     ## print(cs_seg[529:532,3])
     ## exit()
+
+
+
     return cs_seg, ci_seg, ref_seg
 
 #
@@ -1447,6 +1449,31 @@ def tie_harmonic_centroid(model):
 
 
 ################################################################################
+def phase_angle(complex_number):
+    return np.arctan2(complex_number.imag, complex_number.real)
+
+
+################################################################################
+def vecrotate(theta, complex_number):
+    print("Theta:", theta)
+    print("Before rotation, 4th segment")
+    print("Abs:", np.abs(complex_number[3]))
+    print("Angle:", phase_angle(complex_number[3]))
+    x = complex_number.real
+    y = complex_number.imag
+    xrot = x * np.cos(theta) - y * np.sin(theta)
+    yrot = x * np.sin(theta) + y * np.cos(theta)
+    rotated_complex_number = xrot + yrot*1j
+    # print type(rotated_complex_number)
+    # print type(rotated_complex_number[0])
+    # print np.shape(rotated_complex_number)
+    print("After rotation, 4th segment")
+    print("Abs:", np.abs(rotated_complex_number[3]))
+    print("Angle:", phase_angle(rotated_complex_number[3]))
+    return rotated_complex_number
+
+
+################################################################################
 def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
                  harmonic=False):
 
@@ -1530,24 +1557,31 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
         print("Harmonic centroid:", 2. * qpo_and_noise.x_0_f_1.value)
         print("Harmonic Q:", 2.*qpo_and_noise.x_0_f_1.value / qpo_and_noise.fwhm_f_1.value)
 
-    temp1 = qpo_and_noise.x_0_f_1.value - qpo_and_noise.fwhm_f_1.value / 2
-    temp2 = qpo_and_noise.x_0_f_1.value + qpo_and_noise.fwhm_f_1.value / 2
+    # temp1 = qpo_and_noise.x_0_f_1.value - qpo_and_noise.fwhm_f_1.value / 2
+    # temp2 = qpo_and_noise.x_0_f_1.value + qpo_and_noise.fwhm_f_1.value / 2
 
     plt.figure(figsize=(10, 7.5))
     plt.plot(freq, ref.pos_power * freq, 'ko', label="Data")
-    plt.plot(freq, qpo_and_noise(freq) + hif_noise(freq), label="Model", lw=2)
-    plt.vlines(temp1, ymin=0, ymax=1.1E11, color='magenta')
-    plt.vlines(temp2, ymin=0, ymax=1.1E11, color='magenta')
+    plt.plot(freq, qpo_and_noise(freq) + hif_noise(freq), label="Total model",
+             lw=2, color='blue')
+    plt.plot(freq, qpo_f_filter_model(freq), label="Fundamental", lw=2,
+             color='magenta')
+
+    # plt.vlines(temp1, ymin=0, ymax=1.1E11, color='magenta')
+    # plt.vlines(temp2, ymin=0, ymax=1.1E11, color='magenta')
     if harmonic is True:
-        temp3 = 2. * qpo_and_noise.x_0_f_1.value - qpo_and_noise.fwhm_h_1.value / 2
-        temp4 = 2. * qpo_and_noise.x_0_f_1.value + qpo_and_noise.fwhm_h_1.value / 2
-        plt.vlines(temp3, ymin=0, ymax=1.1E11, color='purple')
-        plt.vlines(temp4, ymin=0, ymax=1.1E11, color='purple')
+        # temp3 = 2. * qpo_and_noise.x_0_f_1.value - qpo_and_noise.fwhm_h_1.value / 2
+        # temp4 = 2. * qpo_and_noise.x_0_f_1.value + qpo_and_noise.fwhm_h_1.value / 2
+        # plt.vlines(temp3, ymin=0, ymax=1.1E11, color='purple')
+        # plt.vlines(temp4, ymin=0, ymax=1.1E11, color='purple')
+        plt.plot(freq, qpo_h_filter_model(freq), label="Harmonic", lw=2,
+                 color='orange')
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Raw power * frequency")
     plt.xlim(1, 20)
     plt.legend(loc=2)
     plt.savefig("./optimal_filter.png")
+    print("Check filter: %s/optimal_filter.png" % os.getcwd())
     # plt.show()
 
     filter_ratio_f = np.where(freq != 0, qpo_f_filter_model(freq) / \
@@ -1583,22 +1617,52 @@ def optimal_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq,
 
         ## Filtering the cross spectrum and ci power spectrum
         cs_filt_h = (cs_avg.real * full_filt_h) + (1j * cs_avg.imag)
+        ## The harmonic phase offset value is hard-wired!!
+        cs_filt_h_rotated = vecrotate(1.2883218366, cs_filt_h)
         ci_pow_filt_h = ci.power * full_filt_h
 
-        print(np.shape(ref_pow_filt_h))
-        print(np.shape(ci_pow_filt_h))
-        print(np.shape(cs_filt_h))
+        cs_filt = cs_filt_f + cs_filt_h_rotated
+        ci_pow_filt = ci_pow_filt_f + ci_pow_filt_h
+        ref_pow_filt = ref_pow_filt_f + ref_pow_filt_h
+
     else:
-        cs_filt_h = 0
-        ci_pow_filt_h = 0
-        ref_pow_filt_h = 0
+        cs_filt = cs_filt_f
+        ci_pow_filt = ci_pow_filt_f
+        ref_pow_filt = ref_pow_filt_f
 
-    return cs_filt_f, ci_pow_filt_f, ref_pow_filt_f, cs_filt_h, ci_pow_filt_h, \
-           ref_pow_filt_h
+    return cs_filt, ci_pow_filt, ref_pow_filt
 
+    # if filter_harmonic:
+    #     filter_ratio_h = np.where(freq != 0, qpo_h_filter_model(freq) / \
+    #                             (qpo_and_noise(freq) + hif_noise(freq)), 0.)
+    #
+    #     shortened_filter_ratio_h = filter_ratio_h[1:-1]
+    #     full_filt_h = np.append(filter_ratio_h, shortened_filter_ratio_h[::-1])
+    #
+    #     ## Filtering the reference band power spectrum
+    #     ref_pow_filt_h = ref.power * full_filt_h
+    #
+    #     ## Broadcasting the filter for detchans
+    #     full_filt_h = np.resize(np.repeat(full_filt_h, meta_dict['detchans']),
+    #                             (meta_dict['n_bins'], meta_dict['detchans']))
+    #
+    #     ## Filtering the cross spectrum and ci power spectrum
+    #     cs_filt_h = (cs_avg.real * full_filt_h) + (1j * cs_avg.imag)
+    #     ci_pow_filt_h = ci.power * full_filt_h
+    #
+    #     # print(np.shape(ref_pow_filt_h))
+    #     # print(np.shape(ci_pow_filt_h))
+    #     # print(np.shape(cs_filt_h))
+    # else:
+    #     cs_filt_h = 0
+    #     ci_pow_filt_h = 0
+    #     ref_pow_filt_h = 0
+    #
+    # return cs_filt_f, ci_pow_filt_f, ref_pow_filt_f, cs_filt_h, \
+    #        ci_pow_filt_h, ref_pow_filt_h
 
 ################################################################################
-def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
+def filt_cs_to_ccf_w_err_IV(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
         filter_harmonic=False, noisy=True):
     """
     Filter the cross-spectrum in frequency space, take the iFFT of the
@@ -1664,8 +1728,7 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
     freq = np.abs(freq_long[0:nyq_index + 1])
 
     ## Apply optimal filter to cross-spectrum
-    filtered_cs_avg_f, signal_ci_pow_f, signal_ref_pow_f, filtered_cs_avg_h, \
-            signal_ci_pow_h, signal_ref_pow_h = optimal_filt(cs_avg, ref, ci,
+    filtered_cs_avg, signal_ci_pow, signal_ref_pow = optimal_filt(cs_avg, ref, ci,
                                                              freq, meta_dict,
                                                              lo_freq, hi_freq,
                                                      harmonic=filter_harmonic)
@@ -1685,129 +1748,273 @@ def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
         noise_ref = 0
 
     ## Apply absolute rms2 normalization to power spectra, subtract noise
-    signal_ci_pow_f = raw_to_absrms(signal_ci_pow_f, ci.mean_rate,
+    signal_ci_pow = raw_to_absrms(signal_ci_pow, ci.mean_rate,
                                     meta_dict['n_bins'],
                                     np.mean(meta_dict['dt']), noisy=noisy)
-    signal_ref_pow_f = raw_to_absrms(signal_ref_pow_f, ref.mean_rate,
+    signal_ref_pow = raw_to_absrms(signal_ref_pow, ref.mean_rate,
                                      meta_dict['n_bins'],
                                      np.mean(meta_dict['dt']), noisy=noisy)
 
     ## If the power is negative, set it equal to zero.
-    signal_ref_pow_f[signal_ref_pow_f < 0] = 0.
-    signal_ci_pow_f[signal_ci_pow_f < 0] = 0.
+    signal_ref_pow[signal_ref_pow < 0] = 0.
+    signal_ci_pow[signal_ci_pow < 0] = 0.
 
     # print("Frac RMS of reference band:", ref.rms / ref.mean_rate)
     ## in frac rms units here -- should be few percent
 
     ## Broadcast signal_ref_pow into same shape as signal_ci_pow
-    signal_ref_pow_f = np.resize(
-        np.repeat(signal_ref_pow_f, meta_dict['detchans']),
-        np.shape(signal_ci_pow_f))
-    assert np.shape(signal_ref_pow_f) == np.shape(signal_ci_pow_f)
+    signal_ref_pow = np.resize(
+        np.repeat(signal_ref_pow, meta_dict['detchans']),
+        np.shape(signal_ci_pow))
+    assert np.shape(signal_ref_pow) == np.shape(signal_ci_pow)
 
     ## Compute amplitude of noise in the cross spectrum
-    temp_f = (noise_ci * signal_ref_pow_f) + (noise_ref * signal_ci_pow_f) + \
+    temp = (noise_ci * signal_ref_pow) + (noise_ref * signal_ci_pow) + \
              (noise_ci * noise_ref)
 
-    cs_noise_amp_f = np.sqrt(
-        np.sum(temp_f, axis=0) / np.float(meta_dict['n_seg']))
+    cs_noise_amp = np.sqrt(
+        np.sum(temp, axis=0) / np.float(meta_dict['n_seg']))
 
     ## Compute amplitude of (filtered) signal in the cross spectrum
-    temp1_f = cs_avg * (2.0 * np.mean(meta_dict['dt']) /
+    temp1 = cs_avg * (2.0 * np.mean(meta_dict['dt']) /
                         np.float(meta_dict['n_bins']))
-    cs_signal_amp_f = np.sum(temp1_f, axis=0)
+    cs_signal_amp = np.sum(temp1, axis=0)
 
     ## Assume cs_noise_amp and cs_signal_amp are float arrays, size DETCHANS
     with np.errstate(all='ignore'):
-        error_ratio_f = np.where(cs_signal_amp_f != 0, cs_noise_amp_f / \
-                                 cs_signal_amp_f, 0)
+        error_ratio = np.where(cs_signal_amp != 0, cs_noise_amp / \
+                                 cs_signal_amp, 0)
 
     ## Take the IFFT of the cross spectrum to get the CCF
-    ccf_end_f = fftpack.ifft(filtered_cs_avg_f, axis=0)
+    ccf_end = fftpack.ifft(filtered_cs_avg, axis=0)
 
     ## Divide average ccf by average rms of signal in reference band
-    ccf_end_f *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
+    ccf_end *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
 
     ## Compute the error on the ccf
-    ccf_rms_ci_f = np.sqrt(np.var(ccf_end_f, axis=0, ddof=1))
-    ccf_error_f = ccf_rms_ci_f * error_ratio_f
+    ccf_rms_ci = np.sqrt(np.var(ccf_end, axis=0, ddof=1))
+    ccf_error = ccf_rms_ci * error_ratio
 
     ## Re-sizing the error array to have the same shape as ccf_end
-    ccf_error_f = np.resize(np.repeat(ccf_error_f, meta_dict['n_bins']),
+    ccf_error = np.resize(np.repeat(ccf_error, meta_dict['n_bins']),
                             (meta_dict['detchans'], meta_dict['n_bins']))
-    ccf_error_f = ccf_error_f.T
-
-    if filter_harmonic:
-
-        bin_offset = int(np.round(0.0433123 / np.mean(meta_dict['dt'])))
-        print("Whole time bin offset: %d" % bin_offset)
-
-        ## Apply absolute rms2 normalization to power spectra, subtract noise
-        signal_ci_pow_h = raw_to_absrms(signal_ci_pow_h, ci.mean_rate,
-                                        meta_dict['n_bins'],
-                                        np.mean(meta_dict['dt']), noisy=noisy)
-        signal_ref_pow_h = raw_to_absrms(signal_ref_pow_h, ref.mean_rate,
-                                         meta_dict['n_bins'],
-                                         np.mean(meta_dict['dt']), noisy=noisy)
-
-        ## If the power is negative, set it equal to zero.
-        signal_ref_pow_h[signal_ref_pow_h < 0] = 0.
-        signal_ci_pow_h[signal_ci_pow_h < 0] = 0.
-
-        # print("Frac RMS of reference band:", ref.rms / ref.mean_rate)
-        ## in frac rms units here -- should be few percent
-
-        ## Broadcast signal_ref_pow into same shape as signal_ci_pow
-        signal_ref_pow_h = np.resize(
-            np.repeat(signal_ref_pow_h, meta_dict['detchans']),
-            np.shape(signal_ci_pow_h))
-        assert np.shape(signal_ref_pow_h) == np.shape(signal_ci_pow_h)
-
-        ## Compute amplitude of noise in the cross spectrum
-        temp_h = (noise_ci * signal_ref_pow_h) + (noise_ref * signal_ci_pow_h) + \
-                 (noise_ci * noise_ref)
-
-        cs_noise_amp_h = np.sqrt(
-            np.sum(temp_h, axis=0) / np.float(meta_dict['n_seg']))
-
-        ## Compute amplitude of (filtered) signal in the cross spectrum
-        temp1_h = cs_avg * (2.0 * np.mean(meta_dict['dt']) /
-                            np.float(meta_dict['n_bins']))
-        cs_signal_amp_h = np.sum(temp1_h, axis=0)
-
-        ## Assume cs_noise_amp and cs_signal_amp are float arrays, size DETCHANS
-        with np.errstate(all='ignore'):
-            error_ratio_h = np.where(cs_signal_amp_h != 0, cs_noise_amp_h / \
-                                     cs_signal_amp_h, 0)
-
-        ## Take the IFFT of the cross spectrum to get the CCF
-        ccf_end_h = fftpack.ifft(filtered_cs_avg_h, axis=0)
-
-        ## Divide average ccf by average rms of signal in reference band
-        ccf_end_h *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
-
-        ## Compute the error on the ccf
-        ccf_rms_ci_h = np.sqrt(np.var(ccf_end_h, axis=0, ddof=1))
-        ccf_error_h = ccf_rms_ci_h * error_ratio_h
-
-        ## Re-sizing the error array to have the same shape as ccf_end
-        ccf_error_h = np.resize(np.repeat(ccf_error_h, meta_dict['n_bins']),
-                                (meta_dict['detchans'], meta_dict['n_bins']))
-        ccf_error_h = ccf_error_h.T
-
-
-        temp_ccf_h = np.vstack((ccf_end_h[-bin_offset:meta_dict['n_bins'],:],
-                                ccf_end_h[0:-bin_offset,:]))
-        print(temp_ccf_h)
-        ccf_end = ccf_end_f + temp_ccf_h
-        temp_err_h = np.vstack((ccf_error_h[-bin_offset:meta_dict['n_bins'],:],
-                                ccf_error_h[0:-bin_offset,:]))
-        ccf_error = np.sqrt(ccf_error_f**2 + temp_err_h**2)
-    else:
-        ccf_end = ccf_end_f
-        ccf_error = ccf_error_f
+    ccf_error = ccf_error.T
 
     return ccf_end.real, ccf_error.real
+
+
+# ################################################################################
+# def filt_cs_to_ccf_w_err(cs_avg, meta_dict, ci, ref, lo_freq=0.0, hi_freq=0.0,
+#         filter_harmonic=False, noisy=True):
+#     """
+#     Filter the cross-spectrum in frequency space, take the iFFT of the
+#     filtered cross spectrum to get the cross-correlation function, and compute
+#     the error on the cross-correlation function. Note that error is definitely
+#     NOT independent between time bins due to the filtering! But is still
+#     independent between energy bins.
+#
+#     Keep in mind that if adjusting segments to line up QPOs that shift in
+#     frequency between segments, the rms of the avg ref power spectrum and the
+#     avg of the rmses of each segment's ref power spectrum are not the same. This
+#     has been accounted for here.
+#
+#     Parameters
+#     ----------
+#     cs_avg : np.array of complex numbers
+#         2-D array of the segment-averaged cross spectrum of the channels of
+#         interest with the reference band. Size = (n_bins, detchans).
+#
+#     meta_dict : dict
+#         Dictionary of necessary meta-parameters for data analysis.
+#
+#     ci : ccf_lc.Lightcurve object
+#         Channel of interest light curve, with (averaged) mean_rate and
+#         (averaged, raw) power assigned.
+#
+#     ref : ccf_lc.Lightcurve object
+#         Reference band light curve, with (averaged) mean_rate, (averaged, raw)
+#         power, and rms (of averaged power in abs rms units) assigned.
+#
+#     lo_freq : float
+#         The lower frequency bound for filtering the cross spectrum, in Hz. [0.0]
+#
+#     hi_freq : float
+#         The upper frequency bound for filtering the cross spectrum, in Hz. [0.0]
+#
+#     filter_harmonic : bool
+#         If true, the filter will include the harmonic. The lo_freq - hi_freq
+#         range must then include the harmonic! This isn't checked. If
+#         filtering=False, this does nothing. But then we wouldn't get to this
+#         method anyways. [False]
+#
+#     noisy : bool
+#         If True, data has Poisson noise in it that must be subtracted away. If
+#         False, using simulated data without Poisson noise.
+#
+#
+#     Returns
+#     -------
+#     ccf_end : np.array of floats
+#         2-D array of the cross-correlation function. Size = (n_bins, detchans).
+#
+#     ccf_error : np.array of floats
+#         The error on the cross-correlation function.
+#
+#     """
+#     nyq_index = meta_dict['n_bins'] / 2
+#     if len(ref.power) == meta_dict['n_bins']:
+#         ref.pos_power = ref.power[0:nyq_index + 1]
+#
+#     ## Compute the Fourier frequencies
+#     freq_long = fftpack.fftfreq(meta_dict['n_bins'], d=np.mean(meta_dict['dt']))
+#     freq = np.abs(freq_long[0:nyq_index + 1])
+#
+#     ## Apply optimal filter to cross-spectrum
+#     filtered_cs_avg_f, signal_ci_pow_f, signal_ref_pow_f, filtered_cs_avg_h, \
+#             signal_ci_pow_h, signal_ref_pow_h = optimal_filt(cs_avg, ref, ci,
+#                                                              freq, meta_dict,
+#                                                              lo_freq, hi_freq,
+#                                                      harmonic=filter_harmonic)
+#
+#     ## Apply tophat filter to cross-spectrum
+#     # filtered_cs_avg, signal_ci_pow, signal_ref_pow = tophat_filt(cs_avg, ref,
+#     #         ci, freq, meta_dict, lo_freq, hi_freq)
+#
+#     ## Poisson noise level in absolute rms^2 norm
+#     noise_ci = 2.0 * ci.mean_rate
+#     noise_ci[noise_ci <= 0] = 0.0  ## Can't have a negative noise
+#     noise_ref = 2.0 * ref.mean_rate
+#
+#     ## If there's no noise in a (simulated) power spectrum, noise level = 0
+#     if not noisy:
+#         noise_ci = np.zeros(meta_dict['detchans'])
+#         noise_ref = 0
+#
+#     ## Apply absolute rms2 normalization to power spectra, subtract noise
+#     signal_ci_pow_f = raw_to_absrms(signal_ci_pow_f, ci.mean_rate,
+#                                     meta_dict['n_bins'],
+#                                     np.mean(meta_dict['dt']), noisy=noisy)
+#     signal_ref_pow_f = raw_to_absrms(signal_ref_pow_f, ref.mean_rate,
+#                                      meta_dict['n_bins'],
+#                                      np.mean(meta_dict['dt']), noisy=noisy)
+#
+#     ## If the power is negative, set it equal to zero.
+#     signal_ref_pow_f[signal_ref_pow_f < 0] = 0.
+#     signal_ci_pow_f[signal_ci_pow_f < 0] = 0.
+#
+#     # print("Frac RMS of reference band:", ref.rms / ref.mean_rate)
+#     ## in frac rms units here -- should be few percent
+#
+#     ## Broadcast signal_ref_pow into same shape as signal_ci_pow
+#     signal_ref_pow_f = np.resize(
+#         np.repeat(signal_ref_pow_f, meta_dict['detchans']),
+#         np.shape(signal_ci_pow_f))
+#     assert np.shape(signal_ref_pow_f) == np.shape(signal_ci_pow_f)
+#
+#     ## Compute amplitude of noise in the cross spectrum
+#     temp_f = (noise_ci * signal_ref_pow_f) + (noise_ref * signal_ci_pow_f) + \
+#              (noise_ci * noise_ref)
+#
+#     cs_noise_amp_f = np.sqrt(
+#         np.sum(temp_f, axis=0) / np.float(meta_dict['n_seg']))
+#
+#     ## Compute amplitude of (filtered) signal in the cross spectrum
+#     temp1_f = cs_avg * (2.0 * np.mean(meta_dict['dt']) /
+#                         np.float(meta_dict['n_bins']))
+#     cs_signal_amp_f = np.sum(temp1_f, axis=0)
+#
+#     ## Assume cs_noise_amp and cs_signal_amp are float arrays, size DETCHANS
+#     with np.errstate(all='ignore'):
+#         error_ratio_f = np.where(cs_signal_amp_f != 0, cs_noise_amp_f / \
+#                                  cs_signal_amp_f, 0)
+#
+#     ## Take the IFFT of the cross spectrum to get the CCF
+#     ccf_end_f = fftpack.ifft(filtered_cs_avg_f, axis=0)
+#
+#     ## Divide average ccf by average rms of signal in reference band
+#     ccf_end_f *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
+#
+#     ## Compute the error on the ccf
+#     ccf_rms_ci_f = np.sqrt(np.var(ccf_end_f, axis=0, ddof=1))
+#     ccf_error_f = ccf_rms_ci_f * error_ratio_f
+#
+#     ## Re-sizing the error array to have the same shape as ccf_end
+#     ccf_error_f = np.resize(np.repeat(ccf_error_f, meta_dict['n_bins']),
+#                             (meta_dict['detchans'], meta_dict['n_bins']))
+#     ccf_error_f = ccf_error_f.T
+#
+#     if filter_harmonic:
+#
+#         bin_offset = int(np.round(0.0933303808428 / np.mean(meta_dict['dt'])))
+#         print("float time bin offset: %.5f" % (0.0933303808428 / np.mean(meta_dict['dt'])))
+#         print("Whole time bin offset: %d" % bin_offset)
+#
+#         ## Apply absolute rms2 normalization to power spectra, subtract noise
+#         signal_ci_pow_h = raw_to_absrms(signal_ci_pow_h, ci.mean_rate,
+#                                         meta_dict['n_bins'],
+#                                         np.mean(meta_dict['dt']), noisy=noisy)
+#         signal_ref_pow_h = raw_to_absrms(signal_ref_pow_h, ref.mean_rate,
+#                                          meta_dict['n_bins'],
+#                                          np.mean(meta_dict['dt']), noisy=noisy)
+#
+#         ## If the power is negative, set it equal to zero.
+#         signal_ref_pow_h[signal_ref_pow_h < 0] = 0.
+#         signal_ci_pow_h[signal_ci_pow_h < 0] = 0.
+#
+#         # print("Frac RMS of reference band:", ref.rms / ref.mean_rate)
+#         ## in frac rms units here -- should be few percent
+#
+#         ## Broadcast signal_ref_pow into same shape as signal_ci_pow
+#         signal_ref_pow_h = np.resize(
+#             np.repeat(signal_ref_pow_h, meta_dict['detchans']),
+#             np.shape(signal_ci_pow_h))
+#         assert np.shape(signal_ref_pow_h) == np.shape(signal_ci_pow_h)
+#
+#         ## Compute amplitude of noise in the cross spectrum
+#         temp_h = (noise_ci * signal_ref_pow_h) + (noise_ref * signal_ci_pow_h) + \
+#                  (noise_ci * noise_ref)
+#
+#         cs_noise_amp_h = np.sqrt(
+#             np.sum(temp_h, axis=0) / np.float(meta_dict['n_seg']))
+#
+#         ## Compute amplitude of (filtered) signal in the cross spectrum
+#         temp1_h = cs_avg * (2.0 * np.mean(meta_dict['dt']) /
+#                             np.float(meta_dict['n_bins']))
+#         cs_signal_amp_h = np.sum(temp1_h, axis=0)
+#
+#         ## Assume cs_noise_amp and cs_signal_amp are float arrays, size DETCHANS
+#         with np.errstate(all='ignore'):
+#             error_ratio_h = np.where(cs_signal_amp_h != 0, cs_noise_amp_h / \
+#                                      cs_signal_amp_h, 0)
+#
+#         ## Take the IFFT of the cross spectrum to get the CCF
+#         ccf_end_h = fftpack.ifft(filtered_cs_avg_h, axis=0)
+#
+#         ## Divide average ccf by average rms of signal in reference band
+#         ccf_end_h *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
+#
+#         ## Compute the error on the ccf
+#         ccf_rms_ci_h = np.sqrt(np.var(ccf_end_h, axis=0, ddof=1))
+#         ccf_error_h = ccf_rms_ci_h * error_ratio_h
+#
+#         ## Re-sizing the error array to have the same shape as ccf_end
+#         ccf_error_h = np.resize(np.repeat(ccf_error_h, meta_dict['n_bins']),
+#                                 (meta_dict['detchans'], meta_dict['n_bins']))
+#         ccf_error_h = ccf_error_h.T
+#
+#
+#         temp_ccf_h = np.vstack((ccf_end_h[-bin_offset:meta_dict['n_bins'],:],
+#                                 ccf_end_h[0:-bin_offset,:]))
+#         # print(temp_ccf_h)
+#         ccf_end = ccf_end_f + temp_ccf_h
+#         temp_err_h = np.vstack((ccf_error_h[-bin_offset:meta_dict['n_bins'],:],
+#                                 ccf_error_h[0:-bin_offset,:]))
+#         ccf_error = np.sqrt(ccf_error_f**2 + temp_err_h**2)
+#     else:
+#         ccf_end = ccf_end_f
+#         ccf_error = ccf_error_f
+#
+#     return ccf_end.real, ccf_error.real
 
 
 ################################################################################
@@ -1980,9 +2187,18 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         if os.path.isfile(adjust_file):
             adjust_segments = [int(line.strip()) for line in open(adjust_file)]
         else:
-            print("adjustby.txt file does not exist. NOT adjusting segments to"\
-                  " line up QPO.")
-            adjust_segments = np.zeros(len(data_files))
+            adjust_file = out_dir + "/" + prefix + "_t" + str(
+                dt_mult) + "_" + str(int(n_seconds)) + \
+                          "sec_adjustby.txt"
+            if os.path.isfile(adjust_file):
+                adjust_segments = [int(line.strip()) for line in
+                                   open(adjust_file)]
+            else:
+                print("WARNING: adjustby.txt file does not exist. NOT "\
+                      "adjusting segments to line up QPO.")
+                adjust = False
+                adjust_segments = np.zeros(len(data_files))
+                out_file = out_file.replace("_adj","")
     else:
         adjust_segments = np.zeros(len(data_files))
 
@@ -2149,7 +2365,7 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ##############################################
 
     if meta_dict['filter']:
-        ccf_avg, ccf_error = filt_cs_to_ccf_w_err(avg_cross_spec, meta_dict,
+        ccf_avg, ccf_error = filt_cs_to_ccf_w_err_IV(avg_cross_spec, meta_dict,
                 ci_total, ref_total, lo_freq, hi_freq, filter_harmonic=harmonic,
                 noisy=True)
     else:
