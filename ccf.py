@@ -860,7 +860,7 @@ def TypeB_optimal_filt(meta_dict, dt):
     for line in f:
         element0 = line.split()[0]
         element1 = line.split()[1]
-        print(element0, element1)
+        # print(element0, element1)
         # print("i=%d, j=%d" %(i,j))
 
         if element0 != '=':
@@ -887,8 +887,8 @@ def TypeB_optimal_filt(meta_dict, dt):
             i += 1
 
         ## For testing: to stop after 2 bands (ref and one ci) have been read in
-        if k == 2:
-            exit()
+        # if k == 2:
+        #     exit()
 
     return big_filter
 
@@ -1043,91 +1043,6 @@ def make_cs(rate_ci, rate_ref, meta_dict, dt_seg):
 
     return cs_seg, ci_seg, ref_seg, f_lag_seg
 
-#
-# ################################################################################
-# def each_segment(time_ci, time_ref, energy_ci, energy_ref, meta_dict,\
-#     start_time, end_time):
-#     """
-#     Turn the event list into a populated histogram, stack the reference band,
-#     and make the cross spectrum, per segment of light curve.
-#
-#     Parameters
-#     ----------
-#     time_ci : np.array of floats
-#         1-D array of the photon arrival times of events in this segment for the
-#         channel of interest.
-#
-#     time_ref : np.array of floats
-#         1-D array of the photon arrival times of events in this segment for the
-#         reference band.
-#
-#     energy_ci : np.array of ints
-#         1-D array of the energy channels of events in this segment for the
-#         channel of interest.
-#
-#     energy_ref : np.array of ints
-#         1-D array of the energy channels of events in this segment for the
-#         reference band.
-#
-#     meta_dict : dict
-#         Dictionary of necessary meta-parameters for data analysis.
-#
-#     start_time : float
-#         Starting time of the segment (front of bin), in whatever units time_ci
-#         and time_ref are in.
-#
-#     end_time : float
-#         End time of the segment (back of bin), in whatever units time_ci,
-#         time_ref, and start_time are in.
-#
-#     Returns
-#     -------
-#     cs_seg : np.array of complex numbers
-#         The cross spectrum of the channels of interest with the reference band
-#         for this segment of data. Size=(n_bins, detchans).
-#
-#     ci_seg : ccf_lc.Lightcurve object
-#         The channels of interest light curve.
-#
-#     ref_seg : ccf_lc.Lightcurve object
-#         The reference band light curve.
-#
-#     np.mean(rate_ci_2d) : float
-#         The total mean count rate of the channels of interest.
-#
-#     """
-#     assert len(time_ci) == len(energy_ci)
-#     assert len(time_ref) == len(energy_ref)
-#
-#     ##############################################################
-#     ## Populate the light curves for interest and reference bands
-#     ##############################################################
-#
-#     rate_ci_2d = tools.make_2Dlightcurve(np.asarray(time_ci),
-#         np.asarray(energy_ci), meta_dict['n_bins'], meta_dict['detchans'],
-#         start_time, end_time)
-#     rate_ref_2d = tools.make_2Dlightcurve( np.asarray(time_ref),
-#         np.asarray(energy_ref), meta_dict['n_bins'], meta_dict['detchans'],
-#         start_time, end_time)
-#
-#     ## Stack the reference band
-#     rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
-#                                     obs_epoch=meta_dict['obs_epoch'])
-#
-#     ## Save the reference band light curve to a text file
-# # 	out_file="./GX339-BQPO_ref_lc.dat"
-# # 	f_handle = file(out_file, 'a')
-# # 	np.savetxt(f_handle, rate_ref)
-# # 	f_handle.close()
-#
-#     ###########################
-#     ## Make the cross spectrum
-#     ###########################
-#
-#     cs_seg, ci_seg, ref_seg = make_cs(rate_ci_2d, rate_ref, meta_dict)
-#
-#     return cs_seg, ci_seg, ref_seg, np.mean(rate_ci_2d)
-
 
 ################################################################################
 def fits_in(in_file, meta_dict, test=False):
@@ -1189,7 +1104,7 @@ def fits_in(in_file, meta_dict, test=False):
 
     """
 
-    assert tools.power_of_two(meta_dict['n_bins']), "ERROR: n_bins must be a "\
+    assert power_of_two(meta_dict['n_bins']), "ERROR: n_bins must be a "\
             "power of 2."
     meta_dict['obs_epoch'] = tools.obs_epoch_rxte(in_file)
 
