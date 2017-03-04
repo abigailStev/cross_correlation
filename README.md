@@ -1,7 +1,7 @@
 # cross_correlation
 Computes the cross-correlation function of a broad reference energy band with 
-narrow energy channels of interest. Please see Stevens et al. (in prep) for 
-reference. If you use this software, please cite that paper!!
+narrow energy channels of interest. Please see [Stevens & Uttley 2016](https://ui.adsabs.harvard.edu/#abs/2016MNRAS.460.2796S/abstract)
+for reference.
 
 ## Contents
 
@@ -38,9 +38,6 @@ Plots the cross spectrum. Only intended for testing purposes.
 Plots multiple 1-D cross-correlation functions from different energy channels on
 one plot.
 
-### README.md
-This document.
-
 ### run_ccf.sh
 Bash script to run ccf.py and plotting scripts.
 
@@ -52,27 +49,24 @@ These are offshoots of their non-_OIR counterparts, created for collaboration
 with Federico Vincentelli and Piergiorgio Casella. TODO: incorporate these in
 the regular ccf.py and run_ccf.py.
 
-[![astropy](http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)]
-(http://www.astropy.org/) 
+[![astropy](http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](http://www.astropy.org/)
 
 ## Authors
 * Abigail Stevens (UvA API)
 
-Please cite Stevens et al. (in prep) if you use this paper for research!!
 
 ## Collaborators
 * Phil Uttley (UvA API) -- Math and stats theory
 * Federico Vincentelli (INAF Roma, INAF Brera) -- Adding option for IR and/or 
 optical reference band
 
-Pull requests are welcome!
+## Copyright
+All content © 2014-2017 the Authors, and is distributed under the MIT
+Licence. See LICENSE.md for details.
 
+If you use this code, please cite [Stevens & Uttley 2016](https://ui.adsabs.harvard.edu/#abs/2016MNRAS.460.2796S/abstract).
 
-## License
-All code is Copyright 2014-2015 The Authors, and is distributed under the MIT 
-Licence. See LICENSE for details. If you are interested in the further 
-development of cross_correlation, please [get in touch via the issues]
-(https://github.com/abigailstev/cross_correlation/issues)!
-
+The functionality of this software will be folded into [Stingray](http://stingraysoftware.github.io/),
+so please get involved there.
 
 
