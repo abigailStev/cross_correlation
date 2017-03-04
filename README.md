@@ -3,6 +3,9 @@ Computes the cross-correlation function of a broad reference energy band with
 narrow energy channels of interest. Please see [Stevens & Uttley 2016](https://ui.adsabs.harvard.edu/#abs/2016MNRAS.460.2796S/abstract)
 for reference.
 
+The functionality of this software will be folded into [Stingray](http://stingraysoftware.github.io/),
+so please get involved there.
+
 ## Contents
 
 ### ccf.py
