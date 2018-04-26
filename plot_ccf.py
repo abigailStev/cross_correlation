@@ -14,7 +14,40 @@ from matplotlib.ticker import MultipleLocator
 import tools
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
-__year__ = "2014-2015"
+__year__ = "2014-2017"
+
+
+################################################################################
+def type_positive_int(num):
+    """
+    Check if an input is a positive integer, as an argparse type.
+
+    Parameters
+    ----------
+    num : int, long, float, or double
+        The number in question.
+
+    Returns
+    -------
+    n : int
+        The input number, if it's a positive integer
+
+    Raises
+    ------
+    ArgumentTypeError if n isn't a real number or a positive integer.
+
+    """
+    try:
+        n = int(num)
+    except ValueError or TypeError:
+        message = "Input is not a positive integer."
+        raise argparse.ArgumentTypeError(message)
+
+    if n >= 0:
+        return n
+    else:
+        message = "%d is not a positive integer." % n
+        raise argparse.ArgumentTypeError(message)
 
 
 ################################################################################
@@ -84,6 +117,7 @@ def make_plot(x_bins, ccf_amps, ccf_err, n_bins, prefix, plot_file, chan, \
     ax.set_xlim(-t_length, t_length)
     # ax.set_xlim(0, t_length)
     # ax.set_ylim(-1.5, 3.0)
+    # ax.set_ylim(-0.5, 0.5)
 
     ## Setting the axes' minor ticks. It's complicated.
     x_maj_loc = ax.get_xticks()
@@ -139,7 +173,7 @@ if __name__ == "__main__":
             help="File extension for the plot. Do not include the '.' [eps]")
 
     parser.add_argument('-l', '--length', dest='t_length', default=30,
-            type=tools.type_positive_int,
+            type=type_positive_int,
             help="Number of time bins to plot on either side of 0. [30]")
 
     args = parser.parse_args()

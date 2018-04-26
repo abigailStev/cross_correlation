@@ -13,10 +13,44 @@ import matplotlib.font_manager as font_manager
 from matplotlib.ticker import MultipleLocator
 
 __author__ = "Abigail Stevens <A.L.Stevens@uva.nl>"
-__year__ = "2014-2016"
+__year__ = "2014-2017"
+
 
 ################################################################################
-def main(ccf_file, plot_file, prefix):
+def type_positive_int(num):
+    """
+    Check if an input is a positive integer, as an argparse type.
+
+    Parameters
+    ----------
+    num : int, long, float, or double
+        The number in question.
+
+    Returns
+    -------
+    n : int
+        The input number, if it's a positive integer
+
+    Raises
+    ------
+    ArgumentTypeError if n isn't a real number or a positive integer.
+
+    """
+    try:
+        n = int(num)
+    except ValueError or TypeError:
+        message = "Input is not a positive integer."
+        raise argparse.ArgumentTypeError(message)
+
+    if n >= 0:
+        return n
+    else:
+        message = "%d is not a positive integer." % n
+        raise argparse.ArgumentTypeError(message)
+
+
+################################################################################
+def main(ccf_file, plot_file, prefix, t_len=30):
     """
     Main method of plot_multi.py. Plots 1-D CCFs of multiple energy channels
     together on one plot.
@@ -26,6 +60,7 @@ def main(ccf_file, plot_file, prefix):
     ccf_file : str
     plot_file : str
     prefix : str
+    t_len : int
 
     Returns
     -------
@@ -110,8 +145,9 @@ def main(ccf_file, plot_file, prefix):
                   fontproperties=font_prop)
     ax.set_ylabel('Deviation from mean (cts$\;$s$^{-1}$)', \
     	fontproperties=font_prop)
-    ax.set_xlim(-50, 50)
-    ax.set_ylim(-5, 25)
+    ax.set_xlim(-t_len, t_len)
+    ax.set_ylim(-10, 15)
+    # ax.set_ylim(-1, 1)
 
     ## Setting the axes' minor ticks. It's complicated.
     x_maj_loc = ax.get_xticks()
@@ -132,7 +168,8 @@ def main(ccf_file, plot_file, prefix):
     ax.tick_params(which='minor', width=1.5, length=4)
     for axis in ['top', 'bottom', 'left', 'right']:
         ax.spines[axis].set_linewidth(1.5)
-#     ax.set_title("%s, CCF per energy channel" % prefix, fontproperties=font_prop)
+    ax.set_title("%s, CCF per energy channel" % prefix,
+                 fontproperties=font_prop)
 
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles, labels, loc='upper right', fontsize=18,
@@ -161,10 +198,14 @@ if __name__ == "__main__":
             help="The identifying prefix of the data (object nickname or "\
             "proposal ID). [--]")
 
+    parser.add_argument('-l', '--length', dest='t_length', default=30,
+            type=type_positive_int,
+            help="Number of time bins to plot on either side of 0. [30]")
+
     args = parser.parse_args()
 
     # print("Input file: %s" % args.ccf_table)
 
-    main(args.ccf_table, args.plot_file, args.prefix)
+    main(args.ccf_table, args.plot_file, args.prefix, t_len=args.t_length)
 	
 ################################################################################

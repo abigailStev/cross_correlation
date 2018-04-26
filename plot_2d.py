@@ -17,12 +17,12 @@ from matplotlib.ticker import MultipleLocator
 import tools  # at https://github.com/abigailStev/whizzy_scripts
 
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
-__year__ = "2014-2015"
+__year__ = "2014-2017"
 
 
 ################################################################################
 def make_plot(ccf, t_bins, mean_rate_ci, t_length, delay,
-        plot_file, energies=None, prefix="--", tab_file=None):
+        plot_file, energies=[], prefix="--", tab_file=None):
     """
     Actually makes the plots.
 
@@ -102,14 +102,17 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, delay,
     fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
 
     if len(energies) > 0:  ## If energies exists as a variable
-        plt.pcolor(t_bins, energies, ratio, cmap='YlGnBu_r')
-        # plt.pcolor(t_bins, energies, ratio, cmap='hot')
+        # plt.pcolor(t_bins, energies, ratio, cmap='YlGnBu_r', vmin=-0.3, vmax=0.3)
+        # plt.pcolor(t_bins, energies, ratio, cmap='YlGnBu_r', vmin=-0.05, vmax=0.05)
+
+        plt.pcolor(t_bins, energies, ratio, cmap='spring')
         # plt.pcolor(t_bins, energies, ratio, cmap='hot', vmin=-0.26, vmax=0.42)
         # plt.pcolor(t_bins, energies, ratio, cmap='spring', vmin=-0.04,
         #         vmax=0.04)
     else:
 # 		plt.pcolor(ratio, cmap='hot', vmin=-4.0, vmax=4.0)
         plt.pcolor(ratio, cmap='hot')
+        plt.xlim(t_bins[0], t_bins[-1])
     # ax.vlines(0.0, 2, 31, linestyle='solid', color='black', lw=1.0)
 
     cbar = plt.colorbar()
@@ -121,18 +124,19 @@ def make_plot(ccf, t_bins, mean_rate_ci, t_length, delay,
 
     if len(energies) > 0:  ## If energies exists as a variable
         ax.set_ylabel('Energy (keV)', fontproperties=font_prop)
-        ax.set_ylim(3, 20)
+        if len(energies) == 65:
+            ax.set_ylim(3, 20)
         # rect = patches.Rectangle((-t_length,energies[10]), 2*t_length, 0.41,
         #         facecolor="orange", ec="none")
-        rect = patches.Rectangle((-t_length, energies[10]), 2 * t_length, 0.41,
-                facecolor="blue", ec="none")
+            rect = patches.Rectangle((-t_length, energies[10]), 2 * t_length, 0.41,
+                    facecolor="black", ec="none")
+            ax.add_patch(rect)
     else:
         ax.set_ylabel('Energy channel', fontproperties=font_prop)
         ax.set_ylim(0, np.shape(ratio)[0])
-    #     rect = patches.Rectangle((-t_length,10), 2*t_length, 1, ec="none")
-    #
-    ax.add_patch(rect)
-    zero_outline = patches.Rectangle((0, 2), 1, 26, edgecolor="black",
+        # rect = patches.Rectangle((-t_length,10), 2*t_length, 1, ec="none")
+
+    zero_outline = patches.Rectangle((0, 2), 0.5, 26, edgecolor="black",
             facecolor="none")
     ax.add_patch(zero_outline)
 

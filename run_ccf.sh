@@ -13,7 +13,7 @@
 ## Notes: HEASOFT 6.19.*, bash 3.*, and conda 4.0.7 with python 2.7.*
 ## 		  must be installed in order to run this script. 
 ##
-## Author: Abigail Stevens <A.L.Stevens at uva.nl>, 2014-2016
+## Author: Abigail Stevens <A.L.Stevens at uva.nl>, 2014-2017
 ##
 ################################################################################
 
@@ -51,22 +51,19 @@ numsec=64
 obs_epoch=5
 ## Whether or not to run as a test; 0 for no, 1 for yes
 testing=0
-## Whether or not to adjust segment length to line up QPOs (values are hardwired
-## for GX339-4); 0 for no, 1 for yes; adds _adj to filename if yes
+## Whether or not to adjust segment length to line up QPOs
+## Uses file ${ccf_out_dir}/${prefix}_t${dt}_${numsec}sec_adjustby.txt
+## One line per input file, integers.
+## 0 for no, 1 for yes; adds _adj to filename if yes
 adjusting=1
-## Whether or not you want to filter the cross spectrum in frequency.
-## Expected format: "no" or "low:high" (e.g. "400:402")
-filtfreq="3:10"
-#filtfreq="no"
-## Whether or not you want to include another Lorentzian for the harmonic
-## 0 for no, 1 for yes; if yes, filtfreq range must include harmonic!
-## if filtfreq="no", this is ignored; adds _wh to filename if yes
-filt_harmonic=1
+## Whether or not you want to filter the Fourier transforms (hardcoded)
+## 0 for no, 1 for yes; adds _filt to filename if yes
+filtering=1
 ## Lower frequency bound for lag-energy spectra, in Hz
-lag_lf=4.0
+lag_lf=3.0
 #lag_lf=780.0
 ## Upper frequency bound for lag-energy spectra, in Hz
-lag_uf=7.0
+lag_uf=10.0
 #lag_uf=880.0
 ## Lower energy bound for lag-frequency spectra, in detector channels
 lag_le=2
@@ -76,16 +73,17 @@ lag_ue=25
 ## Desired plot file extension, without the dot
 p_ext="eps"
 ## Number of time bins to plot for the 1D and 2D ccf
-tlen=50
+tlen=60
 ## Today's date (gets automatically), for writing in file names
 day=$(date +%y%m%d)
+#day="160913"
 #day="160318"
-#day="160127"
+#day="170329"
 ## Local file name for output files
-#filename="${prefix}_${day}_t${dt}_${numsec}sec_weird2"
-filename="${prefix}_${day}_t${dt}_${numsec}sec"
+filename="${prefix}_${day}_t${dt}_${numsec}sec_nooff"
+#filename="${prefix}_${day}_t${dt}_${numsec}sec"
 #filename="${obsID}_${day}_t${dt}_${numsec}sec"
-rebin_const=1.03
+rebin_const=1.04
 
 ## Your computer's home directory (gets automatically)
 home_dir=$(ls -d ~)
@@ -159,12 +157,12 @@ fi
 
 qpo_fit_file="${psd_out_dir}/${prefix}_QPOfit.txt"
 
-if (( $filt_harmonic == 1 )) && [ "$filtfreq" != "no" ]; then
-    ccf_out_file="${ccf_out_file}_wh"
+if (( $filtering == 1 )); then
+    ccf_out_file="${ccf_out_file}_filt"
 	ccf_plot_root="${ccf_out_file}"
-	lag_out_file="${lag_out_file}_wh"
+	lag_out_file="${lag_out_file}_filt"
 	lag_plot_root="${lag_out_file}"
-	psd_out_file="${psd_out_file}_wh"
+	psd_out_file="${psd_out_file}_filt"
 	psd_plot_root="${psd_out_file}"
 fi
 
@@ -190,14 +188,14 @@ cd "${ccf_exe_dir}"
 
 if [ -e "$in_file" ] && [ -e "$bkgd_spec" ]; then
 	time python "${ccf_exe_dir}"/ccf.py "${in_file}" "${ccf_out_file}.fits" \
-		    -b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" \
-		    -a "${adjusting}" --harmonic "${filt_harmonic}"
+		    -b "$bkgd_spec" -n "$numsec" -m "$dt" -t "$testing" \
+		    -a "${adjusting}" -f "${filtering}"
 
 elif [ -e "${in_file}" ]; then
 	echo "Background file not found."
 	time python "${ccf_exe_dir}"/ccf.py "${in_file}" "${ccf_out_file}.fits" \
-		    -n "$numsec" -m "$dt" -t "$testing" -f "$filtfreq" \
-		    -a "${adjusting}" --harmonic "${filt_harmonic}"
+		    -n "$numsec" -m "$dt" -t "$testing" -a "${adjusting}" \
+		    -f "${filtering}"
 else
 	echo -e "\tERROR: ccf.py was not run. Eventlist and/or background energy "\
             "spectrum doesn't exist."
@@ -217,10 +215,9 @@ fi
 #   echo -e "ERROR: re-binned reference band power spectrum does not exist."
 #fi
 
-#python "${psd_exe_dir}"/power_spectra/fit_qpo.py "${psd_out_file}.fits" \
-#       --mod "L" --fitfile "${qpo_fit_file}"
-#
-#open "${qpo_fit_file}"
+##python "${psd_exe_dir}"/power_spectra/fit_qpo.py "${psd_out_file}.fits" \
+##       --mod "L" --fitfile "${qpo_fit_file}"
+##open "${qpo_fit_file}"
 
 #############
 ## Plot CCFs
@@ -232,15 +229,15 @@ if [ -e "${ccf_out_file}.fits" ]; then
 	        -o "${ccf_plot_root}" --prefix "${prefix}" --ext "${p_ext}" \
 		    -l "$tlen"
 
-    if [ -e "${ccf_out_file}_chan_15.${p_ext}" ]; then
-        open "${ccf_out_file}_chan_15.${p_ext}"; fi
+#    if [ -e "${ccf_out_file}_chan_15.${p_ext}" ]; then
+#        open "${ccf_out_file}_chan_15.${p_ext}"; fi
 
     python "${ccf_exe_dir}"/plot_multi.py "${ccf_out_file}.fits" \
-        "$ccf_multi_plot" --prefix "${prefix}"
+        "$ccf_multi_plot" --prefix "${prefix}" -l "$tlen"
 
 	if [ -e "${ccf_multi_plot}" ]; then
       open "${ccf_multi_plot}"
-#      cp "${ccf_multi_plot}" "$home_dir/Dropbox/Research/CCF_paper1/images"
+#      cp "${ccf_multi_plot}" "$home_dir/Dropbox/Research/TypeC_spectim_paper/images"
     fi
 fi
 
@@ -248,89 +245,92 @@ fi
 ## Get the energy list from a channel list
 ###########################################
 
-if [ ! -e "$energies_file" ]; then
-    if [ -e "$ec_table_file" ] && [ -e "$chan_bin_file" ]; then
-
-        python "${xte_exe_dir}"/channel_to_energy.py "$ec_table_file" \
-                "$chan_bin_file" "$energies_file" "$obs_epoch"
-
-    else
-        echo -e "\tERROR: channel_to_energy.py not run. ec_table_file and/or "\
-                   "chan_bin_file do not exist."
-    fi
-fi
+#if [ ! -e "$energies_file" ]; then
+#    if [ -e "$ec_table_file" ] && [ -e "$chan_bin_file" ]; then
+#
+#        python "${xte_exe_dir}"/channel_to_energy.py "$ec_table_file" \
+#                "$chan_bin_file" "$energies_file" "$obs_epoch"
+#
+#    else
+#        echo -e "\tERROR: channel_to_energy.py not run. ec_table_file and/or "\
+#                   "chan_bin_file do not exist."
+#    fi
+#fi
 
 ####################################
 ## Plot the 2D ccf with a colourmap
 ####################################
 
 if [ -e "${ccf_out_file}.fits" ]; then
-
-	python "${ccf_exe_dir}"/plot_2d.py "${ccf_out_file}.fits" \
-	        -o "${ccf2d_plot}" --prefix "${prefix}" -l "$tlen" \
-	        -e "$energies_file"
-
-#	python "${ccf_exe_dir}"/plot_2d.py "${ccf_out_file}.fits" \
-#	        -o "${ccf2d_plot}" --prefix "${prefix}" -l "$tlen"
+    if [ -e "$energies_file" ]; then
+	    python "${ccf_exe_dir}"/plot_2d.py "${ccf_out_file}.fits" \
+	            -o "${ccf2d_plot}" --prefix "${prefix}" -l "$tlen" \
+	            -e "$energies_file"
+    else
+	    python "${ccf_exe_dir}"/plot_2d.py "${ccf_out_file}.fits" \
+	            -o "${ccf2d_plot}" --prefix "${prefix}" -l "$tlen"
+    fi
 
 	if [ -e "${ccf2d_plot}" ]; then open "${ccf2d_plot}"; fi
-#	cp "${ccf2d_plot}" "$home_dir/Dropbox/Research/CCF_paper1/images"
+#	cp "${ccf2d_plot}" "$home_dir/Dropbox/Research/TypeC_spectim_paper/images"
 
 fi
 
-#fits_cmd="print int(tools.get_key_val('${ccf_out_file}.fits', 1, 'DETCHANS'))"
-#detchans=$(python -c "import tools; ${fits_cmd}")
-#tlen2=$(( 2*tlen+1 ))
-#
-#cd "${ccf_out_dir}"
-#if [ -e "./temp.dat" ]; then
-#    fimgcreate bitpix=-32 \
-#	    naxes="${tlen2},${detchans}" \
-#	    datafile="./temp.dat" \
-#	    outfile="${ccf2d_fits_plot}" \
-#	    nskip=1 \
-#	    history=true \
-#	    clobber=yes
-#else
-#    echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
-#fi
+if [ -e "${ccf_out_file}.fits" ]; then
+    fits_cmd="print int(tools.get_key_val('${ccf_out_file}.fits', 1, 'DETCHANS'))"
+    detchans=$(python -c "import tools; ${fits_cmd}")
+    tlen2=$(( 2*tlen+1 ))
 
-#if [ -e "${ccf2d_fits_plot}" ]; then
-#    echo "FITS 2D ccf image: ${ccf2d_fits_plot}"
-#else
-#    echo -e "\tERROR: FIMGCREATE was not successful."
-#fi
+    cd "${ccf_out_dir}"
+    if [ -e "./temp.dat" ]; then
+        fimgcreate bitpix=-32 \
+            naxes="${tlen2},${detchans}" \
+            datafile="./temp.dat" \
+            outfile="${ccf2d_fits_plot}" \
+            nskip=1 \
+            history=true \
+            clobber=yes
+    else
+        echo -e "\tERROR: FIMGCREATE did not run. 2Dccf temp file does not exist."
+    fi
+
+    if [ -e "${ccf2d_fits_plot}" ]; then
+        echo "FITS 2D ccf image: ${ccf2d_fits_plot}"
+    else
+        echo -e "\tERROR: FIMGCREATE was not successful."
+    fi
+fi
 
 ###########################################
 ## Make and plot lags, covariance spectrum
 ###########################################
 
 #cd "${lag_exe_dir}"
-#local_rsp_matrix="${lag_out_dir}/${prefix}.rsp"
-#cp "${rsp_matrix}" "${local_rsp_matrix}"
+##local_rsp_matrix="${lag_out_dir}/${prefix}.rsp"
+##cp "${rsp_matrix}" "${local_rsp_matrix}"
 #
 #if [ -e "${lag_out_file}_cs.fits" ]; then
 #
-#python "${lag_exe_dir}"/get_lags.py "${lag_out_file}_cs.fits" \
-#		"${lag_out_file}_lag.fits" "${energies_file}" \
-#		-o "${lag_plot_root}" --prefix "$prefix" --ext "${p_ext}" \
-#		--lf "${lag_lf}" --uf "${lag_uf}" --le "${lag_le}" --ue "${lag_ue}"
+#    python "${lag_exe_dir}"/get_lags.py "${lag_out_file}_cs.fits" \
+#            "${lag_out_file}_lag.fits" "${energies_file}" \
+#            -o "${lag_plot_root}" --prefix "$prefix" --ext "${p_ext}" \
+#            --lf "${lag_lf}" --uf "${lag_uf}" --le "${lag_le}" --ue "${lag_ue}"
 #
-#if [ -e "${lag_plot_root}"_lag-energy."${p_ext}" ]; then
-#    open "${lag_plot_root}"_lag-energy."${p_ext}"
-###    cp "${lag_plot_root}"_lag-energy."${p_ext}" "$home_dir/Dropbox/Research/TypeC_spectim_paper/images"
-#fi
-#if [ -e "${lag_plot_root}"_lag-freq."${p_ext}" ]; then
-#    open "${lag_plot_root}"_lag-freq."${p_ext}"
-#fi
-##
-###	python "${lag_exe_dir}"/covariance_spectrum.py "${lag_out_file}_cs.fits" \
-###			"${lag_out_file}_cov.fits" --prefix "$prefix" --ext "${p_ext}" \
-###			--rsp "${local_rsp_matrix}" --lf "${lag_lf}" --uf "${lag_uf}"
-##
-#else
-#    echo -e "\tERROR: get_lags.py was not run. Cross spectrum output file does"\
-#        " not exist."
+#    if [ -e "${lag_plot_root}"_lag-energy."${p_ext}" ]; then
+#        open "${lag_plot_root}"_lag-energy."${p_ext}"
+##        cp "${lag_plot_root}"_lag-energy."${p_ext}" "$home_dir/Dropbox/Research/TypeC_spectim_paper/images"
+#    fi
+#    if [ -e "${lag_plot_root}"_lag-freq."${p_ext}" ]; then
+#        open "${lag_plot_root}"_lag-freq."${p_ext}"
+#    fi
+#
+##    python "${lag_exe_dir}"/covariance_spectrum.py "${lag_out_file}_cs.fits" \
+##            "${lag_out_file}_cov.fits" --prefix "$prefix" --ext "${p_ext}" \
+##            --rsp "${local_rsp_matrix}" --lf "${lag_lf}" --uf "${lag_uf}"
+#
+##else
+##    echo -e "\tERROR: get_lags.py was not run. Cross spectrum output file does"\
+##        " not exist."
 #fi
 
 ################################################################################

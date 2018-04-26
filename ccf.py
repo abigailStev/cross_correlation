@@ -45,6 +45,7 @@ import ccf_lightcurves as ccf_lc  ## in cross_correlation
 __author__ = "Abigail Stevens <A.L.Stevens at uva.nl>"
 __year__ = "2014-2017"
 
+
 ################################################################################
 def type_positive_float(num):
     """
@@ -77,6 +78,7 @@ def type_positive_float(num):
         message = "%d is not a positive number." % n
         raise argparse.ArgumentTypeError(message)
 
+
 ################################################################################
 def power_of_two(num):
     """
@@ -107,6 +109,7 @@ def power_of_two(num):
         while x < n and x < 2147483648:
             x *= 2
         return n == x
+
 
 ################################################################################
 def type_positive_int(num):
@@ -139,6 +142,7 @@ def type_positive_int(num):
     else:
         message = "%d is not a positive integer." % n
         raise argparse.ArgumentTypeError(message)
+
 
 ################################################################################
 def type_power_of_two(num):
@@ -227,7 +231,8 @@ def flx2xsp_out(file_root, ref, freq, n_seg, n_bins):
     out_table.add_column(Column(data=err_pow[1:]*freq[1:]*delta_freq,
                                 name='ERR_POW*FREQ*DF'))
 
-    out_table.write(out_file, format='ascii.no_header', delimiter="\t")
+    out_table.write(out_file, format='ascii.no_header', delimiter="\t",
+                    overwrite=True)
 
 
 ################################################################################
@@ -292,7 +297,8 @@ def ci_flx2xsp_out(file_root, ci, ref, freq, n_seg):
         out_table.add_column(Column(data=err_pow[1:] * freq[1:] * delta_freq,
                                     name='ERR CHAN %d' % i))
 
-    out_table.write(out_file, format='ascii.no_header', delimiter="\t")
+    out_table.write(out_file, format='ascii.no_header', delimiter="\t",
+                    overwrite=True)
 
 
 ################################################################################
@@ -323,33 +329,6 @@ def find_nearest(array, value):
         return array[idx-1], idx-1
     else:
         return array[idx], idx
-
-
-@custom_model
-def bbn(x, amp=1.0, x_0=0.9, fwhm=3.0):
-    numerator = fwhm / (np.pi * 2.0)
-    denominator = (x - x_0) ** 2 + (1.0 / 2.0 * fwhm) ** 2
-    L = (numerator / denominator) * amp * x
-    return L
-
-
-@custom_model
-def qpo_and_harmonic(x, amp_f=1., x_0_f=3., fwhm_f=0.5, amp_h=1., fwhm_h=0.8):
-    numerator1 = fwhm_f / (np.pi * 2.0)
-    denominator1 = (x - x_0_f) ** 2 + (1.0 / 2.0 * fwhm_f) ** 2
-    L1 = (numerator1 / denominator1) * amp_f * x
-    numerator2 = fwhm_h / (np.pi * 2.0)
-    denominator2 = (x - 2 * x_0_f) ** 2 + (1.0 / 2.0 * fwhm_h) ** 2
-    L2 = (numerator2 / denominator2) * amp_h * x
-    return L1 + L2
-
-
-@custom_model
-def qpo_fundamental_only(x, amp_f=1., x_0_f=3., fwhm_f=0.5):
-    numerator = fwhm_f / (np.pi * 2.0)
-    denominator = (x - x_0_f) ** 2 + (1.0 / 2.0 * fwhm_f) ** 2
-    L = (numerator / denominator) * amp_f * x
-    return L
 
 
 ################################################################################
@@ -396,7 +375,7 @@ def fits_out(out_file, in_file, bkgd_file, meta_dict, mean_rate_ci,
     -------
     Nothing, but writes to out_file.fits.
     """
-    print(out_file)
+    print("CCF output file: %s" % out_file)
     ## Check that the output file name has FITS file extension
     assert out_file[-4:].lower() == "fits", "ERROR: Output file must have "\
             "extension '.fits'."
@@ -431,7 +410,7 @@ def fits_out(out_file, in_file, bkgd_file, meta_dict, mean_rate_ci,
 
 
 ################################################################################
-def rebin(freq, power, err_power, rebin_const):
+def rebin(freq, power, err_power, rebin_const=1.01):
     """
     Re-bin the power spectrum in frequency space by some re-binning constant
     (rebin_const > 1).
@@ -783,8 +762,11 @@ def optimal_filt(meta_dict, dt):
     :param dt:
     :return:
     """
-    pow_filt_file = "/Users/abigail/Dropbox/Research/power_spectra/out_ps/GX339-4HzCQPO/allps_rb_mod_linetied_sigmatied_normfree.xcm"
-    # pow_filt_file = "/Users/abigailstevens/Dropbox/Research/power_spectra/out_ps/GX339-4HzCQPO/allps_rb_mod_linetied_sigmatied_normfree.xcm"
+    homedir = os.path.expanduser("~")
+    pow_filt_file = homedir+"/Dropbox/Research/power_spectra/out_ps/"\
+            "GX339-4HzCQPO/allps_rb_mod_linetied_sigmatied_normfree.xcm"
+    print("WARNING: Hardwired power spectra filter.")
+    print(pow_filt_file)
 
     ## The first one is the reference band,
     ## the rest are channels 2-25 inclusive, without channel 10 (since it's
@@ -795,32 +777,26 @@ def optimal_filt(meta_dict, dt):
     i = 1  # lines to read in for one spec;
             # a counter so we know when to stop and make the filter
     j = 0  # parameters in one spec; index in 'pars' array
-    k = 0
+    k = 0  # number of channels completed; only used in testing
     pars = np.zeros(14)
+
     for line in f:
         element0 = line.split()[0]
         element1 = line.split()[1]
-        # print("i=%d, j=%d" %(i,j))
 
         if element0 != '=':
-            # print(element0)
             pars[j] = element0
             j += 1
         else:
-            # print(element1)
             if i == 10 or i == 15 or i == 16: # the three values computed by p12 and p13
                 pass
             else:
                 j += 1
-        # print(pars)
         if i == 17: # There are 17, but we start at 0
             this_filt = ccf_lc.Filter(pars, k, n_bins=meta_dict['n_bins'], dt=dt)
             big_filter.append(this_filt)
             j = 0
             i = 1
-            # print(len(pars))
-            # print(pars[10:14])
-            # print(this_filt)
             k += 1
         else:
             i += 1
@@ -831,70 +807,9 @@ def optimal_filt(meta_dict, dt):
 
     return big_filter
 
-################################################################################
-def TypeB_optimal_filt(meta_dict, dt):
-    """
-    Reads in from a mod .xcm file, for fitting multiple power spectra in XSPEC.
-    Expects powerlaw + lorf + lorf + lorf
-    .xcm file name is hardcoded. Saves parameters into a ccf_lc.TypeBFilter object
-    and makes filters.
-
-    :param meta_dict:
-    :param dt:
-    :return:
-    """
-    pow_filt_file = "/Users/abigail/Dropbox/Research/power_spectra/out_ps/GX339-BQPO/GX339-BQPO_170221_t64_64sec_adj_rb_allps.xcm"
-    # pow_filt_file = "/Users/abigailstevens/Dropbox/Research/power_spectra/out_ps/GX339-4HzCQPO/allps_rb_mod_linetied_sigmatied_normfree.xcm"
-
-    ## The first one is the reference band,
-    ## the rest are channels 2-25 inclusive, without channel 10 (since it's
-    ## zeros)
-    f = open(pow_filt_file, 'r')
-    f.seek(138)
-    big_filter = []
-    i = 1  # lines to read in for one spec;
-            # a counter so we know when to stop and make the filter
-    j = 0  # parameters in one spec; index in 'pars' array
-    k = 0
-    pars = np.zeros(9)
-    for line in f:
-        element0 = line.split()[0]
-        element1 = line.split()[1]
-        # print(element0, element1)
-        # print("i=%d, j=%d" %(i,j))
-
-        if element0 != '=':
-            # print(element0)
-            pars[j] = element0
-            j += 1
-        else:
-            # print(element1)
-            if i == 9 or i == 10:
-                pass
-            else:
-                j += 1
-        # print(pars)
-        if i == 11: #
-            this_filt = ccf_lc.TypeBFilter(pars, k, n_bins=meta_dict['n_bins'], dt=dt)
-            big_filter.append(this_filt)
-            j = 0
-            i = 1
-            # print(len(pars))
-            # print(pars[10:14])
-            # print(this_filt)
-            k += 1
-        else:
-            i += 1
-
-        ## For testing: to stop after 2 bands (ref and one ci) have been read in
-        # if k == 2:
-        #     exit()
-
-    return big_filter
-
 
 ################################################################################
-def make_cs(rate_ci, rate_ref, meta_dict, dt_seg):
+def make_cs(rate_ci, rate_ref, meta_dict, fft_filter=None):
     """
     Generate the cross spectrum for one segment of the light curve.
 
@@ -909,6 +824,8 @@ def make_cs(rate_ci, rate_ref, meta_dict, dt_seg):
 
     meta_dict : dict
         Dictionary of necessary meta-parameters for data analysis.
+        
+    fft_filter : ccf_lc.Filter object of the optimal filter
 
     Returns
     -------
@@ -949,87 +866,65 @@ def make_cs(rate_ci, rate_ref, meta_dict, dt_seg):
     fft_data_ci = fftpack.fft(rate_sub_mean_ci, axis=0)
     fft_data_ref = fftpack.fft(rate_sub_mean_ref)
 
-    ## Computing the power from the fourier transform
+    ## Computing the power from the fourier transform, unfiltered
     ci_seg.power = np.absolute(fft_data_ci) ** 2
     ref_seg.power = np.absolute(fft_data_ref) ** 2
 
-    ## Getting the optimal filter
-    optimal_filter = optimal_filt(meta_dict, dt_seg)
-    optimal_filter = TypeB_optimal_filt(meta_dict, dt_seg)
+    ## Computing the cross spectrum, unfiltered
+    cs_seg.total = np.multiply(fft_data_ci.T, np.conj(fft_data_ref)).T
 
     ## Applying the optimal filter to the reference band
-    fft_data_ref_fund = fft_data_ref * optimal_filter[0].fund_filt
-    fft_data_ref_harm = fft_data_ref * optimal_filter[0].harm_filt
-    fft_data_ref_both = fft_data_ref * optimal_filter[0].both_filt
+    fft_data_ref_fund = fft_data_ref * fft_filter[0].fund_filt
+    fft_data_ref_harm = fft_data_ref * fft_filter[0].harm_filt
+    fft_data_ref_both = fft_data_ref * fft_filter[0].both_filt
+
+    ## Computing the power of the filtered reference band
     ref_seg.filt_qpo_power = np.absolute(fft_data_ref_both) ** 2
-    ref_seg.filt_qpo_power = ref_seg.filt_qpo_power[0:meta_dict['n_bins']/2+1]
+    # ref_seg.filt_qpo_power = ref_seg.filt_qpo_power[0:meta_dict['n_bins']/2+1]
+    ref_seg.fund_power = np.absolute(fft_data_ref_fund) ** 2
+    # ref_seg.fund_power = ref_seg.fund_power[0:meta_dict['n_bins']/2+1]
+    ref_seg.harm_power = np.absolute(fft_data_ref_harm) ** 2
+    # ref_seg.harm_power = ref_seg.harm_power[0:meta_dict['n_bins']/2+1]
 
     ## Applying the optimal filter to the channels of interest
     ## I have filters for channels 2-25 inclusive (except 11), which start
     ## at filter index 1 (since 0 is the reference band)
-    ci_fund_filt = np.ones(np.shape(fft_data_ci))
-    # print(ci_fund_filt[1,1])
+    ci_fund_filt = np.zeros(np.shape(fft_data_ci))
+
     for i in range(1,9):
-        # print(optimal_filter[i].continuum)
-        ci_fund_filt[:,i+1] = optimal_filter[i].fund_filt
+        ci_fund_filt[:,i+1] = fft_filter[i].fund_filt
     for i in range(9,25):
-        ci_fund_filt[:,i+2] = optimal_filter[i].fund_filt
-    ci_harm_filt = np.ones(np.shape(fft_data_ci))
+        ci_fund_filt[:,i+2] = fft_filter[i].fund_filt
+    ci_harm_filt = np.zeros(np.shape(fft_data_ci))
     for i in range(1, 9):
-        ci_harm_filt[:, i + 1] = optimal_filter[i].harm_filt
+        ci_harm_filt[:, i + 1] = fft_filter[i].harm_filt
     for i in range(9, 25):
-        ci_harm_filt[:, i + 2] = optimal_filter[i].harm_filt
-
-    # np.savetxt("ref_fund_filt.txt", optimal_filter[0].fund_filt)
-    # np.savetxt("ref_harm_filt.txt", optimal_filter[0].harm_filt)
-    # print(optimal_filter[0].continuum)
-    # np.savetxt("ref_continuum.txt", optimal_filter[0].continuum)
-    # np.savetxt("ref_fund.txt", optimal_filter[0].fund)
-    # np.savetxt("ci_chan2_continuum.txt", optimal_filter[1].continuum)
-    # np.savetxt("ci_chan2_fund.txt", optimal_filter[1].fund)
-    # np.savetxt("ci_chan22_continuum.txt", optimal_filter[-3].continuum)
-    # np.savetxt("ci_chan22_fund.txt", optimal_filter[-3].fund)
-    # np.savetxt("ci_fund_filt.txt", ci_fund_filt)
-    # np.savetxt("ci_harm_filt.txt", ci_harm_filt)
-    # np.savetxt("pos_freqs.txt", optimal_filter[0].pos_freq)
-    # print("Ref fund:", optimal_filter[0].fund[240])
-    # print("Ref con:", optimal_filter[0].continuum[240])
-    # print("Ref ratio:", optimal_filter[0].fund[240]/optimal_filter[0].continuum[240])
-    # print("2 fund:", optimal_filter[2].fund[240])
-    # print("2 con:", optimal_filter[2].continuum[240])
-    # print("2 ratio:", optimal_filter[2].fund[240]/optimal_filter[2].continuum[240])
-    # print("6 fund:", optimal_filter[6].fund[240])
-    # print("6 con:", optimal_filter[6].continuum[240])
-    # print("6 ratio:", optimal_filter[6].fund[240]/optimal_filter[6].continuum[240])
-
-    # print("Before filter:")
-    # print("CI2:", fft_data_ci[240,2], phase_angle(fft_data_ci[240,2]))
-    # print("Ref:", fft_data_ref[240], phase_angle(fft_data_ref[240]))
+        ci_harm_filt[:, i + 2] = fft_filter[i].harm_filt
+    ci_both_filt = np.zeros(np.shape(fft_data_ci))
+    for i in range(1, 9):
+        ci_both_filt[:, i + 1] = fft_filter[i].both_filt
+    for i in range(9, 25):
+        ci_both_filt[:, i + 2] = fft_filter[i].both_filt
 
     fft_data_ci_fund = fft_data_ci * ci_fund_filt
     fft_data_ci_harm = fft_data_ci * ci_harm_filt
+    fft_data_ci_both = fft_data_ci * ci_both_filt
 
-    # print("After filter:")
-    # print("CI2:", fft_data_ci_fund[240,2], phase_angle(fft_data_ci_fund[240,2]))
-    # print("Ref:", fft_data_ref_fund[240], phase_angle(fft_data_ref_fund[240]))
-
-    # lightcurve1 = fftpack.ifft(fft_data_ci_fund, axis=0)
-    # print(np.shape(lightcurve1))
-    # np.savetxt("ci_filtered_lightcurve.txt", lightcurve1)
-    # exit()
-
-    ## Broadcasting fft of ref into same shape as fft of ci
-    fft_data_ref_fund = np.resize(np.repeat(fft_data_ref_fund, \
-            meta_dict['detchans']), (meta_dict['n_bins'], \
-                                     meta_dict['detchans']))
-    fft_data_ref_harm = np.resize(np.repeat(fft_data_ref_harm, \
-            meta_dict['detchans']), (meta_dict['n_bins'], \
-                                     meta_dict['detchans']))
+    ## Computing the power of the filtered channels of interest
+    ci_seg.filt_qpo_power = np.absolute(fft_data_ci_both) ** 2
+    # print(np.shape(ci_seg.filt_qpo_power))
+    # ci_seg.filt_qpo_power = ci_seg.filt_qpo_power[0:meta_dict['n_bins']/2+1,:]
+    # print(np.shape(ci_seg.filt_qpo_power))
+    ci_seg.fund_power = np.absolute(fft_data_ci_fund) ** 2
+    # ci_seg.fund_power = ci_seg.fund_power[0:meta_dict['n_bins']/2+1,:]
+    ci_seg.harm_power = np.absolute(fft_data_ci_harm) ** 2
+    # ci_seg.harm_power = ci_seg.harm_power[0:meta_dict['n_bins']/2+1,:]
 
     ## Computing the cross spectrum from the fourier transform
     ## For both the fundamental filtered part and the harmonic filtered part
-    cs_seg.fund = np.multiply(fft_data_ci_fund, np.conj(fft_data_ref_fund))
-    cs_seg.harm = np.multiply(fft_data_ci_harm, np.conj(fft_data_ref_harm))
+    cs_seg.fund = np.multiply(fft_data_ci_fund.T, np.conj(fft_data_ref_fund)).T
+    cs_seg.harm = np.multiply(fft_data_ci_harm.T, np.conj(fft_data_ref_harm)).T
+    cs_seg.both = np.multiply(fft_data_ci_both.T, np.conj(fft_data_ref_both)).T
 
     ## Computing the cross spectrum and power spectra for frequency lags
     f_lag_seg = ccf_lc.LagFreq(n_bins=meta_dict['n_bins'])
@@ -1114,7 +1009,7 @@ def fits_in(in_file, meta_dict, test=False):
     if meta_dict['n_bins'] == 32768:
         print_iterator = int(10)
     elif meta_dict['n_bins'] < 32768:
-        print_iterator = int(10)   #TODO: change back to 20
+        print_iterator = int(20)
     else:
         print_iterator = int(1)
 
@@ -1146,15 +1041,6 @@ def fits_in(in_file, meta_dict, test=False):
     except IOError:
         print("\tERROR: File does not exist: %s" % in_file)
         exit()
-
-    # try:
-    #     fits_hdu = fits.open(in_file)
-    # except IOError:
-    #     print("\tERROR: File does not exist: %s" % in_file)
-    #     sys.exit()
-    #
-    # data = fits_hdu[1].data
-    # fits_hdu.close()
 
     ###################
     ## Initializations
@@ -1251,7 +1137,6 @@ def fits_in(in_file, meta_dict, test=False):
             print("WARNING: I don't think this segment time selection has "\
                     "been tested.")
             index = np.max(np.where(all_time_ref < ci_final_time))
-            # print("\t", index)
             final_time = all_time_ref[index]
             all_time_ref = all_time_ref[0:index]
         else:
@@ -1259,8 +1144,15 @@ def fits_in(in_file, meta_dict, test=False):
 
     seg_end_time = start_time + meta_dict['n_seconds']
 
-#    print("Start: %.15f" % start_time)
-#    print("Final: %.15f" % final_time)
+    ## Getting optimal filter for this file (i.e., for this dt)
+    dt_seg = (seg_end_time + (meta_dict['adjust_seg'] * meta_dict['dt']) - \
+              start_time) / float(meta_dict['n_bins'])
+    # print(dt_seg)
+    optimal_filter = optimal_filt(meta_dict, dt_seg)
+    ref_whole.model_fund_power = optimal_filter[0].whole_fund
+    ref_whole.model_harm_power = optimal_filter[0].whole_harm
+    ci_whole.model_fund_power4 = optimal_filter[3].whole_fund
+    ci_whole.model_harm_power4 = optimal_filter[3].whole_harm
 
     ############################
     ## Looping through segments
@@ -1307,7 +1199,7 @@ def fits_in(in_file, meta_dict, test=False):
 
         if len(time_ci) > 0 and \
                 (len(time_ref) > 0 or
-                (meta_dict['ref_file'] and \
+                (meta_dict['ref_file'] and
                 len(rate_ref) == meta_dict['n_bins'])):
 
             ##############################################################
@@ -1326,12 +1218,6 @@ def fits_in(in_file, meta_dict, test=False):
                 rate_ref = stack_reference_band(rate_ref_2d, instrument="PCA",
                         obs_epoch=meta_dict['obs_epoch'])
 
-            ## Save the reference band light curve to a text file
-        	# out_file="./GX339-BQPO_ref_lc.dat"
-        	# f_handle = file(out_file, 'a')
-        	# np.savetxt(f_handle, rate_ref)
-        	# f_handle.close()
-
             dt_seg = (seg_end_time - start_time) / float(meta_dict['n_bins'])
             df_seg = 1.0 / (meta_dict['n_bins'] * dt_seg)
 
@@ -1340,86 +1226,96 @@ def fits_in(in_file, meta_dict, test=False):
             ###########################
 
             cs_seg, ci_seg, ref_seg, f_lag_seg = make_cs(rate_ci_2d, rate_ref,
-                                                          meta_dict, dt_seg)
+                    meta_dict, fft_filter=optimal_filter)
 
             ###################################################################
             ## Compute variance and rms of the positive-frequency power in the
             ## reference band.
             ###################################################################
-
             if meta_dict['ref_file']:
                 IR_poisson = np.sum(err_ref ** 2) / float(len(err_ref))
                 print(IR_poisson)
-                absrms_pow = ref_seg.power[0:meta_dict['n_bins'] / 2 + 1] * \
+                abs_pow = ref_seg.power[0:meta_dict['n_bins']/2+1] * \
                         (2.0 * dt_seg / np.float(meta_dict['n_bins']))
 
             else:
-                absrms_pow = raw_to_absrms(ref_seg.power[0:meta_dict['n_bins'] \
-                        / 2 + 1], ref_seg.mean_rate, meta_dict['n_bins'],
-                        dt_seg, noisy=True)
+                if meta_dict['filter']:
+                    abs_pow = raw_to_absrms(ref_seg.filt_qpo_power,
+                            ref_seg.mean_rate, meta_dict['n_bins'], dt_seg,
+                            noisy=False)
+                else:
+                    abs_pow = raw_to_absrms(ref_seg.power[0:meta_dict['n_bins']/2+1],
+                            ref_seg.mean_rate, meta_dict['n_bins'], dt_seg,
+                            noisy=True)
 
-            var, rms = var_and_rms(absrms_pow, df_seg)
+            ref_seg.var, ref_seg.rms = var_and_rms(abs_pow, df_seg)
 
             ######################################################
             ## Only keep and use segments where the variance > 0.
             ######################################################
 
-            # if var >= 0.0:
+            if ref_seg.var >= 0.0:
 
-            dt_whole = np.append(dt_whole, dt_seg)
-            df_whole = np.append(df_whole, df_seg)
-            # print("%.3f\t%.1f\t%.1f" % \
-            #       (np.sum(ci_seg.mean_rate[15:27]) / \
-            #        np.sum(ci_seg.mean_rate[2:7]),
-            #       np.sum(ci_seg.mean_rate[15:27]),
-            #       np.sum(ci_seg.mean_rate[2:7])))
+                dt_whole = np.append(dt_whole, dt_seg)
+                df_whole = np.append(df_whole, df_seg)
 
-            ## Append segment to arrays
-            cs_whole.total = np.dstack((cs_whole.total, cs_seg.total))
-            cs_whole.fund = np.dstack((cs_whole.fund, cs_seg.fund))
-            cs_whole.harm = np.dstack((cs_whole.harm, cs_seg.harm))
-            ci_whole.mean_rate_array = np.hstack((ci_whole.mean_rate_array,
-                    np.reshape(ci_seg.mean_rate, (meta_dict['detchans'],
-                    1))))
-            ref_whole.power_array = np.hstack((ref_whole.power_array,
-                    np.reshape(ref_seg.power, (meta_dict['n_bins'], 1))))
-            ref_whole.mean_rate_array = np.append(ref_whole.mean_rate_array,
-                    ref_seg.mean_rate)
-            ref_whole.var_array = np.append(ref_whole.var_array, var)
+                abs_fund_pow = raw_to_absrms(ref_seg.fund_power,
+                                        ref_seg.mean_rate, meta_dict['n_bins'],
+                                        dt_seg, noisy=False)
+                ref_seg.fund_var, ref_seg.fund_rms = var_and_rms(abs_fund_pow,
+                                                                 df_seg)
+                abs_harm_pow = raw_to_absrms(ref_seg.harm_power,
+                                             ref_seg.mean_rate,
+                                             meta_dict['n_bins'],
+                                             dt_seg, noisy=False)
+                ref_seg.harm_var, ref_seg.harm_rms = var_and_rms(abs_harm_pow,
+                                                                 df_seg)
+                ## Append segment to arrays
+                cs_whole.total = np.dstack((cs_whole.total, cs_seg.total))
+                cs_whole.fund = np.dstack((cs_whole.fund, cs_seg.fund))
+                cs_whole.harm = np.dstack((cs_whole.harm, cs_seg.harm))
+                ci_whole.mean_rate_array = np.hstack((ci_whole.mean_rate_array,
+                        np.reshape(ci_seg.mean_rate, (meta_dict['detchans'],
+                        1))))
+                ref_whole.power_array = np.hstack((ref_whole.power_array,
+                        np.reshape(ref_seg.power, (meta_dict['n_bins'], 1))))
+                ref_whole.mean_rate_array = np.append(ref_whole.mean_rate_array,
+                        ref_seg.mean_rate)
+                ref_whole.var_array = np.append(ref_whole.var_array,
+                                                ref_seg.var)
+                ref_whole.fund_var_array = np.append(ref_whole.fund_var_array,
+                                                ref_seg.fund_var)
+                ref_whole.harm_var_array = np.append(ref_whole.harm_var_array,
+                                                     ref_seg.harm_var)
 
-            ## Sum across segments -- arrays, so it adds by index
-            exposure += (seg_end_time - start_time)
-            n_seg += 1
-            ci_whole.mean_rate += ci_seg.mean_rate
-            ref_whole.mean_rate += ref_seg.mean_rate
-            ci_whole.power += ci_seg.power
-            ref_whole.power += ref_seg.power
-            ref_whole.filt_qpo_power += ref_seg.filt_qpo_power
-            f_lag_whole.cross += f_lag_seg.cross
-            f_lag_whole.pow1 += f_lag_seg.pow1
-            f_lag_whole.pow2 += f_lag_seg.pow2
+                ## Sum across segments -- arrays, so it adds by index
+                exposure += (seg_end_time - start_time)
+                n_seg += 1
+                ci_whole.mean_rate += ci_seg.mean_rate
+                ref_whole.mean_rate += ref_seg.mean_rate
+                ci_whole.power += ci_seg.power
+                ci_whole.filt_qpo_power += ci_seg.filt_qpo_power
+                ci_whole.fund_power += ci_seg.fund_power
+                ci_whole.harm_power += ci_seg.harm_power
+                ref_whole.power += ref_seg.power
+                ref_whole.filt_qpo_power += ref_seg.filt_qpo_power
+                ref_whole.fund_power += ref_seg.fund_power
+                ref_whole.harm_power += ref_seg.harm_power
+                cs_whole.both += cs_seg.both
+                f_lag_whole.cross += f_lag_seg.cross
+                f_lag_whole.pow1 += f_lag_seg.pow1
+                f_lag_whole.pow2 += f_lag_seg.pow2
 
             if n_seg % print_iterator == 0:
                 print("\t", n_seg)
 
             if test is True and n_seg == 1:  # For testing
                 break
-            # else:
-            #     print("Neg var")
-            #     print(var)
-            #     print("Start: %.15f" % start_time)
-            #     print("End: %.15f" % seg_end_time)
-            #     print("dt seg: %.15f" % dt_seg)
-            #     # print(" ! %.3f\t%.1f\t%.1f !" % \
-            #     #       (np.sum(ci_seg.mean_rate[15:27]) / \
-            #     #        np.sum(ci_seg.mean_rate[2:7]),
-            #     #       np.sum(ci_seg.mean_rate[15:27]),
-            #     #       np.sum(ci_seg.mean_rate[2:7])))
 
             start_time = seg_end_time
             seg_end_time += meta_dict['n_seconds']
 
-        ## This next bit deals with gappy data
+        ## This next bit deals with slightly gappy data
         else:
             start_time = max(all_time_ci[0], all_time_ref[0])
             seg_end_time = start_time + meta_dict['n_seconds']
@@ -1436,12 +1332,12 @@ def fits_in(in_file, meta_dict, test=False):
     cs_whole.fund = cs_whole.fund[:,:,1:]
     cs_whole.harm = cs_whole.harm[:,:,1:]
     ref_whole.var_array = ref_whole.var_array[1:]
+    ref_whole.fund_var_array = ref_whole.fund_var_array[1:]
+    ref_whole.harm_var_array = ref_whole.harm_var_array[1:]
     ci_whole.power_array = ci_whole.power_array[:,:,1:]
     ci_whole.mean_rate_array = ci_whole.mean_rate_array[:,1:]
     ref_whole.power_array = ref_whole.power_array[:,1:]
     ref_whole.mean_rate_array = ref_whole.mean_rate_array[1:]
-    # print(dt_whole)
-    # print(df_whole)
 
     return cs_whole, ci_whole, ref_whole, f_lag_whole, n_seg, dt_whole, \
            df_whole, exposure
@@ -1483,178 +1379,6 @@ def get_background(bkgd_file="evt_bkgd_rebinned.pha"):
     rate = counts / exposure
 
     return rate
-
-#
-# ################################################################################
-# def compute_coherence(in_table):
-#     """
-#     Compute the raw coherence of the cross spectrum. Coherence equation from
-#     Uttley et al 2014 eqn 11, bias term equation from footnote 4 on same page.
-#
-#     Parameters
-#     ----------
-#     in_table : astropy Table
-#
-#     Returns
-#     -------
-#     coherence : np.array of floats
-#         The raw coherence of the cross spectrum. (Uttley et al 2014, eqn 11)
-#         Size = n_bins/2+1 (if avg over energy) or detchans (if avg over freq).
-#
-#     """
-#
-#     ## Reshaping (broadcasting) the ref to have same size as ci
-#     # if np.shape(power_ref) != np.shape(power_ci):
-#     #     power_ref = np.resize(np.repeat(power_ref, np.shape(power_ci)[1]),
-#     #             np.shape(power_ci))
-#
-#     powers = in_table['POWER_1'] * in_table['POWER_2']
-#     temp_2 = in_table['CROSS'] * np.conj(in_table['CROSS'])
-#     with np.errstate(all='ignore'):
-#         coherence = np.where(powers != 0, temp_2 / powers, 0)
-#     # print "Coherence shape:", np.shape(coherence)
-#     # print coherence
-#     return np.real(coherence)
-#
-#
-# ################################################################################
-# def get_phase_err(in_table, n_range=1):
-#     """
-#     Compute the error on the complex phase (in radians) via the coherence.
-#     Power should NOT be Poisson-noise-subtracted or normalized.
-#
-#     Parameters
-#     ----------
-#     in_table : Astropy table
-#
-#
-#     n_range : int or np.array of ints
-#         Number of frequency bins averaged over per new frequency bin for lags.
-#         For energy lags, this is the number of frequency bins averaged over. For
-#         frequency lags not re-binned in frequency, this is 1. Same as K in
-#         equations in Section 2 of Uttley et al. 2014.
-#
-#     Returns
-#     -------
-#     phase_err : np.array of floats
-#         1-D array of the error on the phase of the lag.
-#
-#     """
-#
-#     # coherence = np.where(a != 0, cs_avg * np.conj(cs_avg) / a, 0)
-#     coherence = compute_coherence(in_table)
-#
-#     with np.errstate(all='ignore'):
-#         phase_err = np.sqrt(np.where(coherence != 0, (1 - coherence) /
-#                 (2 * coherence * n_range * in_table.meta['SEGMENTS']), 0))
-#
-#     return phase_err
-#
-#
-# ################################################################################
-# def phase_to_tlags(phase, f):
-#     """
-#     Convert a complex-plane cross-spectrum phase (in radians) to a time lag
-#     (in seconds).
-#
-#     Parameters
-#     ----------
-#     phase : float or np.array of floats
-#         1-D array of the phase of the lag, in radians.
-#
-#     f : float or np.array of floats
-#         1-D array of the Fourier frequency of the cross-spectrum, in Hz.
-#
-#     Returns
-#     -------
-#     tlags : float or np.array of floats
-#         1-D array of the time of the lag, in seconds.
-#
-#     """
-#
-#     if np.shape(phase) != np.shape(f):
-#         ## Reshaping (broadcasting) f to have same size as phase
-#         f = np.resize(np.repeat(f, np.shape(phase)[1]), np.shape(phase))
-#
-#     assert np.shape(phase) == np.shape(f), "ERROR: Phase array must have same "\
-#             "dimensions as frequency array."
-#
-#     with np.errstate(all='ignore'):
-#         tlags = np.where(f != 0, phase / (2.0 * np.pi * f), 0)
-#
-#     return tlags
-#
-#
-# ################################################################################
-# def calc_freq_lags(in_table, ccf_out_file):
-#     """
-#     Calculating the frequency lags over an energy range.
-#     See steps in Uttley et al 2014 section 2.2.1.
-#
-#     Parameters
-#     ----------
-#
-#
-#     """
-#     print(np.shape(in_table['CROSS']))
-#     fake_err = np.ones(len(in_table['CROSS']))
-#     ## Re-bin the PSDs and cross-spectrum in frequency
-#     ## Uttley et al 2014 section 2.2.1 step 4
-#     rb_freq_cs, rb_cs, temp1, bin_min, bin_max = rebin(in_table['FREQUENCY'],
-#                                       in_table['CROSS'], fake_err, 1.04)
-#     rb_freq_pow1, rb_pow_1, temp1, bin_min, bin_max = rebin(in_table['FREQUENCY'],
-#                                              in_table['POWER_1'], fake_err,
-#                                              1.04)
-#     rb_freq_pow2, rb_pow_2, temp1, bin_min, bin_max = rebin(in_table['FREQUENCY'],
-#                                              in_table['POWER_2'],fake_err, 1.04)
-#
-#     assert rb_freq_cs.all() == rb_freq_pow1.all(), "Something went wrong in re-binning " \
-#                                         "for frequency lags."
-#     # assert rb_freq_cs == rb_freq_powref, "Something went wrong in re-binning " \
-#     #                                      "for frequency lags."
-#     # assert bin_cs == bin_powci, "Something went wrong in re-binning for " \
-#     #                             "frequency lags."
-#     # assert bin_cs == bin_powref, "Something went wrong in re-binning for " \
-#     #                              "frequency lags."
-#
-#     binning = bin_max - bin_min
-#     rb_table = Table()
-#     rb_table.meta = in_table.meta
-#     rb_table['FREQUENCY'] = Column(rb_freq_cs)
-#     rb_table['CROSS'] = Column(rb_cs)
-#     rb_table['POWER_1'] = Column(rb_pow_1)
-#     rb_table['POWER_2'] = Column(rb_pow_2)
-#
-#     ############################################
-#     ## Getting lag and error for frequency lags
-#     ############################################
-#
-#     ## Negative sign is so that a positive lag is a hard energy lag
-#
-#     freq_lags = Table()
-#     freq_lags.meta = in_table.meta
-#     freq_lags['FREQUENCY'] = Column(rb_table['FREQUENCY'], unit='Hz',
-#                                     description='Fourier frequency')
-#     freq_lags['PHASE_LAG'] = Column(-np.arctan2(rb_table['CROSS'].imag,
-#                                                 rb_table['CROSS'].real),
-#                                     unit='rad', description='Phase lag')
-#     freq_lags['PHASE_ERR'] = Column(get_phase_err(rb_table, binning),
-#                                     unit='rad',description='Error on phase lag')
-#     freq_lags['TIME_LAG'] = Column(phase_to_tlags(freq_lags['PHASE_LAG'],
-#                                                   rb_table['FREQUENCY']),
-#                                    unit='s', description='Time lag')
-#     freq_lags['TIME_ERR'] = Column(phase_to_tlags(freq_lags['PHASE_ERR'],
-#                                                   rb_table['FREQUENCY']),
-#                                    unit='s', description='Error on time lag')
-#
-#     out_file = ccf_out_file.replace("cross_correlation/out_ccf",
-#             "lag_spectra/out_lags")
-#     out_file = out_file.replace(".", "_lag-freq.")
-#     out_dir = out_file[0:out_file.rfind("/")+1]
-#     subprocess.call(['mkdir', '-p', out_dir])
-#     print("Lag-freq written to: %s" % out_file)
-#
-#     freq_lags.write(out_file, format='fits')
 
 
 ################################################################################
@@ -1746,114 +1470,13 @@ def save_for_lags(out_file, in_file, meta_dict, cs_avg, ci, ref, f_lag):
 
 
 ################################################################################
-def tophat_filt(cs_avg, ref, ci, freq, meta_dict, lo_freq, hi_freq):
-    """
-    Apply a tophat filter to the averaged cross-spectrum per energy channel (in
-    frequency space). Any cross spectrum amplitudes above or below pulse_freq
-    get zeroed out.
-
-    Parameters
-    ----------
-    cs_avg : np.array of complex numbers
-        2-D array of the cross spectrum, in frequency space, to be filtered.
-        Size = (n_bins, detchans).
-
-    ref : ccf_lc.Lightcurve object
-        The reference band light curve. Must already have power assigned.
-
-    ci : ccf_lc.Lightcurve object
-        The channel of interest light curve. Must already have power assigned.
-
-    freq : np.array of floats
-        1-D array of the positive Fourier frequencies, including Nyquist.
-        Size = (n_bins/2).
-
-    meta_dict : dict
-        Dictionary of necessary meta-parameters for data analysis.
-
-    lo_freq : float
-        The lower frequency bound for filtering the cross spectrum, in Hz. [0.0]
-
-    hi_freq : float
-        The upper frequency bound for filtering the cross spectrum, in Hz. [0.0]
-
-    Returns
-    -------
-    full_filt_cs_avg : np.array of complex numbers
-        2-D array of the cross spectrum, zeroed out at non-filtered frequencies.
-        Size = (n_bins, detchans)
-
-    signal_ci_pow : np.array of floats
-        2-D array of the filtered power spectrum in the channels of interest.
-        Size = (n_bins, detchans)
-
-    signal_ref_pow : np.array of floats
-        1-D array of the filtered power spectrum in the reference band.
-        Size = (n_bins)
-
-    """
-
-    ## Get the indices of the beginning and end of the signal
-    min_freq_mask = freq < lo_freq  # we want the last 'True' element
-    max_freq_mask = freq > hi_freq  # we want the first 'True' element
-    j_min = list(min_freq_mask).index(False)
-    j_max = list(max_freq_mask).index(True)
-
-    ## Make zeroed arrays to replace with
-    zero_front = np.zeros((j_min, meta_dict['detchans']), dtype=np.complex128)
-    zero_end = np.zeros((meta_dict['n_bins']/2 - j_max, meta_dict['detchans']),
-            dtype=np.complex128)
-
-    ## Concatenate the arrays together
-    filt_cs_avg = np.concatenate((zero_front,
-            cs_avg[j_min:j_max, :], zero_end), axis=0)
-    print(np.shape(filt_cs_avg))
-    ## Want to also keep negative frequencies
-    full_filt_cs_avg = np.vstack((filt_cs_avg, filt_cs_avg[::-1,:]))
-    print(np.shape(full_filt_cs_avg))
-    ## Check that the original array is the same shape as the filtered one
-    assert np.shape(cs_avg) == np.shape(full_filt_cs_avg), \
-            "ERROR: Frequency-filtered cross spectrum does not have the same "\
-            "size as the original cross spectrum. Something went wrong."
-
-    ## Extract only the signal frequencies of the mean powers
-    signal_ci_pow = np.vstack((ci.power[j_min:j_max, :],
-                               ci.power[meta_dict['n_bins']-\
-                                        j_max:meta_dict['n_bins']-j_min, :]))
-    signal_ref_pow = np.hstack((ref.power[j_min:j_max],
-                                ref.power[meta_dict['n_bins']-\
-                                          j_max:meta_dict['n_bins']-j_min]))
-
-    return full_filt_cs_avg, signal_ci_pow, signal_ref_pow
-
-
-################################################################################
-def tie_harmonic_centroid(model):
-    """
-    Used in optimal filtering if filtering the harmonic as well.
-
-    How to use:
-    tied_parameters = {'x_0_1': tie_harmonic_centroid}
-    then within model definition, use tied=tied_parameters
-
-    Parameters
-    ----------
-    model : an astropy model
-    Returns
-    -------
-    x_0_1 : the centroid frequency of the harmonic.
-    """
-    x_0_1 = 2. * model.x_0_0
-    return x_0_1
-
-
-################################################################################
 def phase_angle(complex_number):
     return np.arctan2(complex_number.imag, complex_number.real)
 
 
 ################################################################################
 def vecrotate(theta, complex_number):
+    """ Theta needs to be in radians. """
     # print("Theta:", theta)
     # print("Before rotation, 4th segment")
     # print("Abs:", np.abs(complex_number[3]))
@@ -1874,6 +1497,7 @@ def vecrotate(theta, complex_number):
 
 ################################################################################
 def cs_to_ccf_w_err(cs_array, meta_dict, ref):
+# def cs_to_ccf_w_err(cs_array, cs_array_h, meta_dict, ref):
     """
     Take the iFFT of the cross spectrum to get the cross-correlation function,
     and compute the error on the cross-correlation function. Compute the
@@ -1890,7 +1514,7 @@ def cs_to_ccf_w_err(cs_array, meta_dict, ref):
 
     Parameters
     ----------
-    cs_avg : np.array of complex numbers
+    cs_array : np.array of complex numbers
         3-D array of the cross-spectrum. Size = (n_bins, detchans, n_seg).
 
     meta_dict : dict
@@ -1909,18 +1533,35 @@ def cs_to_ccf_w_err(cs_array, meta_dict, ref):
 
     assert np.shape(cs_array) == (meta_dict['n_bins'], meta_dict['detchans'],
             meta_dict['n_seg'])
-    if len(ref.power) == meta_dict['n_bins']:
-        nyq_index = meta_dict['n_bins'] / 2
-        ref.pos_power = ref.power[0:nyq_index + 1]
 
     ## Take the IFFT of the cross spectrum to get the CCF
     ccf_array = fftpack.ifft(cs_array, axis=0).real
+    # ccf_array_h = fftpack.ifft(cs_array_h, axis=0).real
+    #
+    print(np.shape(ccf_array))
+
+    # print("WARNING: Combining harmonic and fundamental with time-domain "
+    #       "offset (6 bins).")
+    # shifted_ccf_array_h = np.vstack((ccf_array_h[-10:,:,:],
+    #                                  ccf_array_h[0:10,:,:],
+    #                                  ccf_array_h[10:-10,:,:]))
+    # shifted_ccf_array_h = np.vstack((ccf_array_h[10:,:,:],
+    #                                  ccf_array_h[0:10,:,:]))
+    # # print(shifted_ccf_array_h)
+    # print(np.shape(shifted_ccf_array_h))
+
+    ccf_array *= (2.0 / np.float(meta_dict['n_bins']))
+
+    # shifted_ccf_array_h *= (2.0 / np.float(meta_dict['n_bins']))
+    # ccf_array = ccf_array + shifted_ccf_array_h
 
     ## Average across segments and normalize by rms of averaged reference band
-    ## absolute-rms-normalized power spectrum
+    ## absolute-rms-normalized power spectrum of just the signal.
+    ## For Type B, fine to use whole thing. Otherwise, use rms of filter.
     ccf_avg = np.mean(ccf_array, axis=-1)
-    ccf_avg *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
-    ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / np.sqrt(ref.var_array))
+    # ccf_avg *= (2.0 / np.float(meta_dict['n_bins']) / ref.rms)
+    # ccf_array *= (2.0 / np.float(meta_dict['n_bins']) / np.sqrt(ref.var_array))
+
 
     ## Compute the standard error on each ccf bin from the segment-to-segment
     ## variations.
@@ -2105,21 +1746,35 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
         cs_total.total = np.dstack((cs_total.total, cs_whole.total))
         cs_total.fund = np.dstack((cs_total.fund, cs_whole.fund))
         cs_total.harm = np.dstack((cs_total.harm, cs_whole.harm))
+        cs_total.both += cs_whole.both
         ref_total.var_array = np.append(ref_total.var_array,
-                ref_whole.var_array)
+                                        ref_whole.var_array)
+        ref_total.fund_var_array = np.append(ref_total.fund_var_array,
+                                             ref_whole.fund_var_array)
+        ref_total.harm_var_array = np.append(ref_total.harm_var_array,
+                                             ref_whole.harm_var_array)
         ref_total.power_array = np.hstack((ref_total.power_array,
                         ref_whole.power_array))
         ref_total.mean_rate_array = np.append(ref_total.mean_rate_array,
                         ref_whole.mean_rate_array)
         ci_total.mean_rate_array = np.hstack((ci_total.mean_rate_array,
                         ci_whole.mean_rate_array))
+        ref_total.model_fund_power = ref_whole.model_fund_power
+        ref_total.model_harm_power = ref_whole.model_harm_power
+        ci_total.model_fund_power4 = ci_whole.model_fund_power4
+        ci_total.model_harm_power4 = ci_whole.model_harm_power4
         dt_total = np.append(dt_total, dt_whole)
         df_total = np.append(df_total, df_whole)
         ci_total.mean_rate += ci_whole.mean_rate
         ref_total.mean_rate += ref_whole.mean_rate
         ci_total.power += ci_whole.power
+        ci_total.filt_qpo_power += ci_whole.filt_qpo_power
+        ci_total.fund_power += ci_whole.fund_power
+        ci_total.harm_power += ci_whole.harm_power
         ref_total.power += ref_whole.power
         ref_total.filt_qpo_power += ref_whole.filt_qpo_power
+        ref_total.fund_power += ref_whole.fund_power
+        ref_total.harm_power += ref_whole.harm_power
         f_lag_total.cross += f_lag_whole.cross
         f_lag_total.pow1 += f_lag_whole.pow1
         f_lag_total.pow2 += f_lag_whole.pow2
@@ -2144,9 +1799,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ref_total.power_array = ref_total.power_array[:,1:]
     ref_total.mean_rate_array = ref_total.mean_rate_array[1:]
     ref_total.var_array = ref_total.var_array[1:]
-    # print("Mean of var_array:", np.mean(ref_total.var_array))
-    # print("Sqrt of var_array:", np.sqrt(ref_total.var_array))
-    # print("Mean of sqrt of var_array:", np.mean(np.sqrt(ref_total.var_array)))
+    ref_total.fund_var_array = ref_total.fund_var_array[1:]
+    ref_total.harm_var_array = ref_total.harm_var_array[1:]
 
     ######################################
     ## Turn sums over segments into means
@@ -2154,10 +1808,16 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
 
     ci_total.mean_rate /= np.float(meta_dict['n_seg'])
     ci_total.power /= np.float(meta_dict['n_seg'])
+    ci_total.filt_qpo_power /= np.float(meta_dict['n_seg'])
+    ci_total.fund_power /= np.float(meta_dict['n_seg'])
+    ci_total.harm_power /= np.float(meta_dict['n_seg'])
     ref_total.power /= np.float(meta_dict['n_seg'])
     ref_total.filt_qpo_power /= np.float(meta_dict['n_seg'])
+    ref_total.fund_power /= np.float(meta_dict['n_seg'])
+    ref_total.harm_power /= np.float(meta_dict['n_seg'])
     ref_total.mean_rate /= np.float(meta_dict['n_seg'])
     cs_avg_total = np.mean(cs_total.total, axis=-1)
+    cs_total.both /= np.float(meta_dict['n_seg'])
     f_lag_total.cross /= np.float(meta_dict['n_seg'])
     f_lag_total.pow1 /= np.float(meta_dict['n_seg'])
     f_lag_total.pow2 /= np.float(meta_dict['n_seg'])
@@ -2170,6 +1830,7 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     f_lag_total.cross = f_lag_total.cross[0:meta_dict['n_bins']/2+1]
     f_lag_total.pow1 = f_lag_total.pow1[0:meta_dict['n_bins']/2+1]
     f_lag_total.pow2 = f_lag_total.pow2[0:meta_dict['n_bins']/2+1]
+    cs_total.both = cs_total.both[0:meta_dict['n_bins']/2+1]
 
     # freq = fftpack.fftfreq(meta_dict['n_bins'], d=np.mean(meta_dict['dt']))
     # freq = np.abs(freq[0:meta_dict['n_bins']/2+1])
@@ -2179,27 +1840,46 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     ## Compute the variance and rms of the absolute-rms-normalized reference
     ## band power spectrum
     if meta_dict['filter']:
-        absrms_ref_pow = raw_to_absrms(ref_total.filt_qpo_power,
+        abs_ref_pow = raw_to_absrms(ref_total.filt_qpo_power[0:meta_dict['n_bins']/2+1],
                                        ref_total.mean_rate, meta_dict['n_bins'],
                                        np.mean(meta_dict['dt']), noisy=False)
+        abs_ref_pow_fund = raw_to_absrms(ref_total.fund_power[0:meta_dict['n_bins']/2+1],
+                                       ref_total.mean_rate, meta_dict['n_bins'],
+                                       np.mean(meta_dict['dt']), noisy=False)
+        abs_ref_pow_harm = raw_to_absrms(ref_total.harm_power[0:meta_dict['n_bins']/2+1],
+                                       ref_total.mean_rate, meta_dict['n_bins'],
+                                       np.mean(meta_dict['dt']), noisy=False)
+
+        # ref_total.model_fund_power = raw_to_absrms(ref_total.model_fund_power,
+        #                                            ref_total.mean_rate,
+        #                                            meta_dict['n_bins'],
+        #                                            np.mean(meta_dict['dt']),
+        #                                            noisy=False)
+        # ref_total.model_harm_power = raw_to_absrms(ref_total.model_harm_power,
+        #                                            ref_total.mean_rate,
+        #                                            meta_dict['n_bins'],
+        #                                            np.mean(meta_dict['dt']),
+        #                                            noisy=False)
     else:
-        absrms_ref_pow = raw_to_absrms(ref_total.pos_power,
+        abs_ref_pow = raw_to_absrms(ref_total.pos_power,
                                        ref_total.mean_rate, meta_dict['n_bins'],
                                        np.mean(meta_dict['dt']), noisy=True)
 
-
-    ref_total.var, ref_total.rms = var_and_rms(absrms_ref_pow,
+    ref_total.var, ref_total.rms = var_and_rms(abs_ref_pow,
                 np.mean(meta_dict['df']))
+    ref_total.fund_var, ref_total.fund_rms = var_and_rms(abs_ref_pow_fund,
+                                               np.mean(meta_dict['df']))
+    ref_total.harm_var, ref_total.harm_rms = var_and_rms(abs_ref_pow_harm,
+                                               np.mean(meta_dict['df']))
+
     print("Ref variance:", ref_total.var)
     print("Ref rms:", ref_total.rms)
-
-    #############################################################
-    ## Print the cross spectrum to a file, for plotting/checking
-    #############################################################
-
-    # cs_out = np.column_stack((fftpack.fftfreq(meta_dict['n_bins'],
-    #         d=np.mean(meta_dict['dt'])), avg_cross_spec))
-    # np.savetxt('cs_avg.dat', cs_out)
+    print("Fund variance:", ref_total.fund_var)
+    print("Fund rms:", ref_total.fund_rms)
+    print("Harm variance:", ref_total.harm_var)
+    print("Harm rms:", ref_total.harm_rms)
+    ref_total.model_fund_power[ref_total.model_fund_power == 0.0] = 1e-8
+    ref_total.model_harm_power[ref_total.model_harm_power == 0.0] = 1e-8
 
     #####################################################################
     ## Read in the background count rate from a background spectrum, and
@@ -2213,8 +1893,8 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
 
     ci_total.mean_rate -= bkgd_rate
 
-    ## Need to use a background from ref PCU for the reference band...
-    # ref_total.mean_rate -= np.sum(bkgd_rate[2:26])
+    ## Generally, assume background in reference band is negligible
+    ## Otherwise, need to use a background from ref PCU over relevant channels
 
     ####################################################################
     ## Save cross spectra and power spectra for computing lags later in
@@ -2224,45 +1904,86 @@ def main(input_file, out_file, ref_band="", bkgd_file="./evt_bkgd_rebinned.pha",
     save_for_lags(out_file, input_file, meta_dict, cs_avg_total, ci_total,
                   ref_total, f_lag_total)
 
-
     ##############################################
     ## Compute ccf from cs, and compute error
     ##############################################
 
     if meta_dict['filter']:
+        # print("WARNING: normalizing cross spectrum fund and harm by ref "
+        # "amplitudes of fund and harm, respectively.")
+        # print(np.where(cs_total.fund<=0))
+        # cs_total.fund /= np.sqrt(ref_total.model_fund_power[:,np.newaxis,np.newaxis])
+        # cs_total.harm /= np.sqrt(ref_total.model_harm_power[:,np.newaxis,np.newaxis])
         # cs_h_rotated = vecrotate(1.2883218366, cs_total.harm)
+        # print("WARNING: harmonic phase offset hardwired to "
+        #       "1.2883218366 radians.")
         # cs_combined = cs_total.fund + cs_h_rotated
-        print("WARNING: just adding them to test on Type B!")
+
+        print("WARNING: combining harmonic and fundamental without "
+              "phase offset!!!")
         cs_combined = cs_total.fund + cs_total.harm
-        # print(np.shape(cs_combined))
+
+        freq = fftpack.fftfreq(meta_dict['n_bins'], d=np.mean(meta_dict['dt']))
+        out_table = Table()
+        out_table.add_column(Column(data=freq, name='FREQUENCY', unit='Hz'))
+        out_table.add_column(Column(data=cs_total.fund, name='CS_FUND',
+                                    description="Cross spectrum, filtered for the fundamental"))
+        out_table.add_column(Column(data=cs_total.harm, name='CS_HARM',
+                                    description="Cross spectrm, filtered for the harmonic"))
+        out_table.add_column(Column(data=ci_total.filt_qpo_power, name='FILT_POW_CI',
+                                    description="Power spectrum of CI, filtered for both the qpo and harmonic"))
+        # out_table.add_column(Column(data=ci_total.fund_power, name='F_POW_CI',
+        #                             description="Power spectrum of CI, filtered for fundamental"))
+        # out_table.add_column(Column(data=ci_total.harm_power, name='H_POW_CI',
+        #                             description="Power spectrum of CI, filtered for harmonic"))
+        out_table.add_column(Column(data=ref_total.filt_qpo_power, name='FILT_POW_REF',
+                                    description="Power spectrum of ref, filtered for both the qpo and harmonic"))
+        out_table.add_column(Column(data=ref_total.model_fund_power, name='F_MODEL_POW_REF',
+                                    description="Model power spectrum of ref, fundamental"))
+        out_table.add_column(Column(data=ref_total.model_harm_power, name='H_MODEL_POW_REF',
+                                    description="Model power spectrum of ref, harmonic"))
+        out_table.add_column(Column(data=ci_total.model_fund_power4, name='F_MODEL_POW_CI4',
+                                    description="Model power spectrum of ci chan 4, fundamental"))
+        out_table.add_column(Column(data=ci_total.model_harm_power4, name='H_MODEL_POW_CI4',
+                                    description="Model power spectrum of ci chan 4, harmonic"))
+        out_table.meta['TYPE'] = "Cross spectra and power spectra, saved for fiddling"
+        out_table.meta['DATE'] = str(datetime.now())
+        out_table.meta['EVTLIST'] = in_file
+        out_table.meta['DT'] = np.mean(meta_dict['dt'])
+        out_table.meta['DF'] = np.mean(meta_dict['df'])
+        out_table.meta['N_BINS'] = meta_dict['n_bins']
+        out_table.meta['SEGMENTS'] = meta_dict['n_seg']
+        out_table.meta['SEC_SEG'] = meta_dict['n_seconds']
+        out_table.meta['EXPOSURE'] = meta_dict['exposure']
+        out_table.meta['DETCHANS'] = meta_dict['detchans']
+        out_table.meta['RATE_CI'] = str(ci_total.mean_rate.tolist())
+        out_table.meta['RATE_REF'] = ref_total.mean_rate
+        out_table.meta['RMS_REF'] = float(ref_total.rms)
+        out_table.meta['F_RMSREF'] = float(ref_total.fund_rms)
+        out_table.meta['H_RMSREF'] = float(ref_total.harm_rms)
+        out_table.meta['NYQUIST'] = meta_dict['nyquist']
+        out_table.meta['ADJUST'] = "%s" % str(meta_dict['adjust_seg'])
+        out_table.write("./GX339-4HzCQPO_crossspectra.fits", overwrite=True, format='fits')
+
         ccf_avg, ccf_error = cs_to_ccf_w_err(cs_combined, meta_dict,
                                              ref_total)
+        avg_comb_cs = np.mean(cs_combined, axis=-1)
+
+        save_for_lags(out_file, input_file, meta_dict, avg_comb_cs, ci_total,
+                      ref_total, f_lag_total)
+
     else:
         ccf_avg, ccf_error = cs_to_ccf_w_err(cs_total.total, meta_dict,
                                              ref_total)
-
-    print("Exposure_time = %.3f seconds" % meta_dict['exposure'])
-    print("Total number of segments:", meta_dict['n_seg'])
-    print("Mean rate for all of ci:", np.sum(ci_total.mean_rate))
-    print("Mean rate for ci chan 6:", ci_total.mean_rate[6])
-    print("Mean rate for ci chan 15:", ci_total.mean_rate[15])
-    print("Mean rate for ref:", ref_total.mean_rate)
 
     ##########
     ## Output
     ##########
 
-    # print(avg_cross_spec[529:532,3])
-    print(ccf_avg[0:4,3])
-
     if len(data_files) == 1:
         file_description = "Cross-correlation function of one observation"
     else:
         file_description = "Cross-correlation function of multiple observations"
-
-    # print(ccf_avg[0,0])
-    # print(ccf_avg[0,2])
-    # print(ccf_avg[0,15])
 
     # if not test and adjusting and len(data_files) == 9:
     #     assert round(ccf_avg[0,0], 12) == 0.117937948428
